@@ -38,13 +38,13 @@
   - [x] `entities`（Match / Team / Player / PlayerPhoto / RosterSelection）
   - [x] `facts`（MatchFact / MatchFactPayload / PlayFact / ControlFact ほか）
 - [x] P3 validation エラー型（4 enum・37 ケース + DomainValidationIssue + ワイヤ形式 — ADR 0002。2026-07-12）
-- [ ] P4 projection（**最難関**。ADR 0001「保存すべきセマンティクス」9 項目を常に参照）
-  - [ ] `time_segment`
-  - [ ] `segment_resolver`（最重要・最繊細。baseline rolling forward / stoppage carve / 半開区間）
-  - [ ] `timeline`
-  - [ ] `summary`
-  - [ ] `score_progression`
-  - [ ] `live_match`
+- [x] P4 projection（**最難関**。ADR 0001「保存すべきセマンティクス」9 項目を常に参照。2026-07-12）
+  - [x] `time_segment`
+  - [x] `segment_resolver`（最重要・最繊細。baseline rolling forward / stoppage carve / 半開区間）
+  - [x] `timeline`
+  - [x] `summary`
+  - [x] `score_progression`
+  - [x] `live_match`
 - [ ] P5 validators（fact / fact_log / match_write / configuration / match の 5 種）
 - [ ] P6 `sample_dto` モジュール（SAMPLE_DTO_V2 準拠の serde 型 + converter。依存は domain への一方通行厳守 — ADR 0003）
 - [ ] P7 オラクル dump ツール（HandballRecorder の `feat/rust-domain-core` ブランチ。main へ merge しない — 上記「オラクル側の運用」）+ `tests/golden/` 整備 — ADR 0003
@@ -57,6 +57,6 @@ P2〜P5 の順序は Swift のモジュール依存 DAG（Identifiers → Clock 
 
 - 移植元テスト: `../HandballRecorder/Packages/RecorderDomain/Tests/RecorderDomainTests/`（Swift Testing 144 テスト / 約 2,507 行）
 - フィクスチャヘルパーは Rust 側 `tests` 内の `mod fixtures` に集約する
-- 移植したテスト数はパリティ完走判定（P8）の分子になるので、モジュール完了時にここへ累計を記録する: **現在 7 / 140**
+- 移植したテスト数はパリティ完走判定（P8）の分子になるので、モジュール完了時にここへ累計を記録する: **現在 73 / 140**
+  （RecorderDomainTests 8 / SegmentResolverAdvanced 21 / TimelineProjection 12 / SummaryProjection 15 / ScoreProgressionProjection 7 / LiveMatchProjection 10）
 - 分母の補正（144 → 140）: `DomainValidationMessageTests.swift`（4 件）は文言レイヤのテストで移植対象外（ADR 0002 — 文言はシェル所有）。lookup key `(scope, code)` の安定性は Rust 新設の `tests/validation_wire_format_tests.rs`（6 件。分子には数えない）が担保する
-- 繰り越し: `RecorderDomainTests.swift` の `moduleExposesCoreTypes`（1 件）は `TimeSegment` を参照するため P4 `projection::time_segment` の移植時に写す
