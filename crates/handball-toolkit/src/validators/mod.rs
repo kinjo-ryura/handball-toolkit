@@ -8,6 +8,7 @@ mod configuration_validator;
 mod fact_log_validator;
 mod fact_validator;
 mod match_validator;
+mod match_write_validator;
 
 pub use configuration_validator::validate_configuration;
 pub use fact_log_validator::validate_fact_log;
@@ -15,3 +16,4 @@ pub use fact_validator::{
     RosterContext, validate_control_fact, validate_match_fact, validate_play_fact,
 };
 pub use match_validator::validate_match;
+pub use match_write_validator::{validate_append, validate_delete, validate_update};
