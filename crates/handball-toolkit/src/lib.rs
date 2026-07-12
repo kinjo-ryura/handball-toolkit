@@ -10,4 +10,5 @@
 //! `handball-project/docs/research/handballrecorder-rust-core.md` を参照。
 
 pub mod clock;
+pub mod configuration;
 pub mod ids;
