@@ -1,5 +1,7 @@
 # 移植作業ガイド — RecorderDomain → Rust
 
+> **状態（2026-07-12）: 移植完走。** P0〜P8 完了（移植テスト 140/140 green・パリティ bit-exact 公開 8 + ローカル 2 件）、P9 は全項目見送りを判断済み（下記トリガー参照）。Issue 側の残り: handball-project#49 の UniFFI PoC（本ガイドの範囲外）と #52〜#54。以降の toolkit 変更は通常の開発フローで行う。
+
 セッションをまたいで移植を進めるための「現在地と次の一手」のファイル。**各セッションの冒頭でこれを読み、進捗があったらチェックを更新する**。設計判断の正典は `docs/adr/`（このファイルには理由を書かない）。
 
 - 背景・経緯: handball-project#49 / `handball-project/docs/research/handballrecorder-rust-core.md`
@@ -52,7 +54,11 @@
   - ハーネス: `tests/golden_parity_tests.rs`。**serde_json の `float_roundtrip` feature 必須**（ADR 0003 §5 追記）
   - ローカル `.timer` は pdf-matches（旧 V2 形式）を `scripts/migrate_pdf_matches_legacy.py` で移行して使用（ADR 0003 §1 追記。importer の現行スキーマ化は別 Issue 候補）
   - オラクル側の後始末実施済み: `parity/oracle-dump` 先端に tag `oracle-dump-final` を打ちブランチ削除（push は手動: `git push origin oracle-dump-final`）
-- [ ] P9 完走後: OSS 公開判断（README 英語化・ライセンス選定）/ ID の newtype 化（handball-project#52）/ `.timer` 公開サンプル追加（handball-project#53）/ 境界拡張候補（ADR 0001「将来の境界拡張候補」）
+- [x] P9 完走後の判断（2026-07-12 実施 — **全項目見送り**。トリガー到来時に再判断）
+  - OSS 公開判断: 見送り。リポは private のまま。トリガー: 公開意思が固まったとき（README 英語化・ライセンス選定とセットで実施）
+  - ID の newtype 化: 見送り（handball-project#52 で管理）。依存（#49 パリティ完走）は解消済みでいつでも着手可
+  - `.timer` 公開サンプル追加: 見送り（handball-project#53）。importer 現行スキーマ化（handball-project#54）の後に正規生成で進める
+  - 境界拡張候補: 見送り（ADR 0001「将来の境界拡張候補」どおり）。トリガー: Android シェル実装時
 
 P2〜P5 の順序は Swift のモジュール依存 DAG（Identifiers → Clock → Configuration → Facts / Entities → Validation → Projection → Validators）に従う。P3（エラー型）を要求するのは P5 だけなので、P3 と P4 は入れ替えてもよい。
 
