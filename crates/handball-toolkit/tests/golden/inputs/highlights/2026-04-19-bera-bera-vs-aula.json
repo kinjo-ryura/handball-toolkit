@@ -1,0 +1,87 @@
+{
+  "facts": [
+    {
+      "factID": "b3cbf6c3-0773-5d41-b4c0-42f993712127",
+      "payload": {
+        "control": {
+          "anchor": {
+            "endMatchElapsedSeconds": null,
+            "endVideoElapsedSeconds": 5821.0,
+            "kind": "videoClock",
+            "matchClock": null,
+            "videoClock": {
+              "elapsedSeconds": 0.0
+            }
+          },
+          "kind": "phaseStart",
+          "phaseStart": {
+            "kind": "regular"
+          },
+          "stoppage": null
+        },
+        "kind": "control",
+        "play": null
+      },
+      "recordedAt": "2026-05-05T09:30:35Z"
+    },
+    {
+      "factID": "f9055216-2db4-5354-8005-cc077275f6d7",
+      "payload": {
+        "control": null,
+        "kind": "play",
+        "play": {
+          "anchor": {
+            "endMatchElapsedSeconds": null,
+            "endVideoElapsedSeconds": null,
+            "kind": "videoClock",
+            "matchClock": null,
+            "videoClock": {
+              "elapsedSeconds": 4264.884848278387
+            }
+          },
+          "kind": "goal",
+          "note": null,
+          "playerKey": "06741B18-4BD5-4440-BD32-6DE70D099AA2",
+          "relatedPlayerKey": null,
+          "teamKey": "home",
+          "title": null
+        }
+      },
+      "recordedAt": "2026-05-05T09:31:17Z"
+    }
+  ],
+  "match": {
+    "configuration": {
+      "kind": "videoHighlight",
+      "timer": null,
+      "video": null,
+      "videoHighlight": {
+        "source": {
+          "externalID": "5egklw4_Yv8",
+          "provider": "youtube"
+        }
+      }
+    },
+    "date": "2026-05-05T09:29:49Z",
+    "displayName": "石川空選手の得点。"
+  },
+  "schemaVersion": 2,
+  "teams": {
+    "away": {
+      "key": "away",
+      "name": "AULA",
+      "players": []
+    },
+    "home": {
+      "key": "home",
+      "name": "BERA BERA",
+      "players": [
+        {
+          "jerseyNumber": 89,
+          "key": "06741B18-4BD5-4440-BD32-6DE70D099AA2",
+          "name": "石川空"
+        }
+      ]
+    }
+  }
+}

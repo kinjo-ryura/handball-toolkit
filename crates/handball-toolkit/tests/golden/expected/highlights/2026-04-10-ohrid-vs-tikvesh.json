@@ -1,0 +1,403 @@
+{
+  "liveSamples" : [
+    {
+      "availableActions" : {
+        "canRecordFreeNote" : false,
+        "canRecordGoal" : false,
+        "canRecordShotMissed" : false,
+        "canResume" : false,
+        "canStartNextPhase" : true,
+        "canStartTimeout" : false
+      },
+      "timerState" : "beforeMatch"
+    },
+    {
+      "availableActions" : {
+        "canRecordFreeNote" : true,
+        "canRecordGoal" : true,
+        "canRecordShotMissed" : true,
+        "canResume" : false,
+        "canStartNextPhase" : false,
+        "canStartTimeout" : true
+      },
+      "currentMatchClockSeconds" : 0,
+      "currentPhaseIndex" : 0,
+      "currentPhaseKind" : "regular",
+      "timerState" : "playing",
+      "videoElapsedSeconds" : 0
+    },
+    {
+      "availableActions" : {
+        "canRecordFreeNote" : true,
+        "canRecordGoal" : true,
+        "canRecordShotMissed" : true,
+        "canResume" : false,
+        "canStartNextPhase" : false,
+        "canStartTimeout" : true
+      },
+      "currentMatchClockSeconds" : 2844.6205,
+      "currentPhaseIndex" : 0,
+      "currentPhaseKind" : "regular",
+      "timerState" : "playing",
+      "videoElapsedSeconds" : 2844.6205
+    },
+    {
+      "availableActions" : {
+        "canRecordFreeNote" : true,
+        "canRecordGoal" : true,
+        "canRecordShotMissed" : true,
+        "canResume" : false,
+        "canStartNextPhase" : false,
+        "canStartTimeout" : true
+      },
+      "currentMatchClockSeconds" : 5689.240999999999,
+      "currentPhaseIndex" : 0,
+      "currentPhaseKind" : "regular",
+      "timerState" : "playing",
+      "videoElapsedSeconds" : 5689.240999999999
+    },
+    {
+      "availableActions" : {
+        "canRecordFreeNote" : true,
+        "canRecordGoal" : false,
+        "canRecordShotMissed" : false,
+        "canResume" : false,
+        "canStartNextPhase" : true,
+        "canStartTimeout" : false
+      },
+      "timerState" : "ended",
+      "videoElapsedSeconds" : 5689.241
+    },
+    {
+      "availableActions" : {
+        "canRecordFreeNote" : true,
+        "canRecordGoal" : false,
+        "canRecordShotMissed" : false,
+        "canResume" : false,
+        "canStartNextPhase" : true,
+        "canStartTimeout" : false
+      },
+      "timerState" : "ended",
+      "videoElapsedSeconds" : 5690.241
+    }
+  ],
+  "resolver" : {
+    "phases" : [
+      {
+        "factID" : "b44def26-fa87-5dd6-9d49-454d18794b9f",
+        "kind" : "regular",
+        "matchElapsedEnd" : 5689.241,
+        "matchElapsedStart" : 0,
+        "videoElapsedEnd" : 5689.241,
+        "videoElapsedStart" : 0
+      }
+    ],
+    "segments" : [
+      {
+        "endFactID" : "b44def26-fa87-5dd6-9d49-454d18794b9f",
+        "kind" : "running",
+        "matchElapsedEnd" : 5689.241,
+        "matchElapsedStart" : 0,
+        "phaseKind" : "regular",
+        "startFactID" : "b44def26-fa87-5dd6-9d49-454d18794b9f",
+        "videoElapsedEnd" : 5689.241,
+        "videoElapsedStart" : 0
+      }
+    ]
+  },
+  "scoreProgression" : {
+    "maxAbsDiff" : 6,
+    "phaseSpans" : [
+      {
+        "endSeconds" : 5689.241,
+        "phaseFactID" : "b44def26-fa87-5dd6-9d49-454d18794b9f",
+        "regularIndex" : 0,
+        "startSeconds" : 0
+      }
+    ],
+    "points" : [
+      {
+        "awayScore" : 0,
+        "cumulativeSeconds" : 0,
+        "diff" : 0,
+        "homeScore" : 0
+      },
+      {
+        "awayScore" : 0,
+        "cumulativeSeconds" : 394.0116787071628,
+        "diff" : 0,
+        "homeScore" : 0
+      },
+      {
+        "awayScore" : 0,
+        "cumulativeSeconds" : 394.0116787071628,
+        "diff" : -1,
+        "homeScore" : 1
+      },
+      {
+        "awayScore" : 0,
+        "cumulativeSeconds" : 886,
+        "diff" : -1,
+        "homeScore" : 1
+      },
+      {
+        "awayScore" : 0,
+        "cumulativeSeconds" : 886,
+        "diff" : -2,
+        "homeScore" : 2
+      },
+      {
+        "awayScore" : 0,
+        "cumulativeSeconds" : 1134,
+        "diff" : -2,
+        "homeScore" : 2
+      },
+      {
+        "awayScore" : 0,
+        "cumulativeSeconds" : 1134,
+        "diff" : -3,
+        "homeScore" : 3
+      },
+      {
+        "awayScore" : 0,
+        "cumulativeSeconds" : 1430.576510732438,
+        "diff" : -3,
+        "homeScore" : 3
+      },
+      {
+        "awayScore" : 0,
+        "cumulativeSeconds" : 1430.576510732438,
+        "diff" : -4,
+        "homeScore" : 4
+      },
+      {
+        "awayScore" : 0,
+        "cumulativeSeconds" : 1788.8509812279667,
+        "diff" : -4,
+        "homeScore" : 4
+      },
+      {
+        "awayScore" : 0,
+        "cumulativeSeconds" : 1788.8509812279667,
+        "diff" : -5,
+        "homeScore" : 5
+      },
+      {
+        "awayScore" : 0,
+        "cumulativeSeconds" : 2119,
+        "diff" : -5,
+        "homeScore" : 5
+      },
+      {
+        "awayScore" : 0,
+        "cumulativeSeconds" : 2119,
+        "diff" : -6,
+        "homeScore" : 6
+      },
+      {
+        "awayScore" : 0,
+        "cumulativeSeconds" : 5689.241,
+        "diff" : -6,
+        "homeScore" : 6
+      }
+    ],
+    "totalSeconds" : 5689.241
+  },
+  "summary" : {
+    "awayScore" : 0,
+    "awayTeam" : {
+      "goals" : 0,
+      "shotAttempts" : 0,
+      "shotMisses" : 0,
+      "teamKey" : "away"
+    },
+    "homeScore" : 6,
+    "homeTeam" : {
+      "goals" : 6,
+      "scoringRate" : 0.8571428571428571,
+      "shotAttempts" : 7,
+      "shotMisses" : 1,
+      "teamKey" : "home"
+    },
+    "phaseSummaries" : [
+      {
+        "awayAttempts" : 0,
+        "awayGoals" : 0,
+        "awayShotMisses" : 0,
+        "homeAttempts" : 7,
+        "homeGoals" : 6,
+        "homeRate" : 0.8571428571428571,
+        "homeShotMisses" : 1,
+        "kind" : "regular",
+        "phaseFactID" : "b44def26-fa87-5dd6-9d49-454d18794b9f",
+        "regularIndex" : 0
+      }
+    ],
+    "playerStats" : [
+      {
+        "goals" : 6,
+        "playerKey" : "928DF2A4-A425-4C88-9F0D-D0F199EAA3A0",
+        "scoringRate" : 0.8571428571428571,
+        "shotAttempts" : 7,
+        "shotMisses" : 1
+      }
+    ]
+  },
+  "timeline" : [
+    {
+      "factID" : "b44def26-fa87-5dd6-9d49-454d18794b9f",
+      "resolvedMatchClock" : 0,
+      "resolvedVideoClock" : 0
+    },
+    {
+      "factID" : "60521aca-1fb8-57f4-9563-32bcf870ff1a",
+      "resolvedMatchClock" : 262.96258529793334,
+      "resolvedVideoClock" : 262.96258529793334
+    },
+    {
+      "factID" : "70b4d2d4-0fe1-5217-9491-bb99187757c9",
+      "resolvedMatchClock" : 375,
+      "resolvedVideoClock" : 375
+    },
+    {
+      "factID" : "d9db5987-bd36-5eed-8fa2-e55fbefe5806",
+      "resolvedMatchClock" : 394.0116787071628,
+      "resolvedVideoClock" : 394.0116787071628
+    },
+    {
+      "factID" : "ec3bcbc2-0907-5c8d-bb91-7ef573b6924c",
+      "resolvedMatchClock" : 454,
+      "resolvedVideoClock" : 454
+    },
+    {
+      "factID" : "ce1534d1-99fa-5a18-ac24-5fa705d11eb9",
+      "resolvedMatchClock" : 501.33683027813925,
+      "resolvedVideoClock" : 501.33683027813925
+    },
+    {
+      "factID" : "c96c4c0b-85cb-5952-92c8-188e2c56391f",
+      "resolvedMatchClock" : 506.68198727196716,
+      "resolvedVideoClock" : 506.68198727196716
+    },
+    {
+      "factID" : "0297552c-ff21-5e29-909e-e24259fd7353",
+      "resolvedMatchClock" : 596,
+      "resolvedVideoClock" : 596
+    },
+    {
+      "factID" : "1812d92e-ecb2-5e28-94ff-86e263c1e2b5",
+      "resolvedMatchClock" : 654,
+      "resolvedVideoClock" : 654
+    },
+    {
+      "factID" : "8aaafcc5-71c3-5b2e-97c5-4463805e37b3",
+      "resolvedMatchClock" : 765,
+      "resolvedVideoClock" : 765
+    },
+    {
+      "factID" : "9c35f8ac-eb6d-53f0-941a-e34a77148c49",
+      "resolvedMatchClock" : 886,
+      "resolvedVideoClock" : 886
+    },
+    {
+      "factID" : "33f8540f-a6f1-53d0-a5d1-a6ca3d69e006",
+      "resolvedMatchClock" : 951,
+      "resolvedVideoClock" : 951
+    },
+    {
+      "factID" : "acf722c8-a5bf-5498-a8e2-d5d247b8ed2a",
+      "resolvedMatchClock" : 1042.7655854053974,
+      "resolvedVideoClock" : 1042.7655854053974
+    },
+    {
+      "factID" : "0ed771fe-7678-5bb0-b542-9c75a544b1ad",
+      "resolvedMatchClock" : 1112.3941283922436,
+      "resolvedVideoClock" : 1112.3941283922436
+    },
+    {
+      "factID" : "5bb0977b-180d-5f59-ac70-91a46b3bd4a6",
+      "resolvedMatchClock" : 1134,
+      "resolvedVideoClock" : 1134
+    },
+    {
+      "factID" : "b9323e13-b66a-5cca-b53e-88140925b1ba",
+      "resolvedMatchClock" : 1336.5148625995294,
+      "resolvedVideoClock" : 1336.5148625995294
+    },
+    {
+      "factID" : "49a02a29-4f0e-5efc-9dbe-214ffac05c88",
+      "resolvedMatchClock" : 1409.2356921813077,
+      "resolvedVideoClock" : 1409.2356921813077
+    },
+    {
+      "factID" : "9b252b69-ef3f-5b73-910a-c8605b9fde74",
+      "resolvedMatchClock" : 1430.576510732438,
+      "resolvedVideoClock" : 1430.576510732438
+    },
+    {
+      "factID" : "6612871d-b97e-551e-a09e-a6266b3817be",
+      "resolvedMatchClock" : 1511,
+      "resolvedVideoClock" : 1511
+    },
+    {
+      "factID" : "7d54afc9-6811-5a97-afc0-00173c2668ed",
+      "resolvedMatchClock" : 1680,
+      "resolvedVideoClock" : 1680
+    },
+    {
+      "factID" : "38b7a3ef-ad11-5365-bba4-ca6df4f5e632",
+      "resolvedMatchClock" : 1788.8509812279667,
+      "resolvedVideoClock" : 1788.8509812279667
+    },
+    {
+      "factID" : "68aa679c-0cfa-5465-b687-82adf6929828",
+      "resolvedMatchClock" : 1835.5768128342916,
+      "resolvedVideoClock" : 1835.5768128342916
+    },
+    {
+      "factID" : "97c43729-087f-5a3e-a372-441beb7b55b0",
+      "resolvedMatchClock" : 1979.4001363214986,
+      "resolvedVideoClock" : 1979.4001363214986
+    },
+    {
+      "factID" : "150ffa2a-41c1-5853-98f5-ddfbc0ad05ad",
+      "resolvedMatchClock" : 1984.2083435720358,
+      "resolvedVideoClock" : 1984.2083435720358
+    },
+    {
+      "factID" : "703a1e2e-0cb1-58b6-bacb-133957f93a91",
+      "resolvedMatchClock" : 2119,
+      "resolvedVideoClock" : 2119
+    },
+    {
+      "factID" : "92de02a7-a4ae-564c-8445-325240b698b5",
+      "resolvedMatchClock" : 2242.055636496647,
+      "resolvedVideoClock" : 2242.055636496647
+    },
+    {
+      "factID" : "7e34b849-593a-5e67-adba-4934810b9d37",
+      "resolvedMatchClock" : 3156.7936519852337,
+      "resolvedVideoClock" : 3156.7936519852337
+    },
+    {
+      "factID" : "21aade00-e1e2-5723-880e-0d531fa38022",
+      "resolvedMatchClock" : 3715.072135028706,
+      "resolvedVideoClock" : 3715.072135028706
+    },
+    {
+      "factID" : "be45ad22-56e2-5c9c-b6e2-1642a870def9",
+      "resolvedMatchClock" : 3827.5882960318513,
+      "resolvedVideoClock" : 3827.5882960318513
+    },
+    {
+      "factID" : "a9a18301-8c11-5306-83a0-95a6870faabf",
+      "resolvedMatchClock" : 3905.361377322115,
+      "resolvedVideoClock" : 3905.361377322115
+    },
+    {
+      "factID" : "fa937ddd-c948-5d4a-b2ac-2aee085062af",
+      "resolvedMatchClock" : 4444.981389712168,
+      "resolvedVideoClock" : 4444.981389712168
+    }
+  ]
+}
