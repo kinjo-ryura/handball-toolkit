@@ -8,8 +8,12 @@
 //! しない）。将来「パーサ抜きでコアだけ使いたい」需要が実在したときの crate 分離を
 //! 機械作業に保つため（ADR 0003）。
 
+mod sample_match_converter;
 mod sample_match_dtos;
 
+pub use sample_match_converter::{
+    SampleMatchConversionResult, convert, decode_configuration, decode_fact,
+};
 pub use sample_match_dtos::{
     SCHEMA_VERSION_CURRENT, SampleControlFactDtoV2, SampleFactAnchorDtoV2, SampleFactDtoV2,
     SampleFactPayloadDtoV2, SampleHighlightIndexDtoV2, SampleHighlightSummaryV2, SampleIndexDtoV2,
