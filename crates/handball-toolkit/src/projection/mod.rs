@@ -6,6 +6,8 @@
 
 pub mod segment_resolver;
 pub mod time_segment;
+pub mod timeline;
 
 pub use segment_resolver::SegmentResolver;
 pub use time_segment::{TimeSegment, TimeSegmentKind};
+pub use timeline::{ResolvedFact, TimelineProjection};
