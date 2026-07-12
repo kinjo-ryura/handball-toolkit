@@ -71,6 +71,8 @@ dump ツール・Rust 側テストハーネスの双方が「内部 ID → コ�
 
 Issue #49 の「パリティ検証の完走」= 公開コーパス 8 件 + ローカル `.timer` コーパスの全件で、上記 5 系統（resolver / timeline / summary / scoreProgression / liveSamples）の出力が一致し、かつ移植済み単体テスト 144 件が green であること。OSS 公開判断はこの完走後（research メモ）。
 
+補正（2026-07-12、P3 移植時）: 144 件のうち `DomainValidationMessageTests.swift` の 4 件は文言レイヤ（ADR 0002 で移植対象外 — 文言はシェル所有）のテストであり移植先が存在しないため、**分母は 140 件**とする。同テストが担っていた「内部用語を UI に漏らさない」責務のうちコアに残る部分（シェル文言テーブルの lookup key `(scope, code)` の安定性）は、Rust 新設のワイヤ形式テスト（`tests/validation_wire_format_tests.rs`）が担保する。
+
 ## Considered options
 
 - **オラクル出力をアプリ実行時に生成**（DEBUG メニュー等）→ 却下。手動操作が入り再現性がない。CLI 化で CI / 再生成が自動化できる
