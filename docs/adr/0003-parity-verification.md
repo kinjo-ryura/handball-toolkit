@@ -33,6 +33,8 @@ Swift 側にはスナップショット/ゴールデンテスト資産は存在�
 - 位置づけは「handball-sample-matches SCHEMA の型付き実装」（research メモの OSS 枠づけと一致）。将来の JSON 検証 CLI・wasm デモの土台
 - コア crate 内モジュールとして置く（grill 確定 2026-07-12）。別 crate への分離は「パーサ抜きでコアだけ使いたい」需要が実在してから行う。**分離を機械作業に保つため、依存は `sample_dto` → domain 型の一方通行を厳守**（domain 側から sample_dto を参照しない）
 
+追記（2026-07-12、P6 移植時）: Swift converter の `UUID()` 直生成は設計不変条件（コアに ID 生成を置かない）に反するため、Rust 版 converter は ID 供給 closure（`new_id: impl FnMut() -> Uuid`）をシェルから注入する（生成順は Swift の生成順を保存し、テストでは決定的な列を渡せる）。また §3 の「内部 ID → コーパスキーの逆写像」の材料として、変換結果に teamKey / playerKey → 内部 ID の写像（`teams_by_key` / `players_by_key`）を同梱する（Swift 版の結果型には無い Rust 側追加）。
+
 ### 3. ID の決定性 — 出力は「コーパス由来キー」で表現する
 
 Swift の `SampleMatchConverterV2` は decode 時に player key → 新規 UUID を割り当てる（非決定的）。オラクルと Rust の出力を突き合わせるため、**ゴールデン出力では domain 内部 ID を使わず、コーパス由来の安定キーへ正規化する**:

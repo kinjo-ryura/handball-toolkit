@@ -46,7 +46,7 @@
   - [x] `score_progression`
   - [x] `live_match`
 - [x] P5 validators（fact / fact_log / match_write / configuration / match の 5 種。2026-07-12）
-- [ ] P6 `sample_dto` モジュール（SAMPLE_DTO_V2 準拠の serde 型 + converter。依存は domain への一方通行厳守 — ADR 0003）
+- [x] P6 `sample_dto` モジュール（SAMPLE_DTO_V2 準拠の serde 型 + converter。依存は domain への一方通行厳守 — ADR 0003。ID 供給はシェル注入・変換結果に逆写像同梱 — ADR 0003 §2 追記。2026-07-12）
 - [ ] P7 オラクル dump ツール（HandballRecorder の `feat/rust-domain-core` ブランチ。main へ merge しない — 上記「オラクル側の運用」）+ `tests/golden/` 整備 — ADR 0003
 - [ ] P8 パリティ検証完走（公開 8 件 + ローカル `.timer` × 5 系統 bit-exact 一致、移植テスト 144 件 green。完走判定の定義は ADR 0003）
 - [ ] P9 完走後: OSS 公開判断（README 英語化・ライセンス選定）/ ID の newtype 化（handball-project#52）/ `.timer` 公開サンプル追加（handball-project#53）/ 境界拡張候補（ADR 0001「将来の境界拡張候補」）
@@ -60,3 +60,4 @@ P2〜P5 の順序は Swift のモジュール依存 DAG（Identifiers → Clock 
 - 移植したテスト数はパリティ完走判定（P8）の分子になるので、モジュール完了時にここへ累計を記録する: **現在 140 / 140（完了）**
   （RecorderDomainTests 8 / SegmentResolverAdvanced 21 / TimelineProjection 12 / SummaryProjection 15 / ScoreProgressionProjection 7 / LiveMatchProjection 10 / MatchValidator 5 / ConfigurationValidator 10 / FactValidator 25 / RosterReferenceValidation 4 / FactLogValidator 23）
 - 分母の補正（144 → 140）: `DomainValidationMessageTests.swift`（4 件）は文言レイヤのテストで移植対象外（ADR 0002 — 文言はシェル所有）。lookup key `(scope, code)` の安定性は Rust 新設の `tests/validation_wire_format_tests.rs`（6 件。分子には数えない）が担保する
+- P6 `sample_dto` の移植元はアプリ層（`HandballRecorderTests/SampleMatchConverterV2Tests.swift`）のため分母 140 の外。converter テスト 31 件を `tests/sample_match_converter_tests.rs` に移植し、serde 表現（`factID` / `externalID` の明示 rename・明示 null 耐性・RFC 3339 日時）は Rust 新設の `tests/sample_dto_serde_tests.rs`（7 件。分子に数えない）で固定する
