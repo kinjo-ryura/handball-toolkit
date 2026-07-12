@@ -18,11 +18,14 @@
 
 ## オラクル（HandballRecorder）側の運用
 
-- dump ツール（P7）は HandballRecorder の **`feat/rust-domain-core` ブランチに置き、main へは merge しない**。Swift がオラクルの役目を終えたら（完走後に「Swift へ追従しない」と決めた時点で）ブランチごと削除する
+仕分けの原則: **ブランチに隔離するのは「捨てる物」、main に入れるのは「残す物」**。パリティ検証の部品のうち、捨てる物は Swift 側の dump ツールだけ。Rust 側（ゴールデン + 比較テスト + 移植テスト）は完走後も回帰ロックとして永続するので toolkit の main に置く。
+
+- dump ツール（P7）は HandballRecorder の **`parity/oracle-dump` ブランチに置き、main へは merge しない**
+- **寿命はパリティ完走まで**。完走したらブランチ先端に tag（`oracle-dump-final`）を打ってからブランチを削除する（tag は消えないので万一の再利用時に checkout で復元できる。ツール自体は数百行なので作り直しも安い）
 - **ブランチの不変条件: RecorderDomain のライブラリソースを一切変更しない**。追加してよいのは dump ツールのファイルと Package.swift の executable target 定義のみ。これにより「オラクルの中身 = main の RecorderDomain」が常に成り立つ
 - **ゴールデンの出所記録**: `tests/golden/` に「どの HandballRecorder **main** コミットの RecorderDomain から生成したか」のハッシュを記録する。ブランチのハッシュは使わない（ブランチ削除後に消えるため。main のハッシュは永続する）
-- **再同期の手順**（main の RecorderDomain に変更が入ったら）: `feat/rust-domain-core` に main を merge → dump 再実行 → `tests/golden/` と出所ハッシュを更新 → Rust 実装を追従 → 一括で commit
-- dump ツールは「テスト後すぐ不要」ではなく **Swift がオラクル（正）である間は必要**（Swift 側変更のたびにゴールデン再生成で使う）。それまでブランチを維持する
+- **再同期の手順**（完走前に main の RecorderDomain へ変更が入ったら）: `parity/oracle-dump` に main を merge → dump 再実行 → `tests/golden/` と出所ハッシュを更新 → Rust 実装を追従 → 一括で commit。完走後に Swift 側が変わった場合はフル再生成ではなく「変更に対応する Swift テストの移植」で差分を担保する
+- **Rust 移植のために HandballRecorder に切るブランチはこの 1 本のみ**。通常のアプリ開発（バグ修正含む）は従来通り main 運用。完走後にアプリのコアを Rust へ差し替える場合は専用 feature ブランチ + TestFlight 検証になるが、それは #49 の範囲外（その時に判断）
 
 ## 全体フローと現在地
 
