@@ -22,13 +22,23 @@ crates/
 
 ## 開発
 
-Rust ツールチェーン（[rustup](https://rustup.rs/)）が前提。
+開発環境は Nix flake + direnv で宣言的に管理する（rustup は不使用）。ツールチェーンは
+[`rust-toolchain.toml`](./rust-toolchain.toml) でバージョン固定し、[rust-overlay](https://github.com/oxalica/rust-overlay) が提供する。
+
+前提: Nix / direnv / Xcode Command Line Tools。リンクは Nix の clang ではなく CLT の
+`/usr/bin/cc` に任せる構成（将来の iOS ターゲット（UniFFI → XCFramework）ビルドで
+xcrun 系と衝突させないため。詳細は `flake.nix` のコメントを参照）。
 
 ```bash
+direnv allow        # 初回のみ。以降はディレクトリに入ると自動で環境が整う
 cargo test          # 全テスト
 cargo clippy        # lint
 cargo fmt           # フォーマット
 ```
+
+direnv を使わない場合は `nix develop` で同じシェルに入れる。ツールチェーンの更新は
+`rust-toolchain.toml` の `channel` を書き換える（wasm / iOS 等のクロスターゲットも
+同ファイルの `targets` に足していく）。
 
 ## ステータス
 

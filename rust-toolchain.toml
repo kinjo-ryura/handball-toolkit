@@ -1,0 +1,7 @@
+# Rust ツールチェーンの宣言（Nix の rust-overlay がこのファイルを読む。rustup は不使用）。
+# バージョンを上げるときは channel を書き換えて direnv reload。
+[toolchain]
+channel = "1.97.0"
+components = ["clippy", "rustfmt", "rust-analyzer"]
+# クロスターゲットが必要になったらここに足す:
+# targets = ["wasm32-unknown-unknown", "aarch64-apple-ios"]
