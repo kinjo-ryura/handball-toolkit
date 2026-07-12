@@ -25,6 +25,8 @@ Swift 側にはスナップショット/ゴールデンテスト資産は存在�
 
 - 公開 8 件のゴールデンは handball-toolkit の `tests/golden/` にコミットする（入力 JSON のコピー + 期待出力）
 - `.timer` の公開サンプル追加（gap の恒久解消）は別 Issue 候補とする
+
+追記（2026-07-12、P8 完走時）: `pdf-matches/` の既存 JSON は**旧 V2 形式**（captureMethod / phaseRules / phase 相対秒。jha-pdf-importer が現行スキーマ未対応）だったため、一時スクリプト `scripts/migrate_pdf_matches_legacy.py` で現行 SAMPLE_DTO_V2 へ移行して使用した（jha 2 件。PhaseStart 合成 + 累積秒化 + timeoutStarted → stoppage）。恒久対応（importer の現行スキーマ化）は別 Issue 候補。
 - 3 モード網羅の最小フィクスチャ（エッジケース: shootout / `.both` override / stoppage 隣接など）は実試合コーパスとは別に、移植した単体テストが担う
 
 ### 2. Sample DTO V2 パーサはコアの一部（`sample_dto` モジュール）
@@ -67,6 +69,8 @@ dump ツール・Rust 側テストハーネスの双方が「内部 ID → コ�
 ### 5. 比較規約
 
 - **f64 は完全一致（bit-exact）から始める**（grill 確定 2026-07-12）。移植が演算順を保存していれば IEEE 754 の決定性により一致するはず。ズレ = 写経ミスのシグナルとして扱う。破れたケースは原因を特定し、epsilon 許容に切り替える場合はこの ADR に判断を追記する
+
+追記（2026-07-12、P8 完走時）: bit-exact は**維持**（epsilon 緩和は不要だった）。初回実行で出た差分（timeline の解決値 8 ulp / rate の 1 ulp）は写経ミスではなく、**serde_json の既定 float パースが正確丸めでない**（1 ulp 誤差の高速パス）ことが原因 — corpus anchor と期待値の双方が Rust 側でのみ僅かにズレていた。Swift 側の JSONDecoder / JSONEncoder は正確丸め・shortest round-trip と実測確認。対応として dev-dependencies の serde_json に **`float_roundtrip` feature を必須化**（パリティ比較の前提条件。`tests/golden/README.md` にも明記）
 - 比較は Rust 側のテスト（`cargo test`）で実行: `tests/golden/` の期待出力と Rust 実装の出力の JSON 構造比較。差分はケース単位で報告
 
 ### 6. 完走判定
