@@ -48,7 +48,10 @@
 - [x] P5 validators（fact / fact_log / match_write / configuration / match の 5 種。2026-07-12）
 - [x] P6 `sample_dto` モジュール（SAMPLE_DTO_V2 準拠の serde 型 + converter。依存は domain への一方通行厳守 — ADR 0003。ID 供給はシェル注入・変換結果に逆写像同梱 — ADR 0003 §2 追記。2026-07-12）
 - [x] P7 オラクル dump ツール（HandballRecorder の `parity/oracle-dump` ブランチ。main へ merge しない — 上記「オラクル側の運用」）+ `tests/golden/` 整備 — ADR 0003（2026-07-12。公開 8 件の golden 生成済み。出所・正規化規約・再生成手順は `crates/handball-toolkit/tests/golden/README.md`）
-- [ ] P8 パリティ検証完走（公開 8 件 + ローカル `.timer` × 5 系統 bit-exact 一致、移植テスト 144 件 green。完走判定の定義は ADR 0003）
+- [x] P8 パリティ検証完走（公開 8 件 + ローカル `.timer` 2 件 × 5 系統 bit-exact 一致、移植テスト 140 件 green — 分母補正は下記。2026-07-12）
+  - ハーネス: `tests/golden_parity_tests.rs`。**serde_json の `float_roundtrip` feature 必須**（ADR 0003 §5 追記）
+  - ローカル `.timer` は pdf-matches（旧 V2 形式）を `scripts/migrate_pdf_matches_legacy.py` で移行して使用（ADR 0003 §1 追記。importer の現行スキーマ化は別 Issue 候補）
+  - オラクル側の後始末実施済み: `parity/oracle-dump` 先端に tag `oracle-dump-final` を打ちブランチ削除（push は手動: `git push origin oracle-dump-final`）
 - [ ] P9 完走後: OSS 公開判断（README 英語化・ライセンス選定）/ ID の newtype 化（handball-project#52）/ `.timer` 公開サンプル追加（handball-project#53）/ 境界拡張候補（ADR 0001「将来の境界拡張候補」）
 
 P2〜P5 の順序は Swift のモジュール依存 DAG（Identifiers → Clock → Configuration → Facts / Entities → Validation → Projection → Validators）に従う。P3（エラー型）を要求するのは P5 だけなので、P3 と P4 は入れ替えてもよい。
