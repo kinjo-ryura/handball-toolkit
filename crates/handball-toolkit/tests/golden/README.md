@@ -64,3 +64,30 @@ expected/
 
 ローカル `.timer` コーパス（handball-sample-matches の gitignore 済み `pdf-matches/`）は
 コミットしない（ADR 0003 §1 — ローカル実行専用の拡張コーパス）。
+
+## ローカル `.timer` コーパス（`local/` — gitignore 済み）
+
+`local/inputs/<group>/*.json` + `local/expected/<group>/*.json` を置くと、パリティテスト
+（`tests/golden_parity_tests.rs` の `local_timer_corpus_matches_oracle_if_present`）が
+自動で拾って照合する。無い環境（standalone clone / CI）ではスキップされる。
+
+再生成手順（pdf-matches は**旧 V2 形式**のままなので移行を挟む — 恒久対応は
+jha/jhl-pdf-importer の現行スキーマ化が別 Issue 候補）:
+
+```bash
+# 1. 旧形式 → 現行 SAMPLE_DTO_V2 へ移行（リポジトリルートで）
+python3 scripts/migrate_pdf_matches_legacy.py \
+  <sample-matches>/pdf-matches/jha/<試合>.json:crates/handball-toolkit/tests/golden/local/inputs/timer/<試合>.json
+
+# 2. Swift オラクルで期待値を dump（HandballRecorder の parity/oracle-dump。
+#    ブランチ削除後は tag oracle-dump-final から checkout で復元）
+swift run recorder-domain-dump --out .../tests/golden/local/expected/timer \
+  .../tests/golden/local/inputs/timer/*.json
+```
+
+## 比較実行側の前提（重要）
+
+パリティテストは serde_json の **`float_roundtrip` feature を必須**とする（dev-dependencies で
+有効化済み）。serde_json の既定 float パースは高速だが正確丸めでなく **1 ulp の誤差**があり、
+corpus anchor 値と期待値の両方が僅かにズレて bit-exact 比較が偽陽性の差分を報告する
+（2026-07-12 に実際に発生。Swift 側 JSONDecoder / JSONEncoder は正確と実測確認済み — ADR 0003 §5 追記）。

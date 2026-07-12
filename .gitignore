@@ -1,2 +1,5 @@
 /target
 /.direnv
+
+# ローカル実行専用の拡張ゴールデン（.timer コーパス — ADR 0003 §1。コミットしない）
+/crates/handball-toolkit/tests/golden/local/
