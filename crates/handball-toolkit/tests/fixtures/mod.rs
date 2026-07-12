@@ -215,6 +215,85 @@ pub fn play_both(team_id: TeamId, match_secs: f64, video_secs: f64) -> MatchFact
     )
 }
 
+/// SummaryProjectionTests の `playFact`（matchClock=0 anchor、note 任意）。
+pub fn play_fact(
+    kind: PlayEventKind,
+    team: TeamId,
+    player: PlayerId,
+    note: Option<&str>,
+) -> MatchFact {
+    MatchFact {
+        id: Uuid::new_v4(),
+        recorded_at: epoch(),
+        payload: MatchFactPayload::Play(PlayFact {
+            kind,
+            team_id: Some(team),
+            player_id: Some(player),
+            related_player_id: None,
+            anchor: FactAnchor::MatchClock(MatchClock {
+                elapsed_seconds: 0.0,
+            }),
+            title: None,
+            note: note.map(str::to_owned),
+        }),
+    }
+}
+
+/// SummaryProjectionTests の `videoPlayFact`（videoClock=300 anchor）。
+pub fn video_play_fact(kind: PlayEventKind, team: TeamId, player: PlayerId) -> MatchFact {
+    MatchFact {
+        id: Uuid::new_v4(),
+        recorded_at: epoch(),
+        payload: MatchFactPayload::Play(PlayFact {
+            kind,
+            team_id: Some(team),
+            player_id: Some(player),
+            related_player_id: None,
+            anchor: FactAnchor::VideoClock(VideoClock {
+                elapsed_seconds: 300.0,
+            }),
+            title: None,
+            note: None,
+        }),
+    }
+}
+
+/// SummaryProjectionTests の `phaseStart`（matchClock anchor、kind 指定）。
+pub fn phase_start_match(kind: PhaseKind, match_start: f64, match_end: f64) -> MatchFact {
+    MatchFact {
+        id: Uuid::new_v4(),
+        recorded_at: epoch(),
+        payload: MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
+            kind,
+            start_anchor: FactAnchor::MatchClock(MatchClock {
+                elapsed_seconds: match_start,
+            }),
+            end_anchor: FactAnchor::MatchClock(MatchClock {
+                elapsed_seconds: match_end,
+            }),
+        })),
+    }
+}
+
+/// SummaryProjectionTests の `play`（matchClock anchor 位置指定）。
+pub fn play_at_match(kind: PlayEventKind, team: TeamId, player: PlayerId, secs: f64) -> MatchFact {
+    MatchFact {
+        id: Uuid::new_v4(),
+        recorded_at: epoch(),
+        payload: MatchFactPayload::Play(PlayFact {
+            kind,
+            team_id: Some(team),
+            player_id: Some(player),
+            related_player_id: None,
+            anchor: FactAnchor::MatchClock(MatchClock {
+                elapsed_seconds: secs,
+            }),
+            title: None,
+            note: None,
+        }),
+    }
+}
+
 /// タイマーモードの Stoppage marker（endAnchor なし）。
 pub fn timer_stoppage_marker(id: FactId, kind: StoppageKind, start: f64) -> MatchFact {
     MatchFact {

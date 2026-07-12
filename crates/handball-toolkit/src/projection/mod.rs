@@ -5,9 +5,11 @@
 //! 主要型はこのモジュール直下にも re-export する。
 
 pub mod segment_resolver;
+pub mod summary;
 pub mod time_segment;
 pub mod timeline;
 
 pub use segment_resolver::SegmentResolver;
+pub use summary::{PhaseSummaryLine, PlayerStatLine, SummaryProjection, TeamSummaryLine};
 pub use time_segment::{TimeSegment, TimeSegmentKind};
 pub use timeline::{ResolvedFact, TimelineProjection};
