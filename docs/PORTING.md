@@ -31,12 +31,12 @@
 
 - [x] P0 開発環境（Nix flake + direnv、rust-toolchain.toml）
 - [x] P1 設計 ADR 3 本（起草 → grill → accepted、2026-07-12）
-- [ ] P2 型の移植（依存 DAG 順。各モジュール = 実装 + テスト同時）
-  - [ ] `ids`（Identifiers.swift。type alias — ADR 0001）
-  - [ ] `clock`（MatchClock / VideoClock / FactAnchor / FactAnchorKind）
-  - [ ] `configuration`（MatchConfiguration ほか。**ContentKind は移植しない** — ADR 0001）
-  - [ ] `entities`（Match / Team / Player / PlayerPhoto / RosterSelection）
-  - [ ] `facts`（MatchFact / MatchFactPayload / PlayFact / ControlFact ほか）
+- [x] P2 型の移植（依存 DAG 順。各モジュール = 実装 + テスト同時。2026-07-12）
+  - [x] `ids`（Identifiers.swift。type alias — ADR 0001）
+  - [x] `clock`（MatchClock / VideoClock / FactAnchor / FactAnchorKind）
+  - [x] `configuration`（MatchConfiguration ほか。**ContentKind は移植しない** — ADR 0001）
+  - [x] `entities`（Match / Team / Player / PlayerPhoto / RosterSelection）
+  - [x] `facts`（MatchFact / MatchFactPayload / PlayFact / ControlFact ほか）
 - [ ] P3 validation エラー型（4 enum・37 ケース + DomainValidationIssue + ワイヤ形式 — ADR 0002）
 - [ ] P4 projection（**最難関**。ADR 0001「保存すべきセマンティクス」9 項目を常に参照）
   - [ ] `time_segment`
@@ -57,4 +57,5 @@ P2〜P5 の順序は Swift のモジュール依存 DAG（Identifiers → Clock 
 
 - 移植元テスト: `../HandballRecorder/Packages/RecorderDomain/Tests/RecorderDomainTests/`（Swift Testing 144 テスト / 約 2,507 行）
 - フィクスチャヘルパーは Rust 側 `tests` 内の `mod fixtures` に集約する
-- 移植したテスト数はパリティ完走判定（P8）の分子になるので、モジュール完了時にここへ累計を記録する: **現在 0 / 144**
+- 移植したテスト数はパリティ完走判定（P8）の分子になるので、モジュール完了時にここへ累計を記録する: **現在 7 / 144**
+- 繰り越し: `RecorderDomainTests.swift` の `moduleExposesCoreTypes`（1 件）は `TimeSegment` を参照するため P4 `projection::time_segment` の移植時に写す
