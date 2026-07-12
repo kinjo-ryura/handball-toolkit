@@ -2,7 +2,7 @@
 
 ## Status
 
-draft（2026-07-12 起草、grill 前。handball-project#49）
+accepted（2026-07-12 起草、同日 grill 済み。handball-project#49）
 
 ## 文脈
 

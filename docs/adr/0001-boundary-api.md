@@ -2,7 +2,7 @@
 
 ## Status
 
-draft（2026-07-12 起草、grill 前。handball-project#49「境界 API 目録の作成」）
+accepted（2026-07-12 起草、同日 grill 済み。handball-project#49「境界 API 目録の作成」）
 
 ## 文脈
 
@@ -18,7 +18,7 @@ Swift のディレクトリ構成を 1:1 でミラーする。移植レビュー
 |---|---|---|
 | `ids` | `Identifiers.swift` | `MatchId` / `TeamId` / `PlayerId` / `FactId` |
 | `clock` | `Clock/` | `MatchClock` / `VideoClock` / `FactAnchor` / `FactAnchorKind` |
-| `configuration` | `Configuration/` | `MatchConfiguration` / `MatchConfigurationKind` / `PhaseKind` / `VideoSource` / `VideoProvider` / `CaptureMethod` / `ContentKind` |
+| `configuration` | `Configuration/` | `MatchConfiguration` / `MatchConfigurationKind` / `PhaseKind` / `VideoSource` / `VideoProvider` / `CaptureMethod`（`ContentKind` は移植しない — 後述） |
 | `entities` | `Entities/` | `Match` / `Team` / `Player` / `PlayerPhoto` / `RosterSelection` |
 | `facts` | `Facts/` | `MatchFact` / `MatchFactPayload` / `PlayFact` / `PlayEventKind` / `ControlFact` / `PhaseStartPayload` / `StoppagePayload` / `StoppageKind` |
 | `projection::time_segment` | `Projection/TimeSegment.swift` | `TimeSegment` |
@@ -39,7 +39,7 @@ Swift のディレクトリ構成を 1:1 でミラーする。移植レビュー
 
 | Swift | Rust | 備考 |
 |---|---|---|
-| `MatchID` / `TeamID` / `PlayerID` / `FactID`（= UUID の typealias） | `pub type MatchId = Uuid;` ほか type alias | Swift 同様 type alias で忠実移植。newtype 化（型安全強化）は移植完了後の改善候補（**grill 論点**） |
+| `MatchID` / `TeamID` / `PlayerID` / `FactID`（= UUID の typealias） | `pub type MatchId = Uuid;` ほか type alias | Swift 同様 type alias で忠実移植（grill 確定 2026-07-12）。newtype 化（型安全強化）はパリティ完走後の別タスクとして Issue 化 |
 
 ### clock
 
@@ -55,7 +55,7 @@ Swift のディレクトリ構成を 1:1 でミラーする。移植レビュー
 | Swift | Rust | 備考 |
 |---|---|---|
 | `MatchConfiguration`（sum type: `.timer(phaseDurationSeconds:)` / `.video(VideoSource)` / `.videoHighlight(VideoSource)`） | `enum MatchConfiguration { Timer { phase_duration_seconds: f64 }, Video(VideoSource), VideoHighlight(VideoSource) }` | illegal state を型で排除する設計をそのまま維持 |
-| helper: `kind` / `captureMethod` / `contentKind` / `videoSource` / `phaseDurationSeconds` | 同名メソッド | `ContentKind` は CONTEXT.md で「enum/フィールドの復活を避ける」とされつつ Swift 実装には UI helper として現存。Rust 境界に含めるか要判断（**grill 論点**） |
+| helper: `kind` / `captureMethod` / `videoSource` / `phaseDurationSeconds` | 同名メソッド | `contentKind` / `ContentKind` は**移植しない**（grill 確定 2026-07-12）。CONTEXT.md の「避ける」語であり、かつドメイン内部で未使用（利用者はシェル UI のみ）。必要なシェルは case の switch で自前導出する |
 | `PhaseKind`（`.regular` / `.shootout`） | `enum PhaseKind { Regular, Shootout }` | phase 番号は出現順導出、役割名 enum は持たない |
 | `VideoSource { provider, externalID }` / `VideoProvider`（`.youtube` / `.local`） | 同構造 | `.local` は端末固有 PHAsset 参照。コアは中身を解釈しない |
 
@@ -180,7 +180,7 @@ pub fn validate_delete(removed_fact_id: FactId, existing_facts: &[MatchFact], ma
 | Foundation | Rust | 注意 |
 |---|---|---|
 | `UUID` | `uuid::Uuid` | 決定的ソートキー用途（Swift `uuidString` 昇順）は `Uuid` の `Ord`（バイト順 = hex 文字列順と同順）で置換。パリティ検証で同順性を確認する |
-| `Date` | `chrono::DateTime<Utc>`（仮） | 用途は順序比較（tie-break）と ISO 8601 serde のみ。書式化・TZ 計算はコアに無い。ライブラリ選定は **grill 論点**（chrono / time / jiff） |
+| `Date` | `chrono::DateTime<Utc>` | 用途は順序比較（tie-break）と ISO 8601 serde のみ。書式化・TZ 計算はコアに無い。crate は chrono で確定（grill 2026-07-12。用途が狭く最も枯れた選択肢を採る。time / jiff は差が出ない） |
 | `TimeInterval` | `f64` | 実体は Double の別名。等価境界比較（`start == end` の degenerate 判定等）は移植で演算順を変えないこと。ソートは `total_cmp` で決定化 |
 | `Set<UUID>` | `BTreeSet<Uuid>` | 決定性優先（前述） |
 | `String.trimmingCharacters(.whitespacesAndNewlines)` | `str::trim()` | どちらも Unicode 空白基準でほぼ同等。厳密同等性はパリティ検証の確認項目 |
@@ -201,11 +201,19 @@ pub fn validate_delete(removed_fact_id: FactId, existing_facts: &[MatchFact], ma
 8. **ScoreProgression の step-doubling** — 各 goal 時刻に前後 2 点、先頭 (0,0)・末尾 (total, 最終)、`diff = away - home`、`maxAbsDiff = max(1, …)`、regular phase 無し / goal 0 件は None
 9. **playerStats の決定的ソート** — Swift `uuidString` 昇順相当
 
+## 将来の境界拡張候補（移植完了後）
+
+移植期間中の境界はこの目録で凍結する（忠実移植）。完了後の拡張は「**プラットフォーム API を使わない純粋ロジックはコアへ沈め、シェルの二重実装を減らす**」を判断ルールとする（2026-07-12 設計討議）。現時点の候補:
+
+- **タイマーモード phase 自動生成（D-snap auto-create）** — 現在 `RecorderApplication` の `RecordingScreenStore.ensureTimerPhasesCovering`（約 35 行）にある「どの D-snap phase が欠けていて、それぞれ何秒〜何秒で作るべきか」の計算。入力（fact 列 + phase duration + 記録秒）→ 出力（作るべき PhaseStart のリスト）の純粋関数で、Android シェル実装時に二重実装になる筆頭候補。`missing_timer_phases(facts, config, seconds) -> Vec<PhaseStartPayload>` のような形で境界に追加する。挙動の正典は HandballRecorder の ADR 0001「タイマーモードの記録は phase を確認なしで auto-create する」（区間 index の丸め方向の混在に注意）
+
 ## Considered options
 
 - **モジュール構成を Rust 流に再編**（例: validation と validators の統合、projection のフラット化）→ 却下。移植期間中は 1:1 ミラーが差分レビューとパリティ検証の追跡性で勝る。再編は移植完了後の改善候補
-- **ID の newtype 化**（`struct MatchId(Uuid)`）→ 仮却下（type alias）。Swift 側も型安全性は無く、忠実移植を優先。FFI / wasm 境界の設計時に再検討
+- **ID の newtype 化**（`struct MatchId(Uuid)`）→ 却下（grill 確定 2026-07-12）。Swift 側も型安全性は無く、移植期間中は「形を変えない」ことが写経ミス検出の武器になるため type alias を採る。newtype 化はパリティ完走後の型安全化タスクとして Issue 化（backlog）
 - **API を「JSON in → JSON out」の文字列境界にする** → 却下。Rust ネイティブ利用（CLI / テスト）で型を失う。serde 層は境界の外側（各バインディング）に置く
+- **保存コールバック注入**（シェルの save 関数をコアの `add()` に渡し、validate → save の調停をコアが担う案）→ 却下（2026-07-12 設計討議）。理由: (1) DB ハンドルがシェルにある以上「全書き込みが検証を通る」保証は結局シェル側の規約であり、強制力は現行の repository 内包方式と同質 (2) シェルから消えるのは guard 数行だけで、コールバックの trait 化・actor 境界の往復・エラー写像などの梱包材が 10 行強純増し「シェルコード削減」の目的に逆行 (3) async コールバック FFI の問題系一式（隔離・寿命・キャンセル・再入）を最も頻繁に通る書き込み経路で踏む。**再検討トリガー: Android シェル実装時に validate → save 中間役の二重実装が実際に痛いと体感したとき**。書き込み経路を repository 一本に集約し続ける限り、この移行は追加的で手戻りは小さい
+- **write-plan パターン**（`plan_append` が検証合格時のみ「書き込み券（WritePlan）」を返し、シェルの save 関数が WritePlan しか受け取らない形にして validate 忘れを型で防ぐ案）→ 今回は見送り（grill 確定 2026-07-12）。移植元 Swift に無い API を移植期間中に新設しない。既存 `validate_append` を包むだけの追加品なので、後から足しても既存境界を壊さない。再検討トリガーは保存コールバック注入と同じ（Android シェルで validate → save 中間役の痛みを体感したとき）で、**その時点で write-plan / コールバック注入のどちらを採るか比較して決める**
 
 ## Consequences
 

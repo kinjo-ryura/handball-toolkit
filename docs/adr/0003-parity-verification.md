@@ -2,7 +2,7 @@
 
 ## Status
 
-draft（2026-07-12 起草、grill 前。handball-project#49）
+accepted（2026-07-12 起草、同日 grill 済み。handball-project#49）
 
 ## 文脈
 
@@ -31,7 +31,7 @@ Swift 側にはスナップショット/ゴールデンテスト資産は存在�
 
 - `SAMPLE_DTO_V2.md` 準拠の serde 型（`kind` discriminator + null 兄弟フィールドの tagged union、anchor の flat end フィールド）+ domain 型への converter を `sample_dto` モジュールとして実装する
 - 位置づけは「handball-sample-matches SCHEMA の型付き実装」（research メモの OSS 枠づけと一致）。将来の JSON 検証 CLI・wasm デモの土台
-- 別 crate への分離は境界が痛んだら行う（今はモジュールで十分）
+- コア crate 内モジュールとして置く（grill 確定 2026-07-12）。別 crate への分離は「パーサ抜きでコアだけ使いたい」需要が実在してから行う。**分離を機械作業に保つため、依存は `sample_dto` → domain 型の一方通行を厳守**（domain 側から sample_dto を参照しない）
 
 ### 3. ID の決定性 — 出力は「コーパス由来キー」で表現する
 
@@ -45,7 +45,7 @@ dump ツール・Rust 側テストハーネスの双方が「内部 ID → コ�
 
 ### 4. オラクル dump ツール（Swift 側）
 
-- **場所**: HandballRecorder リポに SPM executable target を新設（`Packages/RecorderDomain` に `recorder-domain-dump` executable を追加）。アプリターゲットには触れないため cycle-9 の計測凍結（アプリ本体のコア差し替え禁止）と非干渉
+- **場所**: HandballRecorder リポに SPM executable target を新設（`Packages/RecorderDomain` に `recorder-domain-dump` executable を追加）。アプリターゲットには触れないため cycle-9 の計測凍結（アプリ本体のコア差し替え禁止）と非干渉（grill 確定 2026-07-12。既存の `MatchExporterV2` は入力側=生データの書き出しであり、projection 出力=模範解答を書き出す手段は本ツールが初）
 - **DTO decode はツール内に自前で持つ**（アプリ層の `SampleMatchDTOsV2.swift` はアプリターゲット所属で import 不可。約 200 行の Codable struct の意図的な複製とし、複製である旨をコメントで明記）
 - **出力**: コーパス JSON 1 件につき正規化 JSON 1 件
 
@@ -64,7 +64,7 @@ dump ツール・Rust 側テストハーネスの双方が「内部 ID → コ�
 
 ### 5. 比較規約
 
-- **f64 は完全一致（bit-exact）から始める**。移植が演算順を保存していれば IEEE 754 の決定性により一致するはず。破れたケースは原因を特定し、epsilon 許容に切り替える場合はこの ADR に判断を追記する
+- **f64 は完全一致（bit-exact）から始める**（grill 確定 2026-07-12）。移植が演算順を保存していれば IEEE 754 の決定性により一致するはず。ズレ = 写経ミスのシグナルとして扱う。破れたケースは原因を特定し、epsilon 許容に切り替える場合はこの ADR に判断を追記する
 - 比較は Rust 側のテスト（`cargo test`）で実行: `tests/golden/` の期待出力と Rust 実装の出力の JSON 構造比較。差分はケース単位で報告
 
 ### 6. 完走判定
