@@ -11,4 +11,5 @@
 
 pub mod clock;
 pub mod configuration;
+pub mod entities;
 pub mod ids;
