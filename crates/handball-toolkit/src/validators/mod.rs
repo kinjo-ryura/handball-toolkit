@@ -5,10 +5,12 @@
 //! （累積秒 → recordedAt → id）でソート済みである前提（入力契約 — ADR 0001）。
 
 mod configuration_validator;
+mod fact_log_validator;
 mod fact_validator;
 mod match_validator;
 
 pub use configuration_validator::validate_configuration;
+pub use fact_log_validator::validate_fact_log;
 pub use fact_validator::{
     RosterContext, validate_control_fact, validate_match_fact, validate_play_fact,
 };
