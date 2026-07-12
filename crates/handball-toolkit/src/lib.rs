@@ -15,5 +15,6 @@ pub mod entities;
 pub mod facts;
 pub mod ids;
 pub mod projection;
+pub mod sample_dto;
 pub mod validation;
 pub mod validators;
