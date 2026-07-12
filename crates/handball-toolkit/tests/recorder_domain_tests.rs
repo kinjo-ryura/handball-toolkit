@@ -1,7 +1,4 @@
 //! 移植元: `Tests/RecorderDomainTests/RecorderDomainTests.swift`。
-//!
-//! Swift の `moduleExposesCoreTypes` は `TimeSegment`（P4 `projection::time_segment`）を
-//! 参照するため、そのモジュールの移植時に合わせて移植する。
 
 use chrono::DateTime;
 use handball_toolkit::clock::{FactAnchor, FactAnchorKind, MatchClock, VideoClock};
@@ -10,7 +7,20 @@ use handball_toolkit::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
     StoppageKind, StoppagePayload,
 };
+use handball_toolkit::projection::TimeSegment;
 use uuid::Uuid;
+
+#[test]
+fn module_exposes_core_types() {
+    // Swift 版は `_ = PhaseKind.self` 等の型参照。Rust では型引数の解決がコンパイル時検証になる。
+    fn assert_exists<T>() {}
+    assert_exists::<PhaseKind>();
+    assert_exists::<MatchFact>();
+    assert_exists::<MatchClock>();
+    assert_exists::<TimeSegment>();
+    assert_exists::<MatchConfiguration>();
+    assert_exists::<ControlFact>();
+}
 
 #[test]
 fn match_configuration_round_trips_via_serde() {
