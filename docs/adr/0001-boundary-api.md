@@ -184,6 +184,7 @@ pub fn validate_delete(removed_fact_id: FactId, existing_facts: &[MatchFact], ma
 | `TimeInterval` | `f64` | 実体は Double の別名。等価境界比較（`start == end` の degenerate 判定等）は移植で演算順を変えないこと。ソートは `total_cmp` で決定化 |
 | `Set<UUID>` | `BTreeSet<Uuid>` | 決定性優先（前述） |
 | `String.trimmingCharacters(.whitespacesAndNewlines)` | `str::trim()` | どちらも Unicode 空白基準でほぼ同等。厳密同等性はパリティ検証の確認項目 |
+| `Int` | `i64` | Swift Int は 64-bit（Apple プラットフォーム）。該当は `Player.jerseyNumber` 等の値フィールド。コレクションの index を返す API のみ Rust 慣習の `usize`（関数目録 `phase_index` 参照） |
 
 依存 crate は `uuid` / `serde` / `serde_json` / 日時 crate の最小集合に留める（wasm 対応を壊さない）。
 
