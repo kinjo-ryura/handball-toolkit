@@ -10,10 +10,19 @@
 
 - **忠実移植**: Swift ファイルと Rust ファイルを 1:1 対応させ（ADR 0001 のミラー表）、演算順も保存する。改善したくなったら Issue 化して完走後に回す
 - **テストも同時移植**: モジュールを写したら、対応する Swift Testing のテストを同じセッションで移植する（後回しにしない）。`#expect` の即値はそのまま写す
-- **トランクベース**: main に直接コミット。`cargo test` green の状態でのみ積む。赤いまま中断するときだけ WIP ブランチに退避（main を赤にしない）
+- **ブランチ運用（このリポ）**: フェーズ単位の作業ブランチ（例: `port/p2-types`）で進め、フェーズ完了（`cargo test` green + このファイルのチェック更新）時に main へ merge する。main は常に green を保つ。push 済みコミットの rebase / squash はしない
+- **親リポの pointer bump は main への merge 時のみ**（作業ブランチの中間状態を親リポが指さない）
 - **コミット粒度**: 1 モジュール（実装 + テスト）= 1 コミット目安。メッセージ規約は親リポ commit skill（日本語 Conventional Commits 風）
 - **push 順**: handball-toolkit → 親リポ。逆にすると親リポがリモートに存在しない commit を指す（2026-07-12 に実際に発生）
 - **再検討トリガー**: OSS 公開で外部コントリビュータが現れたら PR + CI（`cargo test` ゲート）へ切替
+
+## オラクル（HandballRecorder）側の運用
+
+- dump ツール（P7）は HandballRecorder の **`feat/rust-domain-core` ブランチに置き、main へは merge しない**。Swift がオラクルの役目を終えたら（完走後に「Swift へ追従しない」と決めた時点で）ブランチごと削除する
+- **ブランチの不変条件: RecorderDomain のライブラリソースを一切変更しない**。追加してよいのは dump ツールのファイルと Package.swift の executable target 定義のみ。これにより「オラクルの中身 = main の RecorderDomain」が常に成り立つ
+- **ゴールデンの出所記録**: `tests/golden/` に「どの HandballRecorder **main** コミットの RecorderDomain から生成したか」のハッシュを記録する。ブランチのハッシュは使わない（ブランチ削除後に消えるため。main のハッシュは永続する）
+- **再同期の手順**（main の RecorderDomain に変更が入ったら）: `feat/rust-domain-core` に main を merge → dump 再実行 → `tests/golden/` と出所ハッシュを更新 → Rust 実装を追従 → 一括で commit
+- dump ツールは「テスト後すぐ不要」ではなく **Swift がオラクル（正）である間は必要**（Swift 側変更のたびにゴールデン再生成で使う）。それまでブランチを維持する
 
 ## 全体フローと現在地
 
@@ -35,7 +44,7 @@
   - [ ] `live_match`
 - [ ] P5 validators（fact / fact_log / match_write / configuration / match の 5 種）
 - [ ] P6 `sample_dto` モジュール（SAMPLE_DTO_V2 準拠の serde 型 + converter。依存は domain への一方通行厳守 — ADR 0003）
-- [ ] P7 オラクル dump ツール（HandballRecorder 側 SPM executable）+ `tests/golden/` 整備 — ADR 0003
+- [ ] P7 オラクル dump ツール（HandballRecorder の `feat/rust-domain-core` ブランチ。main へ merge しない — 上記「オラクル側の運用」）+ `tests/golden/` 整備 — ADR 0003
 - [ ] P8 パリティ検証完走（公開 8 件 + ローカル `.timer` × 5 系統 bit-exact 一致、移植テスト 144 件 green。完走判定の定義は ADR 0003）
 - [ ] P9 完走後: OSS 公開判断（README 英語化・ライセンス選定）/ ID の newtype 化（handball-project#52）/ `.timer` 公開サンプル追加（handball-project#53）/ 境界拡張候補（ADR 0001「将来の境界拡張候補」）
 
