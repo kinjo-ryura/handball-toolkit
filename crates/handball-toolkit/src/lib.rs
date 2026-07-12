@@ -9,4 +9,5 @@
 //! 設計方針の背景: handball-project#49 と
 //! `handball-project/docs/research/handballrecorder-rust-core.md` を参照。
 
+pub mod clock;
 pub mod ids;
