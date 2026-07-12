@@ -21,7 +21,10 @@ pub enum FactAnchor {
 }
 
 /// `invalidAnchorForConfiguration` 等で actual / allowed の表現に使う raw kind。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Ord は `allowed: BTreeSet<FactAnchorKind>`（エラー payload の決定的順序 — ADR 0001 の
+/// BTreeSet 方針と同じ理由）のための derive。順序は宣言順で意味を持たない。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FactAnchorKind {
     MatchClock,

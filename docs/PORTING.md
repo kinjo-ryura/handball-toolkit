@@ -37,7 +37,7 @@
   - [x] `configuration`（MatchConfiguration ほか。**ContentKind は移植しない** — ADR 0001）
   - [x] `entities`（Match / Team / Player / PlayerPhoto / RosterSelection）
   - [x] `facts`（MatchFact / MatchFactPayload / PlayFact / ControlFact ほか）
-- [ ] P3 validation エラー型（4 enum・37 ケース + DomainValidationIssue + ワイヤ形式 — ADR 0002）
+- [x] P3 validation エラー型（4 enum・37 ケース + DomainValidationIssue + ワイヤ形式 — ADR 0002。2026-07-12）
 - [ ] P4 projection（**最難関**。ADR 0001「保存すべきセマンティクス」9 項目を常に参照）
   - [ ] `time_segment`
   - [ ] `segment_resolver`（最重要・最繊細。baseline rolling forward / stoppage carve / 半開区間）
@@ -57,5 +57,6 @@ P2〜P5 の順序は Swift のモジュール依存 DAG（Identifiers → Clock 
 
 - 移植元テスト: `../HandballRecorder/Packages/RecorderDomain/Tests/RecorderDomainTests/`（Swift Testing 144 テスト / 約 2,507 行）
 - フィクスチャヘルパーは Rust 側 `tests` 内の `mod fixtures` に集約する
-- 移植したテスト数はパリティ完走判定（P8）の分子になるので、モジュール完了時にここへ累計を記録する: **現在 7 / 144**
+- 移植したテスト数はパリティ完走判定（P8）の分子になるので、モジュール完了時にここへ累計を記録する: **現在 7 / 140**
+- 分母の補正（144 → 140）: `DomainValidationMessageTests.swift`（4 件）は文言レイヤのテストで移植対象外（ADR 0002 — 文言はシェル所有）。lookup key `(scope, code)` の安定性は Rust 新設の `tests/validation_wire_format_tests.rs`（6 件。分子には数えない）が担保する
 - 繰り越し: `RecorderDomainTests.swift` の `moduleExposesCoreTypes`（1 件）は `TimeSegment` を参照するため P4 `projection::time_segment` の移植時に写す
