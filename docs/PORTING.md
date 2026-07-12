@@ -1,0 +1,48 @@
+# 移植作業ガイド — RecorderDomain → Rust
+
+セッションをまたいで移植を進めるための「現在地と次の一手」のファイル。**各セッションの冒頭でこれを読み、進捗があったらチェックを更新する**。設計判断の正典は `docs/adr/`（このファイルには理由を書かない）。
+
+- 背景・経緯: handball-project#49 / `handball-project/docs/research/handballrecorder-rust-core.md`
+- 設計: [ADR 0001](adr/0001-boundary-api.md)（境界 API 目録）/ [ADR 0002](adr/0002-error-model.md)（エラー体系）/ [ADR 0003](adr/0003-parity-verification.md)（パリティ検証）— すべて accepted（2026-07-12）
+- 移植元（真実の仕様）: `../HandballRecorder/Packages/RecorderDomain/`（sibling submodule）。挙動に迷ったら Swift 実装とそのテストを読む。**「改善」しない**
+
+## 作業規律
+
+- **忠実移植**: Swift ファイルと Rust ファイルを 1:1 対応させ（ADR 0001 のミラー表）、演算順も保存する。改善したくなったら Issue 化して完走後に回す
+- **テストも同時移植**: モジュールを写したら、対応する Swift Testing のテストを同じセッションで移植する（後回しにしない）。`#expect` の即値はそのまま写す
+- **トランクベース**: main に直接コミット。`cargo test` green の状態でのみ積む。赤いまま中断するときだけ WIP ブランチに退避（main を赤にしない）
+- **コミット粒度**: 1 モジュール（実装 + テスト）= 1 コミット目安。メッセージ規約は親リポ commit skill（日本語 Conventional Commits 風）
+- **push 順**: handball-toolkit → 親リポ。逆にすると親リポがリモートに存在しない commit を指す（2026-07-12 に実際に発生）
+- **再検討トリガー**: OSS 公開で外部コントリビュータが現れたら PR + CI（`cargo test` ゲート）へ切替
+
+## 全体フローと現在地
+
+- [x] P0 開発環境（Nix flake + direnv、rust-toolchain.toml）
+- [x] P1 設計 ADR 3 本（起草 → grill → accepted、2026-07-12）
+- [ ] P2 型の移植（依存 DAG 順。各モジュール = 実装 + テスト同時）
+  - [ ] `ids`（Identifiers.swift。type alias — ADR 0001）
+  - [ ] `clock`（MatchClock / VideoClock / FactAnchor / FactAnchorKind）
+  - [ ] `configuration`（MatchConfiguration ほか。**ContentKind は移植しない** — ADR 0001）
+  - [ ] `entities`（Match / Team / Player / PlayerPhoto / RosterSelection）
+  - [ ] `facts`（MatchFact / MatchFactPayload / PlayFact / ControlFact ほか）
+- [ ] P3 validation エラー型（4 enum・37 ケース + DomainValidationIssue + ワイヤ形式 — ADR 0002）
+- [ ] P4 projection（**最難関**。ADR 0001「保存すべきセマンティクス」9 項目を常に参照）
+  - [ ] `time_segment`
+  - [ ] `segment_resolver`（最重要・最繊細。baseline rolling forward / stoppage carve / 半開区間）
+  - [ ] `timeline`
+  - [ ] `summary`
+  - [ ] `score_progression`
+  - [ ] `live_match`
+- [ ] P5 validators（fact / fact_log / match_write / configuration / match の 5 種）
+- [ ] P6 `sample_dto` モジュール（SAMPLE_DTO_V2 準拠の serde 型 + converter。依存は domain への一方通行厳守 — ADR 0003）
+- [ ] P7 オラクル dump ツール（HandballRecorder 側 SPM executable）+ `tests/golden/` 整備 — ADR 0003
+- [ ] P8 パリティ検証完走（公開 8 件 + ローカル `.timer` × 5 系統 bit-exact 一致、移植テスト 144 件 green。完走判定の定義は ADR 0003）
+- [ ] P9 完走後: OSS 公開判断（README 英語化・ライセンス選定）/ ID の newtype 化（handball-project#52）/ `.timer` 公開サンプル追加（handball-project#53）/ 境界拡張候補（ADR 0001「将来の境界拡張候補」）
+
+P2〜P5 の順序は Swift のモジュール依存 DAG（Identifiers → Clock → Configuration → Facts / Entities → Validation → Projection → Validators）に従う。P3（エラー型）を要求するのは P5 だけなので、P3 と P4 は入れ替えてもよい。
+
+## テスト移植のメモ
+
+- 移植元テスト: `../HandballRecorder/Packages/RecorderDomain/Tests/RecorderDomainTests/`（Swift Testing 144 テスト / 約 2,507 行）
+- フィクスチャヘルパーは Rust 側 `tests` 内の `mod fixtures` に集約する
+- 移植したテスト数はパリティ完走判定（P8）の分子になるので、モジュール完了時にここへ累計を記録する: **現在 0 / 144**
