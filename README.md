@@ -15,10 +15,11 @@
 
 ```
 crates/
-  handball-toolkit/   — コア crate（facts / clocks / configuration / entities / validators / projections）
+  handball-toolkit/       — コア crate（facts / clocks / configuration / entities / validators / projections）
+  handball-toolkit-ffi/   — UniFFI バインディング層（JSON in → JSON out の粗い境界 + uniffi-bindgen CLI）
 ```
 
-将来の拡張候補（必要になってから追加）: CLI（JSON 検証器）、wasm バインディング、UniFFI バインディング（Swift / Kotlin）。
+将来の拡張候補（必要になってから追加）: CLI（JSON 検証器）、wasm バインディング、Kotlin バインディング。
 
 ## 開発
 
