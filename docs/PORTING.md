@@ -1,6 +1,6 @@
 # 移植作業ガイド — RecorderDomain → Rust
 
-> **状態（2026-07-12）: 移植完走。** P0〜P8 完了（移植テスト 140/140 green・パリティ bit-exact 公開 8 + ローカル 2 件）、P9 は全項目見送りを判断済み（下記トリガー参照）。Issue 側の残り: handball-project#49 の UniFFI PoC（本ガイドの範囲外）と #52〜#54。以降の toolkit 変更は通常の開発フローで行う。
+> **状態（2026-07-15）: 移植完走。** P0〜P8 完了（移植テスト 140/140 green・パリティ bit-exact 公開 8 + ローカル 2 件）、P9 は全項目見送りを判断済み（下記トリガー参照）。handball-project#49 の UniFFI PoC も完了（2026-07-15。`crates/handball-toolkit-ffi/` + `scripts/build_xcframework.sh` + `scripts/ios_poc/`）。Issue 側の残り: #52〜#54。以降の toolkit 変更は通常の開発フローで行う。
 
 セッションをまたいで移植を進めるための「現在地と次の一手」のファイル。**各セッションの冒頭でこれを読み、進捗があったらチェックを更新する**。設計判断の正典は `docs/adr/`（このファイルには理由を書かない）。
 
