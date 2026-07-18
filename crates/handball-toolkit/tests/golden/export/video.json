@@ -1,0 +1,116 @@
+{
+  "facts" : [
+    {
+      "factID" : "FAC00000-0000-0000-0000-000000000011",
+      "payload" : {
+        "control" : {
+          "anchor" : {
+            "endVideoElapsedSeconds" : 70,
+            "kind" : "videoClock",
+            "videoClock" : {
+              "elapsedSeconds" : 10
+            }
+          },
+          "kind" : "phaseStart",
+          "phaseStart" : {
+            "kind" : "regular"
+          }
+        },
+        "kind" : "control"
+      },
+      "recordedAt" : "2025-06-15T15:06:50Z"
+    },
+    {
+      "factID" : "FAC00000-0000-0000-0000-000000000012",
+      "payload" : {
+        "kind" : "play",
+        "play" : {
+          "anchor" : {
+            "kind" : "videoClock",
+            "videoClock" : {
+              "elapsedSeconds" : 30.25
+            }
+          },
+          "kind" : "goal",
+          "playerKey" : "CCCCCCCC-0000-0000-0000-000000000001",
+          "teamKey" : "home"
+        }
+      },
+      "recordedAt" : "2025-06-15T15:07:00Z"
+    },
+    {
+      "factID" : "FAC00000-0000-0000-0000-000000000013",
+      "payload" : {
+        "control" : {
+          "anchor" : {
+            "endMatchElapsedSeconds" : 15,
+            "endVideoElapsedSeconds" : 40,
+            "kind" : "both",
+            "matchClock" : {
+              "elapsedSeconds" : 15
+            },
+            "videoClock" : {
+              "elapsedSeconds" : 25
+            }
+          },
+          "kind" : "stoppage",
+          "stoppage" : {
+            "stoppageKind" : "timeout"
+          }
+        },
+        "kind" : "control"
+      },
+      "recordedAt" : "2025-06-15T15:07:10Z"
+    },
+    {
+      "factID" : "FAC00000-0000-0000-0000-000000000014",
+      "payload" : {
+        "kind" : "play",
+        "play" : {
+          "anchor" : {
+            "kind" : "videoClock",
+            "videoClock" : {
+              "elapsedSeconds" : 50
+            }
+          },
+          "kind" : "goal",
+          "teamKey" : "away"
+        }
+      },
+      "recordedAt" : "2025-06-15T15:07:20Z"
+    }
+  ],
+  "match" : {
+    "configuration" : {
+      "kind" : "video",
+      "video" : {
+        "source" : {
+          "externalID" : "phasset-ABC123/xyz",
+          "provider" : "local"
+        }
+      }
+    },
+    "date" : "2025-06-15T15:06:40Z"
+  },
+  "schemaVersion" : 2,
+  "teams" : {
+    "away" : {
+      "key" : "away",
+      "name" : "横浜グリーン",
+      "players" : [
+
+      ]
+    },
+    "home" : {
+      "key" : "home",
+      "name" : "湘南ブルー",
+      "players" : [
+        {
+          "jerseyNumber" : 1,
+          "key" : "CCCCCCCC-0000-0000-0000-000000000001",
+          "name" : "Carol"
+        }
+      ]
+    }
+  }
+}

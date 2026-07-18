@@ -9,14 +9,23 @@
 //! - `SegmentResolver` だけ object ハンドル（構築 1 回・参照は self + スカラー）
 //! - 自明なアクセサ（`FactAnchor.matchClock` 等）は公開しない — Swift シムが再実装する
 
+use std::collections::BTreeMap;
+
+use uuid::Uuid;
+
 use crate::clock::{MatchClock, VideoClock};
 use crate::configuration::{MatchConfiguration, PhaseKind};
-use crate::entities::Match;
+use crate::entities::{Match, Player, Team};
 use crate::facts::{ControlFact, MatchFact, PlayFact};
 use crate::ids::FactId;
 use crate::projection::{
     LiveMatchProjection, Phase, ScoreProgressionProjection, SegmentResolver, SummaryProjection,
     TimeSegment, TimelineProjection,
+};
+use crate::sample_dto::{
+    self, SampleFactDtoV2, SampleHighlightIndexDtoV2, SampleIndexDtoV2,
+    SampleMatchConfigurationDtoV2, SampleMatchConversionResult, SampleMatchDecodeErrorV2,
+    SampleMatchDtoV2,
 };
 use crate::validation::DomainValidationIssue;
 use crate::validators;
@@ -159,6 +168,143 @@ pub fn validate_delete(
     match_: Match,
 ) -> Vec<DomainValidationIssue> {
     validators::validate_delete(removed_fact_id, &existing_facts, &match_)
+}
+
+// ── sample_dto（SAMPLE_DTO_V2 の parse / 変換 / export — ADR 0004 決定 2）──
+
+/// sample_dto FFI の失敗（ADR 0002: 構造化 — コード + パラメータのみ。文言はシェル所有）。
+///
+/// Swift では throws で受ける。`Decode` は移植エラー型 `SampleMatchDecodeErrorV2` を
+/// そのまま搬送する。
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Error)]
+pub enum SampleDtoError {
+    /// JSON が SAMPLE_DTO_V2 schema として parse できない（serde の診断文字列を添付）。
+    InvalidJson { message: String },
+    /// DTO → domain の decode 失敗。
+    Decode { error: SampleMatchDecodeErrorV2 },
+    /// 事前生成 ID の不足。`sample_match_required_id_count` の値だけ生成して渡す。
+    InsufficientNewIds { required: usize, provided: usize },
+}
+
+// uniffi::Error は Display を要求する。開発者向け診断のみ（ユーザー向け文言は
+// シェル所有 — 設計不変条件 3）なので Debug 表現をそのまま使う。
+impl std::fmt::Display for SampleDtoError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+fn invalid_json(error: serde_json::Error) -> SampleDtoError {
+    SampleDtoError::InvalidJson {
+        message: error.to_string(),
+    }
+}
+
+/// 配信 JSON → DTO（`/v2/matches/{slug}.json` / `/v2/highlights/{slug}.json` の本体）。
+#[uniffi::export]
+pub fn parse_sample_match(json: String) -> Result<SampleMatchDtoV2, SampleDtoError> {
+    serde_json::from_str(&json).map_err(invalid_json)
+}
+
+/// `/v2/index.json` の parse。
+#[uniffi::export]
+pub fn parse_sample_index(json: String) -> Result<SampleIndexDtoV2, SampleDtoError> {
+    serde_json::from_str(&json).map_err(invalid_json)
+}
+
+/// `/v2/highlights/index.json` の parse。
+#[uniffi::export]
+pub fn parse_sample_highlight_index(
+    json: String,
+) -> Result<SampleHighlightIndexDtoV2, SampleDtoError> {
+    serde_json::from_str(&json).map_err(invalid_json)
+}
+
+/// `sample_dto::required_id_count` — `convert_sample_match` へ渡す事前生成 ID の必要数。
+#[uniffi::export]
+pub fn sample_match_required_id_count(dto: SampleMatchDtoV2) -> usize {
+    sample_dto::required_id_count(&dto)
+}
+
+/// `sample_dto::convert`。ID 生成の closure 注入は FFI では callback interface を要するため、
+/// シェルが必要数を事前生成した `new_ids` で置き換える（ADR 0004 決定 2 — stateless 維持）。
+#[uniffi::export]
+pub fn convert_sample_match(
+    slug: String,
+    dto: SampleMatchDtoV2,
+    configuration_override: Option<MatchConfiguration>,
+    new_ids: Vec<Uuid>,
+) -> Result<SampleMatchConversionResult, SampleDtoError> {
+    let required = sample_dto::required_id_count(&dto);
+    if new_ids.len() < required {
+        return Err(SampleDtoError::InsufficientNewIds {
+            required,
+            provided: new_ids.len(),
+        });
+    }
+    let mut ids = new_ids.into_iter();
+    sample_dto::convert(&slug, &dto, configuration_override, || {
+        ids.next().expect("必要数は事前検査済み")
+    })
+    .map_err(|error| SampleDtoError::Decode { error })
+}
+
+/// `sample_dto::decode_configuration`（importer の merge 調停が単体で使う）。
+#[uniffi::export]
+pub fn decode_sample_configuration(
+    dto: SampleMatchConfigurationDtoV2,
+) -> Result<MatchConfiguration, SampleDtoError> {
+    sample_dto::decode_configuration(&dto).map_err(|error| SampleDtoError::Decode { error })
+}
+
+/// `sample_dto::decode_fact`（importer の merge 調停が、既存 DB と突合済みの
+/// teamKey / playerKey 写像で 1 fact ずつ decode する経路）。
+/// `fallback_id` は factID 無し fact 用にシェルが 1 個だけ事前生成して渡す。
+#[uniffi::export]
+pub fn decode_sample_fact(
+    dto: SampleFactDtoV2,
+    teams_by_key: BTreeMap<String, Uuid>,
+    players_by_key: BTreeMap<String, Uuid>,
+    fallback_id: Uuid,
+) -> Result<MatchFact, SampleDtoError> {
+    let mut fallback = Some(fallback_id);
+    sample_dto::decode_fact(&dto, &teams_by_key, &players_by_key, || {
+        fallback.take().expect("factID 無し fact の採番は 1 回だけ")
+    })
+    .map_err(|error| SampleDtoError::Decode { error })
+}
+
+/// `sample_dto::export_match`（domain → DTO。ドメイン → SAMPLE_DTO_V2 の Rust 一本化）。
+#[uniffi::export]
+pub fn export_sample_match(
+    match_: Match,
+    home_team: Team,
+    away_team: Team,
+    home_players: Vec<Player>,
+    away_players: Vec<Player>,
+    facts: Vec<MatchFact>,
+) -> SampleMatchDtoV2 {
+    sample_dto::export_match(
+        &match_,
+        &home_team,
+        &away_team,
+        &home_players,
+        &away_players,
+        &facts,
+    )
+}
+
+/// `sample_dto::encode_sample_match`（Swift JSONEncoder 互換のバイト出力 — share sheet /
+/// handball-sample-matches への投入用）。
+#[uniffi::export]
+pub fn encode_sample_match(dto: SampleMatchDtoV2) -> String {
+    sample_dto::encode_sample_match(&dto)
+}
+
+/// `sample_dto::default_slug`（エクスポートのファイル名向け ASCII slug）。
+#[uniffi::export]
+pub fn sample_match_default_slug(match_: Match, home_team: Team, away_team: Team) -> String {
+    sample_dto::default_slug(&match_, &home_team, &away_team)
 }
 
 // ── SegmentResolver（object ハンドル — ADR 0004 決定 5）──

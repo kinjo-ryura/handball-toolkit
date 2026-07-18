@@ -32,8 +32,10 @@ use super::sample_match_dtos::{
 /// 1 試合分の変換結果。
 ///
 /// `teams_by_key` / `players_by_key` は Rust 側の追加フィールド（ADR 0003 §3 のゴールデン
-/// 正規化で「内部 ID → コーパスキー」の逆写像を作る材料。Swift 版には無い）。
+/// 正規化で「内部 ID → コーパスキー」の逆写像を作る材料に加え、FFI ではシェルの merge
+/// 調停が既存 DB との突合に使う。Swift 版には無い）。
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct SampleMatchConversionResult {
     pub r#match: Match,
     pub home_team: Team,
@@ -51,6 +53,22 @@ impl SampleMatchConversionResult {
     pub fn teams(&self) -> Vec<Team> {
         vec![self.home_team.clone(), self.away_team.clone()]
     }
+}
+
+/// `convert` が消費する新規 ID の数。
+///
+/// 内訳は生成順どおり: home team 1 + home 選手 + away team 1 + away 選手 + match 1 +
+/// `factID` 無し fact。FFI の「事前生成 `Vec<Uuid>`」方式（ADR 0004 決定 2）でシェルが
+/// 生成数を知るための関数で、消費順の知識をシェルへ漏らさないためコア側に置く。
+pub fn required_id_count(dto: &SampleMatchDtoV2) -> usize {
+    (1 + dto.teams.home.players.len())
+        + (1 + dto.teams.away.players.len())
+        + 1
+        + dto
+            .facts
+            .iter()
+            .filter(|fact| fact.fact_id.is_none())
+            .count()
 }
 
 /// DTO → domain 変換。
@@ -479,6 +497,9 @@ fn decode_end_anchor(
 }
 
 // ── raw value ──
+//
+// from_raw は converter（decode）、_raw は exporter（encode）が使う。
+// 対で並べ、往復（from_raw(raw(k)) == Some(k)）は exporter テストで固定する。
 
 /// Swift `PlayEventKind(rawValue:)` 相当（rawValue は domain serde の camelCase 表記と一致）。
 fn play_event_kind_from_raw(raw: &str) -> Option<PlayEventKind> {
@@ -493,6 +514,18 @@ fn play_event_kind_from_raw(raw: &str) -> Option<PlayEventKind> {
     }
 }
 
+/// Swift `PlayEventKind.rawValue` 相当。
+pub(super) fn play_event_kind_raw(kind: PlayEventKind) -> &'static str {
+    match kind {
+        PlayEventKind::Goal => "goal",
+        PlayEventKind::ShotMissed => "shotMissed",
+        PlayEventKind::FreeNote => "freeNote",
+        PlayEventKind::YellowCard => "yellowCard",
+        PlayEventKind::TwoMinuteSuspension => "twoMinuteSuspension",
+        PlayEventKind::RedCard => "redCard",
+    }
+}
+
 /// Swift `PhaseKind(rawValue:)` 相当。
 fn phase_kind_from_raw(raw: &str) -> Option<PhaseKind> {
     match raw {
@@ -502,11 +535,27 @@ fn phase_kind_from_raw(raw: &str) -> Option<PhaseKind> {
     }
 }
 
+/// Swift `PhaseKind.rawValue` 相当。
+pub(super) fn phase_kind_raw(kind: PhaseKind) -> &'static str {
+    match kind {
+        PhaseKind::Regular => "regular",
+        PhaseKind::Shootout => "shootout",
+    }
+}
+
 /// Swift `StoppageKind(rawValue:)` 相当。
 fn stoppage_kind_from_raw(raw: &str) -> Option<StoppageKind> {
     match raw {
         "timeout" => Some(StoppageKind::Timeout),
         "pause" => Some(StoppageKind::Pause),
         _ => None,
+    }
+}
+
+/// Swift `StoppageKind.rawValue` 相当。
+pub(super) fn stoppage_kind_raw(kind: StoppageKind) -> &'static str {
+    match kind {
+        StoppageKind::Timeout => "timeout",
+        StoppageKind::Pause => "pause",
     }
 }

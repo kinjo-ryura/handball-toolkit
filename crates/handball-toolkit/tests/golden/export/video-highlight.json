@@ -1,0 +1,42 @@
+{
+  "facts" : [
+
+  ],
+  "match" : {
+    "configuration" : {
+      "kind" : "videoHighlight",
+      "videoHighlight" : {
+        "source" : {
+          "externalID" : "dQw4w9WgXcQ",
+          "provider" : "youtube"
+        }
+      }
+    },
+    "date" : "2025-10-09T08:53:20Z",
+    "displayName" : "ハイライト集"
+  },
+  "schemaVersion" : 2,
+  "teams" : {
+    "away" : {
+      "key" : "away",
+      "name" : "Blue Owls",
+      "players" : [
+        {
+          "key" : "EEEEEEEE-0000-0000-0000-000000000001",
+          "name" : "Emi"
+        }
+      ]
+    },
+    "home" : {
+      "key" : "home",
+      "name" : "Osaka 365 Stars",
+      "players" : [
+        {
+          "jerseyNumber" : 10,
+          "key" : "DDDDDDDD-0000-0000-0000-000000000001",
+          "name" : "Daisuke"
+        }
+      ]
+    }
+  }
+}

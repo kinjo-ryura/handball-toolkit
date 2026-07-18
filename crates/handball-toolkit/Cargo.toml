@@ -14,6 +14,8 @@ uniffi = ["dep:uniffi"]
 chrono = { version = "0.4", default-features = false, features = ["std", "serde"] }
 # rc: TimelineProjection.resolver の Arc を透過 serialize するため（ADR 0004）。
 serde = { version = "1", features = ["derive", "rc"] }
+# sample_dto の encode（Swift JSONEncoder 互換の配信 JSON 書き出し — ADR 0004 決定 2）。
+serde_json = { version = "1" }
 uniffi = { version = "0.32", optional = true }
 uuid = { version = "1", features = ["serde"] }
 

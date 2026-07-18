@@ -63,3 +63,12 @@ uniffi::custom_type!(PlayerTeamLookup, std::collections::HashMap<Uuid, Uuid>, {
     try_lift: |val| Ok(val.into_iter().collect()),
     lower: |obj| obj.into_iter().collect(),
 });
+
+/// `BTreeMap<String, Uuid>`（sample_dto の teamKey / playerKey → 内部 ID 写像）も
+/// HashMap でブリッジ（Swift は `[String: UUID]`）。
+pub type SampleKeyLookup = BTreeMap<String, Uuid>;
+uniffi::custom_type!(SampleKeyLookup, std::collections::HashMap<String, Uuid>, {
+    remote,
+    try_lift: |val| Ok(val.into_iter().collect()),
+    lower: |obj| obj.into_iter().collect(),
+});

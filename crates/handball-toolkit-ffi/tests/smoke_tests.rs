@@ -54,3 +54,59 @@ fn segment_resolver_の_ffi_コンストラクタが疎通する() {
     assert!(resolver.all_phases().is_empty());
     assert_eq!(resolver.phase_kind_ffi(0.0), None);
 }
+
+#[test]
+fn sample_dto_の_parse_convert_export_が疎通する() {
+    let json = r#"{
+      "schemaVersion": 2,
+      "match": {
+        "displayName": "スモーク",
+        "date": "2026-01-01T00:00:00Z",
+        "configuration": {"kind": "timer", "timer": {"phaseDurationSeconds": 1800}}
+      },
+      "teams": {
+        "home": {"key": "home", "name": "Tigers", "players": [{"key": "p1", "name": "Alice"}]},
+        "away": {"key": "away", "name": "Falcons", "players": []}
+      },
+      "facts": []
+    }"#;
+
+    let dto = ffi_api::parse_sample_match(json.to_string()).expect("parse 成功");
+    let required = ffi_api::sample_match_required_id_count(dto.clone());
+    assert_eq!(required, 4); // home team + Alice + away team + match
+
+    // ID 不足は構造化エラー
+    let starved = ffi_api::convert_sample_match("smoke".to_string(), dto.clone(), None, vec![]);
+    assert_eq!(
+        starved.unwrap_err(),
+        ffi_api::SampleDtoError::InsufficientNewIds {
+            required: 4,
+            provided: 0
+        }
+    );
+
+    let ids: Vec<Uuid> = (1..=required as u128).map(Uuid::from_u128).collect();
+    let conversion =
+        ffi_api::convert_sample_match("smoke".to_string(), dto, None, ids).expect("convert 成功");
+    assert_eq!(conversion.home_team.name, "Tigers");
+    assert_eq!(conversion.players_by_key["p1"], Uuid::from_u128(2));
+
+    // export → encode → 再 parse の round-trip
+    let exported = ffi_api::export_sample_match(
+        conversion.r#match.clone(),
+        conversion.home_team.clone(),
+        conversion.away_team.clone(),
+        conversion.players.clone(),
+        vec![],
+        conversion.facts.clone(),
+    );
+    let encoded = ffi_api::encode_sample_match(exported);
+    let reparsed = ffi_api::parse_sample_match(encoded).expect("再 parse 成功");
+    assert_eq!(reparsed.r#match.display_name.as_deref(), Some("スモーク"));
+
+    // 不正 JSON は throws（Swift 側）に対応する構造化エラー
+    assert!(matches!(
+        ffi_api::parse_sample_match("{".to_string()),
+        Err(ffi_api::SampleDtoError::InvalidJson { .. })
+    ));
+}

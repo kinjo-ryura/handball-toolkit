@@ -49,6 +49,13 @@ serde 層を境界の外側に置く原則（ADR 0001）は変わらない — U
 
 なお repository / DB に触る `MatchImporterV2` / `MatchMergerV2` の調停ロジックはシェルの責務のまま（純変換部分だけが Rust へ移る）。
 
+**実装追記（2026-07-18 実装で確定）**: 実装時の具体化は次のとおり。
+
+- **オラクル golden はバイト一致**: 決定的試合 3 件を Swift `MatchExporterV2` で encode した出力を fixture（`tests/golden/export/`）としてコミットし、Rust 側は文字列一致で検証。JSON 構造比較では見えない `JSONEncoder` の書式仕様（UUID **大文字** / `.iso8601` の**秒未満切り捨て** / 整数値 double の `.0` 省略 / nil キー省略 / 空コンテナの `[\n\n  ]` 形）を釘付けするため、Rust に Swift 互換 encoder（`sample_match_encoder` + DTO の `swift_wire` serialize）を新設した。配信ファイルの形式は Swift 時代から不変
+- **round-trip は 2 系統**: 実配信コーパス 8 件 + ローカルの parse → convert → export が ID 命名を除き元 DTO と一致（逆写像性）、および export → encode → parse → convert のドメイン復元（秒未満切り捨ての lossy も明示的に固定）
+- **ID 必要数はコアが数える**: `sample_dto::required_id_count`（= FFI `sample_match_required_id_count`）を追加し、消費順の知識をシェルへ漏らさない。不足は構造化エラー `SampleDtoError::InsufficientNewIds` で拒否
+- **DTO 型も record 公開**: importer / merger の調停（シェル残置）が DTO を直接読むため、SAMPLE_DTO_V2 の全 DTO 型 + index 型を uniffi record 化し、`parse_sample_match` / `parse_sample_index` / `parse_sample_highlight_index` / `encode_sample_match` / `decode_sample_configuration` / `decode_sample_fact`（fallback ID 1 個注入）/ `export_sample_match` / `sample_match_default_slug` を公開した
+
 ### 3. 型の写像方式 — コア crate に feature-gate した uniffi derive（grill 確定）
 
 コア crate `handball-toolkit` に feature `uniffi`（default off）を追加し、公開型に `#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]` 等を付ける。ffi crate はコア型を再エクスポートして scaffolding を集約する（uniffi のマルチ crate 構成。Mozilla application-services の実運用形）。
