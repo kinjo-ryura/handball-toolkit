@@ -6,6 +6,7 @@ use crate::clock::FactAnchor;
 use crate::ids::{PlayerId, TeamId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "camelCase")]
 pub enum PlayEventKind {
     Goal,
@@ -34,6 +35,7 @@ impl PlayEventKind {
 /// `team_id` は全 kind で optional。ただし score 系 projection は team_id を直接参照し
 /// player からの導出 fallback を持たないため、goal / shotMissed では実質必須（UI 側で担保）。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct PlayFact {
     pub kind: PlayEventKind,

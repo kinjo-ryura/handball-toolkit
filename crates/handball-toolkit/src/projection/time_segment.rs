@@ -8,6 +8,7 @@ use crate::ids::FactId;
 
 /// `TimeSegment.Kind`（Swift の nested enum）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "camelCase")]
 pub enum TimeSegmentKind {
     /// タイマー動作中（matchTime と videoTime が 1:1 で進む）。shootout phase の running は degenerate（matchClock 固定）。
@@ -21,6 +22,7 @@ pub enum TimeSegmentKind {
 /// running / stopped の 2 種で、video↔match の対応を保持する。
 /// 旧設計では phase でグルーピングしていたが、新設計では累積秒ベースの flat list に変更。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct TimeSegment {
     pub kind: TimeSegmentKind,

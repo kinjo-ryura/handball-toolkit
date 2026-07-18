@@ -15,7 +15,7 @@ pub use live_match::{AvailableActions, LiveMatchProjection, MatchTimerState};
 pub use score_progression::{
     ScoreProgressionPhaseSpan, ScoreProgressionPoint, ScoreProgressionProjection,
 };
-pub use segment_resolver::SegmentResolver;
+pub use segment_resolver::{Phase, SegmentResolver};
 pub use summary::{PhaseSummaryLine, PlayerStatLine, SummaryProjection, TeamSummaryLine};
 pub use time_segment::{TimeSegment, TimeSegmentKind};
 pub use timeline::{ResolvedFact, TimelineProjection};

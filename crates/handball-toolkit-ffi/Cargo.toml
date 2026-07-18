@@ -3,8 +3,8 @@ name = "handball-toolkit-ffi"
 version.workspace = true
 edition.workspace = true
 
-# UniFFI バインディング層。コア crate は型付き API のまま、この crate が
-# 「JSON in → JSON out」の粗い FFI 境界を提供する（serde 層は境界の外側 — ADR 0001）。
+# FFI パッケージング crate。uniffi の型・関数公開はコア crate（feature `uniffi`）の
+# namespace に集約し（ADR 0004）、ここは staticlib 化と bindgen CLI の同居だけを担う。
 
 [lib]
 # staticlib: iOS へは静的リンクで届ける（XCFramework の中身）。lib は host テスト用。
@@ -18,11 +18,13 @@ path = "src/bin/uniffi_bindgen.rs"
 required-features = ["bindgen"]
 
 [features]
-bindgen = ["uniffi/cli"]
+bindgen = ["dep:uniffi", "uniffi/cli"]
 
 [dependencies]
-handball-toolkit = { path = "../handball-toolkit" }
-serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["float_roundtrip"] }
-uniffi = "0.32"
-uuid = { version = "1", features = ["serde"] }
+# feature `uniffi` でコアの derive + export を有効化し、staticlib にメタデータを集約する。
+handball-toolkit = { path = "../handball-toolkit", features = ["uniffi"] }
+uniffi = { version = "0.32", optional = true }
+
+[dev-dependencies]
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+uuid = { version = "1" }

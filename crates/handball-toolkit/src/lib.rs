@@ -13,8 +13,18 @@ pub mod clock;
 pub mod configuration;
 pub mod entities;
 pub mod facts;
+#[cfg(feature = "uniffi")]
+pub mod ffi_api;
+#[cfg(feature = "uniffi")]
+mod ffi_support;
 pub mod ids;
 pub mod projection;
 pub mod sample_dto;
 pub mod validation;
 pub mod validators;
+
+// uniffi メタデータ（namespace: handball_toolkit）。型 derive も関数公開（ffi_api）も
+// この 1 namespace に集約する — ADR 0004（複数 namespace で module_name を共有すると
+// 生成ファイルが上書き衝突するため）。staticlib 化は handball-toolkit-ffi crate。
+#[cfg(feature = "uniffi")]
+uniffi::setup_scaffolding!();

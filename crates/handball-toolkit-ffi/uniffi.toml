@@ -1,4 +1,0 @@
-# Swift バインディングの生成設定。
-# module_name: Swift 側で import する名前（生成物 HandballToolkit.swift / HandballToolkitFFI.h）。
-[bindings.swift]
-module_name = "HandballToolkit"

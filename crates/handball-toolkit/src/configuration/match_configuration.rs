@@ -12,6 +12,7 @@ use super::VideoSource;
 /// Swift 版の `contentKind` / `ContentKind` は移植しない（ADR 0001。ドメイン内部で未使用の
 /// UI helper のため。必要なシェルは variant の match で自前導出する）。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum MatchConfiguration {
     /// タイマーモード（動画なし、フル試合）。`phase_duration_seconds` は phase 開始時の
@@ -25,6 +26,7 @@ pub enum MatchConfiguration {
 
 /// `invalidAnchorForConfiguration` 等で「どの variant 由来か」を伝えるための raw kind。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "camelCase")]
 pub enum MatchConfigurationKind {
     Timer,
@@ -82,6 +84,7 @@ impl MatchConfiguration {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "camelCase")]
 pub enum CaptureMethod {
     ManualClock,

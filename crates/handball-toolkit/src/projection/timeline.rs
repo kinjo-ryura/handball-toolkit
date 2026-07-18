@@ -1,5 +1,7 @@
 //! 移植元: `Projection/TimelineProjection.swift`。
 
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 
 use crate::clock::{FactAnchor, MatchClock, VideoClock};
@@ -12,13 +14,17 @@ use super::segment_resolver::SegmentResolver;
 /// fact log を時系列に並べ、anchor から表示用の MatchClock / VideoClock を解決した
 /// 読み取り専用 projection。永続化はしない。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct TimelineProjection {
     pub resolved_facts: Vec<ResolvedFact>,
-    pub resolver: SegmentResolver,
+    /// FFI 境界では object ハンドルとして渡る（ADR 0004 決定 4/5）。resolver は不変の
+    /// 導出スナップショットなので Arc 共有で意味論は変わらない（serde では透過）。
+    pub resolver: Arc<SegmentResolver>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct ResolvedFact {
     pub fact: MatchFact,
@@ -30,7 +36,7 @@ impl TimelineProjection {
     /// Swift 版同様、`match` は未使用だが API 対称性（facts 版 / timeline 版の 2 系統 —
     /// ADR 0001 関数目録）のため引数に保持する。
     pub fn build(_match: &Match, facts: &[MatchFact]) -> TimelineProjection {
-        let resolver = SegmentResolver::build(facts);
+        let resolver = Arc::new(SegmentResolver::build(facts));
 
         let resolved_facts = facts
             .iter()

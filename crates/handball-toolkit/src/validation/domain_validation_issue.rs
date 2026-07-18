@@ -20,6 +20,7 @@ use super::{
 /// variant tag が `scope`、内側のエラーが `code` + `params` を与え、全体で
 /// `{ "scope": "fact", "code": "negativeMatchClock", "params": {...} }` になる。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(tag = "scope", rename_all = "camelCase")]
 pub enum DomainValidationIssue {
     Match(MatchValidationError),

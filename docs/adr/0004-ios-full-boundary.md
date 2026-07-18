@@ -56,6 +56,8 @@ serde 層を境界の外側に置く原則（ADR 0001）は変わらない — U
 - 型定義は 1 箇所のまま（ミラー型の二重更新なし）。wasm / CLI ビルドは feature off のため uniffi が依存グラフから存在ごと消え、依存最小の原則を壊さない
 - ミラー型方式（ffi crate に写し + `From` 変換、約 30 型 × 600〜900 行）は**フォールバック**として保持する。cross-crate の metadata 集約が実装初期の smoke で通らない場合に切り替える（境界契約は同一なのでシム・アプリ側は影響なし。退避コストは cfg_attr 行の削除のみ）
 
+**実装追記（2026-07-18 smoke で確定）**: uniffi は複数 crate（namespace）が同じ Swift `module_name` を共有すると生成ファイル（.swift / ヘッダ / modulemap）を上書き衝突させるため、「ffi crate に export 関数を置いて scaffolding を集約」は成立しなかった。実装では **export 関数もコア crate の feature-gated `ffi_api` モジュールに置き、namespace をコア 1 つに集約**する。ffi crate は staticlib 化 + bindgen CLI 同居のみの packaging 殻となる。境界契約・シム・アプリ側への影響はない（ミラー型への退避も不要だった）。
+
 ### 4. メソッド持ち型の扱い — 「データは record、繊細なロジックは object、自明なアクセサはシム」
 
 | 分類 | 対象 | 写し方 |

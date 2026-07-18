@@ -20,6 +20,7 @@ use crate::ids::{PlayerId, TeamId};
 /// - `missingTeamForPlayKind`（`team_id` 全 Kind optional 化）
 /// - `playerRequiresTeamReference` / `relatedPlayerRequiresTeamReference`（`team_id` optional 化）
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(
     tag = "code",
     content = "params",

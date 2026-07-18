@@ -1,0 +1,11 @@
+# この crate（namespace: handball_toolkit）の Swift バインディング生成設定。
+# ffi crate と同じモジュール名に揃え、生成 Swift を 1 つの Swift モジュールへまとめる — ADR 0004 決定 8。
+[bindings.swift]
+module_name = "HandballToolkit"
+
+# Uuid（String ブリッジ — src/ffi_support.rs）を Swift の Foundation UUID へ写す。
+[bindings.swift.custom_types.Uuid]
+type_name = "UUID"
+imports = ["Foundation"]
+into_custom = "UUID(uuidString: {})!"
+from_custom = "{}.uuidString"

@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 /// shootout は時計が動かない → shootout 開始時点で matchClock 累積秒は固定
 /// （shootout 中の全 fact が同じ値）。
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct MatchClock {
     pub elapsed_seconds: f64,

@@ -15,6 +15,7 @@ use super::timeline::TimelineProjection;
 /// 旧設計の `currentPhase: MatchPhase` は新設計では `current_phase_kind: Option<PhaseKind>` +
 /// `current_phase_index: Option<usize>`（出現順、regular のみ）に分解。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct LiveMatchProjection {
     pub current_phase_kind: Option<PhaseKind>,
@@ -25,6 +26,7 @@ pub struct LiveMatchProjection {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "camelCase")]
 pub enum MatchTimerState {
     BeforeMatch,
@@ -36,6 +38,7 @@ pub enum MatchTimerState {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct AvailableActions {
     pub can_record_goal: bool,

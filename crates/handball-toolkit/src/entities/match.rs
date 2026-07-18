@@ -11,6 +11,7 @@ use crate::ids::{MatchId, PlayerId, TeamId};
 /// ロースター選択。Swift の `Set<PlayerID>` は決定性（エラー payload・ゴールデン出力の順序）
 /// のため `BTreeSet` で移植する（ADR 0001。集合演算の意味論は同一）。
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct RosterSelection {
     pub benched_player_ids: BTreeSet<PlayerId>,
@@ -18,6 +19,7 @@ pub struct RosterSelection {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct Match {
     pub id: MatchId,

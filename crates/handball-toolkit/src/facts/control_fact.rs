@@ -12,6 +12,7 @@ use crate::configuration::PhaseKind;
 /// - `PhaseStart`: phase の開始 + 終了範囲を 1 fact で保持（end は常に値あり）
 /// - `Stoppage`: 試合タイマーが止まる区間を 1 fact で保持（start + optional end）
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "camelCase")]
 pub enum ControlFact {
     PhaseStart(PhaseStartPayload),
@@ -23,6 +24,7 @@ pub enum ControlFact {
 /// `end_anchor` は常に値あり（生成時に必ずユーザー入力ダイアログを経由する不変条件）。
 /// 規定長は `end_anchor.elapsed_seconds - start_anchor.elapsed_seconds` で導出。
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct PhaseStartPayload {
     pub kind: PhaseKind,
@@ -35,6 +37,7 @@ pub struct PhaseStartPayload {
 /// `end_anchor` は `Timer` mode では常に None、`Video` mode では値あり。
 /// 開始のみ記録するモード（タイマーモード）と、区間として記録するモード（動画モード）の両対応。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct StoppagePayload {
     pub kind: StoppageKind,
@@ -44,6 +47,7 @@ pub struct StoppagePayload {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "camelCase")]
 pub enum StoppageKind {
     /// 戦術的タイムアウト。

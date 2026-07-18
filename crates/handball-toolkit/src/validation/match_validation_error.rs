@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::ids::PlayerId;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(
     tag = "code",
     content = "params",
