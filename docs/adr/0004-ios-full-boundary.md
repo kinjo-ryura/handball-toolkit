@@ -138,6 +138,21 @@ object は**不変の導出スナップショットへのハンドル**であり
 
 1. **FFI 実装**: コア crate の feature `uniffi` + derive 付与 → ffi crate で export（**cross-crate metadata の smoke を最初に確認**。詰まったらミラー型へ切替）。sample_dto の export 方向を Rust に新規実装（オラクル比較 + round-trip）
 2. **XCFramework 更新**: 3 スライス（ios / ios-sim / macos）+ サイズ最適化（LTO / strip / panic=abort、実測記録）
+
+   **実装追記（2026-07-18 完了）**: 3 スライス化（macOS は host std でビルドできるため rust-toolchain.toml 変更不要）。サイズ最適化はワークスペース `[profile.release]` に **LTO（fat）+ codegen-units=1 + panic=abort** を採用。実測（本境界 + sample_dto FFI 込み。smoke バイナリは生成 Swift 層込み・シミュレータ向けリンク）:
+
+   | 構成 | staticlib（.a, ios 実機） | リンク後 smoke バイナリ |
+   |---|---|---|
+   | release 既定（ベースライン） | 20.28 MB | 4.42 MB |
+   | + lto=true, codegen-units=1 | 24.25 MB | 3.97 MB |
+   | 　┗ さらに opt-level="s" | 27.25 MB | 5.08 MB（逆効果） |
+   | 　┗ さらに opt-level="z" | 26.45 MB | 4.95 MB（逆効果） |
+   | **+ panic="abort"（採用）** | 23.62 MB | **3.76 MB** |
+   | 採用構成 + アプリ相当の `-dead_strip` リンク | — | **2.42 MB** |
+
+   - .a の増加は fat LTO の中間表現込みのため。配布実体はアプリにリンクされた後のサイズで、dead_strip 込みでベースライン比約 −45%
+   - opt-level は既定 3 が最小（LTO 併用時の "s" / "z" は逆に増える）。`strip = "symbols"` は staticlib に実質無効（−0.01% — シンボル除去はアプリ側リンクの守備範囲）のため不採用
+   - panic=abort の代償: uniffi の catch_unwind が効かず、コアの panic は throw ではなくアプリのクラッシュになる。非 throws 関数は unwind でも fatalError 経由で落ちるため、実質差は throws 関数（sample_dto 系）の panic のみ。cargo test は test profile で panic 設定が無視されるため影響なし
 3. **Swift シム**: アクセサ extension + typealias + 文言レイヤ移設 + Identifiable 付与（Player / Team）+ シム最小テスト
 4. **アプリ差し替え（コア）**: HandballRecorder の feature ブランチで `Packages/RecorderDomain` を置換 → テスト green
 5. **アプリ差し替え（DTO 層）**: Converter / Exporter を Rust 呼び出しに置換 → テスト green

@@ -41,10 +41,10 @@ CLI（JSON 検証器）・wasm バインディング・Kotlin バインディン
 
 ```bash
 ./scripts/build_xcframework.sh   # target/xcframework/ に HandballToolkit.xcframework + 生成 Swift API 層
-./scripts/ios_poc/run.sh         # PoC をビルドして iOS シミュレータ内で実行（ゴールデン入力で確認）
+./scripts/ios_poc/run.sh         # 本境界 smoke をビルドして iOS シミュレータ内で実行
 ```
 
-生成 Swift（`HandballToolkit.swift`）は XCFramework に入らない。「バイナリ + C モジュール」が XCFramework、Swift API 層はソースとして利用側が一緒にコンパイルする 2 段構え（UniFFI の標準配布形）。
+XCFramework は ios / ios-sim / macos の 3 スライス構成（HandballRecorderMac も同じ枠組み）。サイズ最適化はワークスペース Cargo.toml の `[profile.release]`（LTO / codegen-units=1 / panic=abort。実測と代償は ADR 0004 実装追記）。生成 Swift（`HandballToolkit.swift`）は XCFramework に入らない。「バイナリ + C モジュール」が XCFramework、Swift API 層はソースとして利用側が一緒にコンパイルする 2 段構え（UniFFI の標準配布形）。
 
 ### 設計不変条件（コアに入れてよいもの / いけないもの）
 
