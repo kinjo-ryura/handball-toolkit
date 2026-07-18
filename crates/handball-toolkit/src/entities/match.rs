@@ -23,6 +23,8 @@ pub struct RosterSelection {
 #[serde(rename_all = "camelCase")]
 pub struct Match {
     pub id: MatchId,
+    // uniffi(default) は移植元 Swift init のデフォルト引数の保存。
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub title: Option<String>,
     pub date: DateTime<Utc>,
     pub home_team_id: TeamId,
@@ -32,5 +34,6 @@ pub struct Match {
     /// スコア / イベント一覧で「ホームを左」に表示するかどうか。
     /// コートの実配置に合わせて per-match で切り替える前提（V1 DisplaySettingsSheet 同等）。
     /// default true で legacy 互換を保つ。
+    #[cfg_attr(feature = "uniffi", uniffi(default = true))]
     pub is_home_on_left: bool,
 }

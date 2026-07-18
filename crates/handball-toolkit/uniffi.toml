@@ -9,3 +9,12 @@ type_name = "UUID"
 imports = ["Foundation"]
 into_custom = "UUID(uuidString: {})!"
 from_custom = "{}.uuidString"
+
+# PhaseIndex（usize → u32 ブリッジ — src/ffi_support.rs）を Swift の Int へ写す（ADR 0004 決定 6）。
+# 移植元 API は `currentPhaseIndex: Int?` 等の Int で、同名フィールドはシム extension で覆えないため
+# バインディング層で写像する。公開 API 上 PhaseIndex は出力方向のみ（引数に取る関数なし）で、
+# from_custom の UInt32 変換がトラップし得るのは Swift 側が負値を lower する経路に限られる。
+[bindings.swift.custom_types.PhaseIndex]
+type_name = "Int"
+into_custom = "Int({})"
+from_custom = "UInt32({})"
