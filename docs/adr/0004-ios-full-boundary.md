@@ -116,6 +116,8 @@ object は**不変の導出スナップショットへのハンドル**であり
 | `BTreeSet<PlayerId>`（RosterSelection） | ソート済み `Vec<Uuid>` | シムで `Set<UUID>` を受け / 返す convenience init + computed property（既存 init シグネチャ維持） |
 | `usize`（phase_index） | `u32` | シムで `Int` 変換 property |
 
+**実装追記（2026-07-18 シム実装で確定）**: `usize` の Swift 側 `Int` 化は、シムの変換 property ではなく **uniffi.toml の custom_types（`Uuid` と同機構）で `PhaseIndex` → `Int` へ写像**して実現する。対象は `currentPhaseIndex` / `regularIndex` 等の record **同名フィールド**であり、Swift の extension は stored property を別型で覆えないため、シム property では「呼び出し側の型注記を無改修化」を達成できない（別名 property は呼び出し側改修を要し本末転倒）。バインディング層写像なら移植元 API（`Int` / `Int?`）と完全一致する。PhaseIndex は公開 API 上出力方向のみ（引数に取る公開関数なし）のため、`Int → UInt32` 変換（from_custom）がトラップする経路は実質ない。
+
 ### 7. validation / エラーの公開
 
 - `DomainValidationIssue` を record として公開し、`validate_append` / `validate_update` / `validate_delete`（+ `RosterContext`）を関数公開する（ADR 0001 の関数目録どおり）
