@@ -158,6 +158,8 @@ object は**不変の導出スナップショットへのハンドル**であり
 3. **Swift シム**: アクセサ extension + typealias + 文言レイヤ移設 + Identifiable 付与（Player / Team）+ シム最小テスト
 4. **アプリ差し替え（コア）**: HandballRecorder の feature ブランチで `Packages/RecorderDomain` を置換 → テスト green
 5. **アプリ差し替え（DTO 層）**: Converter / Exporter を Rust 呼び出しに置換 → テスト green
+
+   **実装追記（2026-07-18 完了）**: アプリ所有の DTO 型群・`SampleMatchConverterV2`・`MatchExporterV2`・JSONDecoder / JSONEncoder 経路を削除し、`parse_sample_match` / `convert_sample_match` / `export_sample_match` / `encode_sample_match` / `decode_sample_*` の FFI へ全面置換。シェル残置は設計どおり取得（Bundle / HTTP）・新規 UUID の事前生成（ID 供給）・importer の merge 調停のみ。アプリ側テストは FFI 境界の挙動固定（ID 供給契約 `InsufficientNewIds` 含む）に書き換え
 6. **回帰検証**: 完了条件は次の 4 項目 — (a) アプリ側既存テスト全 green（ユニット + パッケージ）、(b) UI テストを実機（Kim iPhone）で green、(c) `docs/PRE_RELEASE_SMOKE_TEST.md` 完走、(d) TestFlight 配布 + 数日の実機 dogfood で問題なし。**App Store 出荷は含めない**（観測 window 外で別途判断 — #56）
 
 テスト資産: `RecorderDomainTests`（約 2,500 行）は Swift パッケージと共に**削除**する（守備範囲は Rust 側 140 テスト + wire format テストへ移管済み）。残すのはシムアクセサへの間引き流用分のみ。並走残置は二重コア保守の残存であり行わない。
