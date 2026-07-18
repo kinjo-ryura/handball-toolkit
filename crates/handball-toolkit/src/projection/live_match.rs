@@ -41,11 +41,18 @@ pub enum MatchTimerState {
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct AvailableActions {
+    // uniffi(default) は移植元 Swift init のデフォルト引数（全 false）の保存。
+    #[cfg_attr(feature = "uniffi", uniffi(default = false))]
     pub can_record_goal: bool,
+    #[cfg_attr(feature = "uniffi", uniffi(default = false))]
     pub can_record_shot_missed: bool,
+    #[cfg_attr(feature = "uniffi", uniffi(default = false))]
     pub can_record_free_note: bool,
+    #[cfg_attr(feature = "uniffi", uniffi(default = false))]
     pub can_start_timeout: bool,
+    #[cfg_attr(feature = "uniffi", uniffi(default = false))]
     pub can_resume: bool,
+    #[cfg_attr(feature = "uniffi", uniffi(default = false))]
     pub can_start_next_phase: bool,
 }
 

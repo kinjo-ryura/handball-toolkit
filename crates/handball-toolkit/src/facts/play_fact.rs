@@ -39,10 +39,16 @@ impl PlayEventKind {
 #[serde(rename_all = "camelCase")]
 pub struct PlayFact {
     pub kind: PlayEventKind,
+    // uniffi(default) は移植元 Swift init のデフォルト引数の保存（ADR 0004 決定 6 と同趣旨）。
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub team_id: Option<TeamId>,
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub player_id: Option<PlayerId>,
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub related_player_id: Option<PlayerId>,
     pub anchor: FactAnchor,
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub title: Option<String>,
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub note: Option<String>,
 }

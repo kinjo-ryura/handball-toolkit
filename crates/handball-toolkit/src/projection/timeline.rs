@@ -28,7 +28,10 @@ pub struct TimelineProjection {
 #[serde(rename_all = "camelCase")]
 pub struct ResolvedFact {
     pub fact: MatchFact,
+    // uniffi(default) は移植元 Swift init のデフォルト引数の保存。
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub resolved_match_clock: Option<MatchClock>,
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub resolved_video_clock: Option<VideoClock>,
 }
 

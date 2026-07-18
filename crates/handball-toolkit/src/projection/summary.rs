@@ -30,6 +30,8 @@ pub struct SummaryProjection {
     /// phase ごとの home/away stats。**記録のある phase のみ**、resolver の出現順。
     /// `build_with_timeline` でのみ非空。日本語ラベル（前半/後半/7mTC）は持たず、
     /// UI 層が `kind` + `regular_index` から導出する（PhaseKind の「ラベルは UI 層」決定）。
+    // uniffi(default) は移植元 Swift init のデフォルト引数の保存。
+    #[cfg_attr(feature = "uniffi", uniffi(default = []))]
     pub phase_summaries: Vec<PhaseSummaryLine>,
 }
 
@@ -38,7 +40,9 @@ pub struct SummaryProjection {
 #[serde(rename_all = "camelCase")]
 pub struct TeamSummaryLine {
     pub team_id: TeamId,
+    #[cfg_attr(feature = "uniffi", uniffi(default = 0))]
     pub goals: i64,
+    #[cfg_attr(feature = "uniffi", uniffi(default = 0))]
     pub shot_misses: i64,
 }
 
@@ -57,7 +61,9 @@ impl TeamSummaryLine {
 #[serde(rename_all = "camelCase")]
 pub struct PlayerStatLine {
     pub player_id: PlayerId,
+    #[cfg_attr(feature = "uniffi", uniffi(default = 0))]
     pub goals: i64,
+    #[cfg_attr(feature = "uniffi", uniffi(default = 0))]
     pub shot_misses: i64,
 }
 
@@ -81,9 +87,13 @@ pub struct PhaseSummaryLine {
     pub kind: PhaseKind,
     /// regular phase の出現順 index（0 始まり）。shootout は None。
     pub regular_index: Option<usize>,
+    #[cfg_attr(feature = "uniffi", uniffi(default = 0))]
     pub home_goals: i64,
+    #[cfg_attr(feature = "uniffi", uniffi(default = 0))]
     pub home_shot_misses: i64,
+    #[cfg_attr(feature = "uniffi", uniffi(default = 0))]
     pub away_goals: i64,
+    #[cfg_attr(feature = "uniffi", uniffi(default = 0))]
     pub away_shot_misses: i64,
 }
 

@@ -42,7 +42,10 @@ pub struct PhaseStartPayload {
 pub struct StoppagePayload {
     pub kind: StoppageKind,
     pub start_anchor: FactAnchor,
+    // uniffi(default) は移植元 Swift init のデフォルト引数の保存。
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub end_anchor: Option<FactAnchor>,
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub note: Option<String>,
 }
 

@@ -11,7 +11,10 @@ pub struct Player {
     pub id: PlayerId,
     pub team_id: TeamId,
     pub name: String,
+    // uniffi(default) は移植元 Swift init のデフォルト引数の保存。
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub jersey_number: Option<i64>,
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub photo: Option<PlayerPhoto>,
 }
 
