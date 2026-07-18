@@ -18,6 +18,7 @@ use super::time_segment::{TimeSegment, TimeSegmentKind};
 /// - `Both` anchor は強制 re-anchor（baseline rolling forward）
 /// - shootout は degenerate（matchClock 累積秒は phase 開始値で固定、videoClock のみ進行）
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 #[serde(rename_all = "camelCase")]
 pub struct SegmentResolver {
     pub segments: Vec<TimeSegment>,
@@ -27,6 +28,7 @@ pub struct SegmentResolver {
 
 /// Swift の nested type `SegmentResolver.Phase`。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct Phase {
     pub fact_id: FactId,

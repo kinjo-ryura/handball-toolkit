@@ -32,19 +32,19 @@ cargo fmt             # フォーマット
 
 Cargo workspace。2 crate 構成:
 
-- `crates/handball-toolkit/` — コア crate（facts / clocks / configuration / entities / validators / projections）
-- `crates/handball-toolkit-ffi/` — UniFFI バインディング層。コアの型付き API には触れず「SAMPLE_DTO_V2 JSON in → summary JSON out」の粗い境界を提供する（serde 層は境界の外側 — ADR 0001）。uniffi-bindgen CLI を feature `bindgen` で同居
+- `crates/handball-toolkit/` — コア crate（facts / clocks / configuration / entities / validators / projections）。feature `uniffi`（default off）でドメイン全型の UniFFI derive と FFI 関数公開（`ffi_api` / `ffi_support`）が有効になる（ADR 0004。feature off の wasm / CLI ビルドでは uniffi が依存グラフごと消える）
+- `crates/handball-toolkit-ffi/` — FFI パッケージング crate。staticlib 化（XCFramework の中身）と uniffi-bindgen CLI（feature `bindgen`）のみを担い、型・関数の公開面はコア crate の namespace に集約する（ADR 0004 決定 3 実装追記）
 
-CLI（JSON 検証器）・wasm バインディング・Kotlin バインディングは将来の拡張候補で、必要になった時点で workspace member として追加する（先回りで作らない）。ドメイン全型を UniFFI 型へ写す本設計は Android シェル実装時の課題（現状の FFI は PoC 境界）。
+CLI（JSON 検証器）・wasm バインディング・Kotlin バインディングは将来の拡張候補で、必要になった時点で workspace member として追加する（先回りで作らない）。iOS シェル向けのドメイン全型 UniFFI 公開（本境界）は ADR 0004 で確定・実装済み。Kotlin バインディングは handball-project#59。
 
 ### iOS 向け XCFramework（UniFFI）
 
 ```bash
 ./scripts/build_xcframework.sh   # target/xcframework/ に HandballToolkit.xcframework + 生成 Swift API 層
-./scripts/ios_poc/run.sh         # PoC をビルドして iOS シミュレータ内で実行（ゴールデン入力で確認）
+./scripts/ios_poc/run.sh         # 本境界 smoke をビルドして iOS シミュレータ内で実行
 ```
 
-生成 Swift（`HandballToolkit.swift`）は XCFramework に入らない。「バイナリ + C モジュール」が XCFramework、Swift API 層はソースとして利用側が一緒にコンパイルする 2 段構え（UniFFI の標準配布形）。
+XCFramework は ios / ios-sim / macos の 3 スライス構成（HandballRecorderMac も同じ枠組み）。サイズ最適化はワークスペース Cargo.toml の `[profile.release]`（LTO / codegen-units=1 / panic=abort。実測と代償は ADR 0004 実装追記）。生成 Swift（`HandballToolkit.swift`）は XCFramework に入らない。「バイナリ + C モジュール」が XCFramework、Swift API 層はソースとして利用側が一緒にコンパイルする 2 段構え（UniFFI の標準配布形）。
 
 ### 設計不変条件（コアに入れてよいもの / いけないもの）
 

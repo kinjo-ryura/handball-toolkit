@@ -3,11 +3,20 @@ name = "handball-toolkit"
 version.workspace = true
 edition.workspace = true
 
+[features]
+# UniFFI 公開型の derive を有効化する（ffi crate 専用 — ADR 0004）。
+# default off のため wasm / CLI ビルドでは uniffi が依存グラフごと消える。
+uniffi = ["dep:uniffi"]
+
 [dependencies]
 # 依存は最小集合に留める（wasm 対応を壊さない — ADR 0001）。
 # chrono は決定性のため clock 機能（now()）を外す（設計不変条件: コアは now() を持たない）。
 chrono = { version = "0.4", default-features = false, features = ["std", "serde"] }
-serde = { version = "1", features = ["derive"] }
+# rc: TimelineProjection.resolver の Arc を透過 serialize するため（ADR 0004）。
+serde = { version = "1", features = ["derive", "rc"] }
+# sample_dto の encode（Swift JSONEncoder 互換の配信 JSON 書き出し — ADR 0004 決定 2）。
+serde_json = { version = "1" }
+uniffi = { version = "0.32", optional = true }
 uuid = { version = "1", features = ["serde"] }
 
 [dev-dependencies]

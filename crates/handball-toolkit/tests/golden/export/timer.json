@@ -1,0 +1,234 @@
+{
+  "facts" : [
+    {
+      "factID" : "FAC00000-0000-0000-0000-000000000001",
+      "payload" : {
+        "control" : {
+          "anchor" : {
+            "endMatchElapsedSeconds" : 1800,
+            "kind" : "matchClock",
+            "matchClock" : {
+              "elapsedSeconds" : 0
+            }
+          },
+          "kind" : "phaseStart",
+          "phaseStart" : {
+            "kind" : "regular"
+          }
+        },
+        "kind" : "control"
+      },
+      "recordedAt" : "2023-11-14T22:15:00Z"
+    },
+    {
+      "factID" : "FAC00000-0000-0000-0000-000000000002",
+      "payload" : {
+        "kind" : "play",
+        "play" : {
+          "anchor" : {
+            "kind" : "matchClock",
+            "matchClock" : {
+              "elapsedSeconds" : 63.5
+            }
+          },
+          "kind" : "goal",
+          "note" : "ナイスシュート",
+          "playerKey" : "AAAAAAAA-0000-0000-0000-000000000001",
+          "teamKey" : "home"
+        }
+      },
+      "recordedAt" : "2023-11-14T22:16:40Z"
+    },
+    {
+      "factID" : "FAC00000-0000-0000-0000-000000000003",
+      "payload" : {
+        "kind" : "play",
+        "play" : {
+          "anchor" : {
+            "kind" : "matchClock",
+            "matchClock" : {
+              "elapsedSeconds" : 120
+            }
+          },
+          "kind" : "shotMissed",
+          "playerKey" : "BBBBBBBB-0000-0000-0000-000000000001",
+          "relatedPlayerKey" : "AAAAAAAA-0000-0000-0000-000000000001",
+          "teamKey" : "away",
+          "title" : "セーブ/ブロック"
+        }
+      },
+      "recordedAt" : "2023-11-14T22:18:20Z"
+    },
+    {
+      "factID" : "FAC00000-0000-0000-0000-000000000004",
+      "payload" : {
+        "control" : {
+          "anchor" : {
+            "endMatchElapsedSeconds" : 360,
+            "kind" : "matchClock",
+            "matchClock" : {
+              "elapsedSeconds" : 300
+            }
+          },
+          "kind" : "stoppage",
+          "stoppage" : {
+            "stoppageKind" : "timeout"
+          }
+        },
+        "kind" : "control"
+      },
+      "recordedAt" : "2023-11-14T22:20:00Z"
+    },
+    {
+      "factID" : "FAC00000-0000-0000-0000-000000000005",
+      "payload" : {
+        "control" : {
+          "anchor" : {
+            "endMatchElapsedSeconds" : 460,
+            "kind" : "matchClock",
+            "matchClock" : {
+              "elapsedSeconds" : 400
+            }
+          },
+          "kind" : "stoppage",
+          "stoppage" : {
+            "note" : "給水/休憩",
+            "stoppageKind" : "pause"
+          }
+        },
+        "kind" : "control"
+      },
+      "recordedAt" : "2023-11-14T22:21:40Z"
+    },
+    {
+      "factID" : "FAC00000-0000-0000-0000-000000000006",
+      "payload" : {
+        "kind" : "play",
+        "play" : {
+          "anchor" : {
+            "kind" : "matchClock",
+            "matchClock" : {
+              "elapsedSeconds" : 500.75
+            }
+          },
+          "kind" : "freeNote",
+          "title" : "メモ"
+        }
+      },
+      "recordedAt" : "2023-11-14T22:23:20Z"
+    },
+    {
+      "factID" : "FAC00000-0000-0000-0000-000000000007",
+      "payload" : {
+        "kind" : "play",
+        "play" : {
+          "anchor" : {
+            "kind" : "matchClock",
+            "matchClock" : {
+              "elapsedSeconds" : 600
+            }
+          },
+          "kind" : "yellowCard",
+          "playerKey" : "AAAAAAAA-0000-0000-0000-000000000002",
+          "teamKey" : "home"
+        }
+      },
+      "recordedAt" : "2023-11-14T22:25:00Z"
+    },
+    {
+      "factID" : "FAC00000-0000-0000-0000-000000000008",
+      "payload" : {
+        "kind" : "play",
+        "play" : {
+          "anchor" : {
+            "kind" : "matchClock",
+            "matchClock" : {
+              "elapsedSeconds" : 700
+            }
+          },
+          "kind" : "twoMinuteSuspension",
+          "playerKey" : "BBBBBBBB-0000-0000-0000-000000000001",
+          "teamKey" : "away"
+        }
+      },
+      "recordedAt" : "2023-11-14T22:26:40Z"
+    },
+    {
+      "factID" : "FAC00000-0000-0000-0000-000000000009",
+      "payload" : {
+        "kind" : "play",
+        "play" : {
+          "anchor" : {
+            "kind" : "matchClock",
+            "matchClock" : {
+              "elapsedSeconds" : 800
+            }
+          },
+          "kind" : "redCard",
+          "playerKey" : "AAAAAAAA-0000-0000-0000-000000000001",
+          "teamKey" : "home"
+        }
+      },
+      "recordedAt" : "2023-11-14T22:28:20Z"
+    },
+    {
+      "factID" : "FAC00000-0000-0000-0000-000000000010",
+      "payload" : {
+        "control" : {
+          "anchor" : {
+            "endMatchElapsedSeconds" : 3900,
+            "kind" : "matchClock",
+            "matchClock" : {
+              "elapsedSeconds" : 3600
+            }
+          },
+          "kind" : "phaseStart",
+          "phaseStart" : {
+            "kind" : "shootout"
+          }
+        },
+        "kind" : "control"
+      },
+      "recordedAt" : "2023-11-14T22:30:00Z"
+    }
+  ],
+  "match" : {
+    "configuration" : {
+      "kind" : "timer",
+      "timer" : {
+        "phaseDurationSeconds" : 1800
+      }
+    },
+    "date" : "2023-11-14T22:13:20Z",
+    "displayName" : "決勝 / ファイナル"
+  },
+  "schemaVersion" : 2,
+  "teams" : {
+    "away" : {
+      "key" : "away",
+      "name" : "Falcons",
+      "players" : [
+        {
+          "jerseyNumber" : 99,
+          "key" : "BBBBBBBB-0000-0000-0000-000000000001",
+          "name" : "Bob"
+        }
+      ]
+    },
+    "home" : {
+      "key" : "home",
+      "name" : "Tigers",
+      "players" : [
+        {
+          "jerseyNumber" : 7,
+          "key" : "AAAAAAAA-0000-0000-0000-000000000001",
+          "name" : "Alice"
+        },
+        {
+          "key" : "AAAAAAAA-0000-0000-0000-000000000002",
+          "name" : "美咲/GK 選手"
+        }
+      ]
+    }
+  }
+}

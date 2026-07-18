@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 /// - `highlightsMustUseSingleTimelinePhase` 系（sum type 化で `VideoHighlight(VS)` は VS 必須）
 /// - `videoCaptureRequiresVideoSource`（sum type 化で `Video(VS)` は VS 必須）
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(
     tag = "code",
     content = "params",

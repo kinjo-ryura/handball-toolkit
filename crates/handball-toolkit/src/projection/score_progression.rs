@@ -20,6 +20,7 @@ use super::timeline::TimelineProjection;
 /// 横軸の符号（左=ホームリード）・軸スケール・ズーム・時間軸の日本語ラベル（`前半 MM:SS` 等）は
 /// view の責務。`phase_spans` はラベルを持たず、view が `regular_index` からラベルを導出する。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct ScoreProgressionProjection {
     pub points: Vec<ScoreProgressionPoint>,
@@ -32,6 +33,7 @@ pub struct ScoreProgressionProjection {
 
 /// 得点差チャートの 1 点。step-doubling のため 1 goal につき 2 点（goal 前/後）作られる。
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct ScoreProgressionPoint {
     pub cumulative_seconds: f64,
@@ -48,6 +50,7 @@ impl ScoreProgressionPoint {
 
 /// 時間軸ラベル用の regular phase 区間（累積 matchClock 秒）。ラベルは持たない（view が導出）。
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct ScoreProgressionPhaseSpan {
     pub phase_fact_id: FactId,

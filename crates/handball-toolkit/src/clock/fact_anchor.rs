@@ -10,6 +10,7 @@ use super::{MatchClock, VideoClock};
 /// - `VideoClock`: 動画を見ながら記録（動画モード / ハイライト）
 /// - `Both`: 強制 sync point（動画カット復旧などの override 専用、平常時は使わない）
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum FactAnchor {
     MatchClock(MatchClock),
@@ -25,6 +26,7 @@ pub enum FactAnchor {
 /// Ord は `allowed: BTreeSet<FactAnchorKind>`（エラー payload の決定的順序 — ADR 0001 の
 /// BTreeSet 方針と同じ理由）のための derive。順序は宣言順で意味を持たない。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "camelCase")]
 pub enum FactAnchorKind {
     MatchClock,

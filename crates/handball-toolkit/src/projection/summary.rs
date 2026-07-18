@@ -19,6 +19,7 @@ use super::timeline::TimelineProjection;
 /// 算出する。`build` では `phase_summaries` は空 — 試合一覧・記録画面など
 /// phase 別を必要としない経路で resolver 構築コストを払わないため。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct SummaryProjection {
     pub home_score: i64,
@@ -33,6 +34,7 @@ pub struct SummaryProjection {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct TeamSummaryLine {
     pub team_id: TeamId,
@@ -51,6 +53,7 @@ impl TeamSummaryLine {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerStatLine {
     pub player_id: PlayerId,
@@ -71,6 +74,7 @@ impl PlayerStatLine {
 /// phase 1 件分の home/away stats。`phase_fact_id` は PhaseStart の FactID（出現順で stable）。
 /// 日本語ラベルは持たない: UI が `kind` + `regular_index` から「前半/後半/延長…/7mTC」を導出する。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct PhaseSummaryLine {
     pub phase_fact_id: FactId,

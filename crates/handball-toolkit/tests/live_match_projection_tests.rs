@@ -24,10 +24,10 @@ fn none_current_video_clock_returns_before_match() {
         &make_video_match(home, away),
         &TimelineProjection {
             resolved_facts: vec![],
-            resolver: SegmentResolver {
+            resolver: std::sync::Arc::new(SegmentResolver {
                 segments: vec![],
                 phases: vec![],
-            },
+            }),
         },
         None,
     );

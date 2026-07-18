@@ -49,12 +49,21 @@ serde 層を境界の外側に置く原則（ADR 0001）は変わらない — U
 
 なお repository / DB に触る `MatchImporterV2` / `MatchMergerV2` の調停ロジックはシェルの責務のまま（純変換部分だけが Rust へ移る）。
 
+**実装追記（2026-07-18 実装で確定）**: 実装時の具体化は次のとおり。
+
+- **オラクル golden はバイト一致**: 決定的試合 3 件を Swift `MatchExporterV2` で encode した出力を fixture（`tests/golden/export/`）としてコミットし、Rust 側は文字列一致で検証。JSON 構造比較では見えない `JSONEncoder` の書式仕様（UUID **大文字** / `.iso8601` の**秒未満切り捨て** / 整数値 double の `.0` 省略 / nil キー省略 / 空コンテナの `[\n\n  ]` 形）を釘付けするため、Rust に Swift 互換 encoder（`sample_match_encoder` + DTO の `swift_wire` serialize）を新設した。配信ファイルの形式は Swift 時代から不変
+- **round-trip は 2 系統**: 実配信コーパス 8 件 + ローカルの parse → convert → export が ID 命名を除き元 DTO と一致（逆写像性）、および export → encode → parse → convert のドメイン復元（秒未満切り捨ての lossy も明示的に固定）
+- **ID 必要数はコアが数える**: `sample_dto::required_id_count`（= FFI `sample_match_required_id_count`）を追加し、消費順の知識をシェルへ漏らさない。不足は構造化エラー `SampleDtoError::InsufficientNewIds` で拒否
+- **DTO 型も record 公開**: importer / merger の調停（シェル残置）が DTO を直接読むため、SAMPLE_DTO_V2 の全 DTO 型 + index 型を uniffi record 化し、`parse_sample_match` / `parse_sample_index` / `parse_sample_highlight_index` / `encode_sample_match` / `decode_sample_configuration` / `decode_sample_fact`（fallback ID 1 個注入）/ `export_sample_match` / `sample_match_default_slug` を公開した
+
 ### 3. 型の写像方式 — コア crate に feature-gate した uniffi derive（grill 確定）
 
 コア crate `handball-toolkit` に feature `uniffi`（default off）を追加し、公開型に `#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]` 等を付ける。ffi crate はコア型を再エクスポートして scaffolding を集約する（uniffi のマルチ crate 構成。Mozilla application-services の実運用形）。
 
 - 型定義は 1 箇所のまま（ミラー型の二重更新なし）。wasm / CLI ビルドは feature off のため uniffi が依存グラフから存在ごと消え、依存最小の原則を壊さない
 - ミラー型方式（ffi crate に写し + `From` 変換、約 30 型 × 600〜900 行）は**フォールバック**として保持する。cross-crate の metadata 集約が実装初期の smoke で通らない場合に切り替える（境界契約は同一なのでシム・アプリ側は影響なし。退避コストは cfg_attr 行の削除のみ）
+
+**実装追記（2026-07-18 smoke で確定）**: uniffi は複数 crate（namespace）が同じ Swift `module_name` を共有すると生成ファイル（.swift / ヘッダ / modulemap）を上書き衝突させるため、「ffi crate に export 関数を置いて scaffolding を集約」は成立しなかった。実装では **export 関数もコア crate の feature-gated `ffi_api` モジュールに置き、namespace をコア 1 つに集約**する。ffi crate は staticlib 化 + bindgen CLI 同居のみの packaging 殻となる。境界契約・シム・アプリ側への影響はない（ミラー型への退避も不要だった）。
 
 ### 4. メソッド持ち型の扱い — 「データは record、繊細なロジックは object、自明なアクセサはシム」
 
@@ -129,6 +138,21 @@ object は**不変の導出スナップショットへのハンドル**であり
 
 1. **FFI 実装**: コア crate の feature `uniffi` + derive 付与 → ffi crate で export（**cross-crate metadata の smoke を最初に確認**。詰まったらミラー型へ切替）。sample_dto の export 方向を Rust に新規実装（オラクル比較 + round-trip）
 2. **XCFramework 更新**: 3 スライス（ios / ios-sim / macos）+ サイズ最適化（LTO / strip / panic=abort、実測記録）
+
+   **実装追記（2026-07-18 完了）**: 3 スライス化（macOS は host std でビルドできるため rust-toolchain.toml 変更不要）。サイズ最適化はワークスペース `[profile.release]` に **LTO（fat）+ codegen-units=1 + panic=abort** を採用。実測（本境界 + sample_dto FFI 込み。smoke バイナリは生成 Swift 層込み・シミュレータ向けリンク）:
+
+   | 構成 | staticlib（.a, ios 実機） | リンク後 smoke バイナリ |
+   |---|---|---|
+   | release 既定（ベースライン） | 20.28 MB | 4.42 MB |
+   | + lto=true, codegen-units=1 | 24.25 MB | 3.97 MB |
+   | 　┗ さらに opt-level="s" | 27.25 MB | 5.08 MB（逆効果） |
+   | 　┗ さらに opt-level="z" | 26.45 MB | 4.95 MB（逆効果） |
+   | **+ panic="abort"（採用）** | 23.62 MB | **3.76 MB** |
+   | 採用構成 + アプリ相当の `-dead_strip` リンク | — | **2.42 MB** |
+
+   - .a の増加は fat LTO の中間表現込みのため。配布実体はアプリにリンクされた後のサイズで、dead_strip 込みでベースライン比約 −45%
+   - opt-level は既定 3 が最小（LTO 併用時の "s" / "z" は逆に増える）。`strip = "symbols"` は staticlib に実質無効（−0.01% — シンボル除去はアプリ側リンクの守備範囲）のため不採用
+   - panic=abort の代償: uniffi の catch_unwind が効かず、コアの panic は throw ではなくアプリのクラッシュになる。非 throws 関数は unwind でも fatalError 経由で落ちるため、実質差は throws 関数（sample_dto 系）の panic のみ。cargo test は test profile で panic 設定が無視されるため影響なし
 3. **Swift シム**: アクセサ extension + typealias + 文言レイヤ移設 + Identifiable 付与（Player / Team）+ シム最小テスト
 4. **アプリ差し替え（コア）**: HandballRecorder の feature ブランチで `Packages/RecorderDomain` を置換 → テスト green
 5. **アプリ差し替え（DTO 層）**: Converter / Exporter を Rust 呼び出しに置換 → テスト green

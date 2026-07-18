@@ -29,6 +29,7 @@ use crate::validation::{DomainValidationIssue, FactValidationError};
 /// Swift の `[PlayerID: TeamID]` / `Set<PlayerID>?` は決定性のため BTreeMap / BTreeSet で移植
 /// （ADR 0001）。
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct RosterContext {
     pub home_team_id: TeamId,
     pub away_team_id: TeamId,

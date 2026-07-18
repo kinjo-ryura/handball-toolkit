@@ -13,6 +13,7 @@ use crate::configuration::PhaseKind;
 /// - `timeoutStartedWhileAnotherStopIsOpen` 等（Stoppage 1 fact 化、`stoppagesOverlap` に統合）
 /// - `incompleteStoppedIntervalInCompleteMode` 等（`complete` mode 廃止）
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(
     tag = "code",
     content = "params",

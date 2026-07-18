@@ -278,6 +278,7 @@ dependencies = [
  "chrono",
  "serde",
  "serde_json",
+ "uniffi",
  "uuid",
 ]
 
@@ -285,9 +286,8 @@ dependencies = [
 name = "handball-toolkit-ffi"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "handball-toolkit",
- "serde",
- "serde_json",
  "uniffi",
  "uuid",
 ]

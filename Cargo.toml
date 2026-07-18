@@ -5,3 +5,14 @@ members = ["crates/handball-toolkit", "crates/handball-toolkit-ffi"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
+
+# XCFramework 配布向けの release チューニング（ADR 0004 実装順序 2。実測は ADR 実装追記）。
+# opt-level は既定 3 が最小だった（"s" / "z" は LTO と併せると逆に増える）。strip は
+# staticlib に実質無効（アプリ側リンクの守備範囲）。panic=abort は uniffi の
+# catch_unwind を無効化する（コアの panic は throw ではなくクラッシュになる —
+# 非 throws 関数は unwind でも fatalError 経由で落ちるため、実質差は throws 関数のみ）。
+# test / bench profile では cargo が panic 設定を無視するので cargo test には影響しない。
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"

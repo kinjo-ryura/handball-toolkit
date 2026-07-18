@@ -9,6 +9,7 @@ use crate::ids::FactId;
 use super::{ControlFact, PlayFact};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "camelCase")]
 pub enum MatchFactPayload {
     Play(PlayFact),
@@ -18,6 +19,7 @@ pub enum MatchFactPayload {
 /// 永続化対象の「事実」1 件。id / timestamp はここに一元化。
 /// `recorded_at` は整列 tie-break 専用（位置づけは anchor — ADR 0001）。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct MatchFact {
     pub id: FactId,

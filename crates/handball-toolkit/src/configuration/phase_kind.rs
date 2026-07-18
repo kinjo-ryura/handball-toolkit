@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 /// 旧 `MatchPhase` enum (firstHalf / secondHalf / overtime1 / overtime2 / shootout) を置き換え。
 /// 役割名は UI 層が出現順から導出（"phase 1" / "phase 2" / ...）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "camelCase")]
 pub enum PhaseKind {
     Regular,
