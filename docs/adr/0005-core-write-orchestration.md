@@ -169,7 +169,7 @@ pub enum CoreWriteError {
 同一 feature ブランチ内でコミット順を分離する（ADR 0004 と同じ規律）:
 
 1. **機構整備**: `MatchWriteRepository` foreign trait + `CoreWriteError` + fact 3 経路の write 入口（Rust 単体テストは fake repo 実装で計画層・拒否経路を固定）。ios_poc smoke に **async 往復のランタイム検証**（Swift 実装を Rust が await して結果が返る・エラーが写る）を追加 → **完了（2026-07-19）**: 計画層 `write`（roster 構築の 0 件 skip / 重複先勝ちルールをコアへ移管）+ 発火層 `ffi_write`。fake repo テストで合格時のみ発火・違反不発火・repository 失敗伝播を固定し、ios_poc で発火・`ValidationFailed` 写像・未知エラーの `Repository` 畳み込みをランタイム確認
-2. **アプリ第 1 段（fact 3 経路）**: `SwiftDataMatchRepository` から validation を剥がし素朴 CRUD 化 → store をコア入口呼び出しへ → 可視性遮断（決定 3）→ アプリテスト green
+2. **アプリ第 1 段（fact 3 経路）**: `SwiftDataMatchRepository` から validation を剥がし素朴 CRUD 化 → store をコア入口呼び出しへ → 可視性遮断（決定 3）→ アプリテスト green → **完了（2026-07-19）**: `MatchFactWriter`（コア入口を旧 repository と同形で包む単一入口）を新設し、store / importer / migrator / view の呼び先を置換。`MatchRepository` protocol から fact 3 メソッドを削除（遮断）。`CoreWriteError` は `DomainValidationFailure` 準拠でエラー表示経路を不変に維持。実装追記: uniffi 0.32 の async foreign trait 機構（`uniffiTraitInterfaceCallAsync*` が `Task {}` へ非 Sendable closure を渡す）が Swift 6 strict concurrency に通らないため、生成コードを含む `HandballToolkit` ターゲットのみ言語モード v5 でコンパイルする（uniffi 側の対応で外す）
 3. **アプリ第 2 段（phase 自動補完）**: `ensureTimerPhasesCovering` をコアの記録入口へ移管（ID 事前生成契約）。該当 Swift テストを Rust テスト + 境界テストへ移植 → green
 4. **アプリ第 3 段（migrate commit）**: `MigrateToVideoStore.commit` の順序 orchestration を移管 → green
 5. **アプリ第 4 段（entity CRUD + 完全遮断）**: match ヘッダ / team / player の CRUD をコア入口へ、削除の使用中判定をコアへ移管（Swift 実装のチェックは削除）。importer / migrator / view の呼び先置換 → 可視性遮断を全書き込みに拡張 → green
