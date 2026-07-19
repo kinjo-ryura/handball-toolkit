@@ -27,6 +27,8 @@ Swift 側にはスナップショット/ゴールデンテスト資産は存在�
 - `.timer` の公開サンプル追加（gap の恒久解消）は別 Issue 候補とする
 
 追記（2026-07-12、P8 完走時）: `pdf-matches/` の既存 JSON は**旧 V2 形式**（captureMethod / phaseRules / phase 相対秒。jha-pdf-importer が現行スキーマ未対応）だったため、一時スクリプト `scripts/migrate_pdf_matches_legacy.py` で現行 SAMPLE_DTO_V2 へ移行して使用した（jha 2 件。PhaseStart 合成 + 累積秒化 + timeoutStarted → stoppage）。恒久対応（importer の現行スキーマ化）は別 Issue 候補。
+
+追記（2026-07-19、handball-project#55）: 上記の恒久対応は完了した（handball-project#54、2026-07-15 — jha/jhl-pdf-importer が現行 SAMPLE_DTO_V2 を直接出力し、既存 `pdf-matches/` も再生成済み）。役目を終えた一時スクリプト `scripts/migrate_pdf_matches_legacy.py` は削除し、ローカル `.timer` コーパスの再生成手順から移行ステップを外した（`tests/golden/README.md`）。
 - 3 モード網羅の最小フィクスチャ（エッジケース: shootout / `.both` override / stoppage 隣接など）は実試合コーパスとは別に、移植した単体テストが担う
 
 ### 2. Sample DTO V2 パーサはコアの一部（`sample_dto` モジュール）

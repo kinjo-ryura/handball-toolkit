@@ -1,6 +1,6 @@
 # 移植作業ガイド — RecorderDomain → Rust
 
-> **状態（2026-07-15）: 移植完走。** P0〜P8 完了（移植テスト 140/140 green・パリティ bit-exact 公開 8 + ローカル 2 件）、P9 は全項目見送りを判断済み（下記トリガー参照）。handball-project#49 の UniFFI PoC も完了（2026-07-15。`crates/handball-toolkit-ffi/` + `scripts/build_xcframework.sh` + `scripts/ios_poc/`）。Issue 側の残り: #52〜#54。以降の toolkit 変更は通常の開発フローで行う。
+> **状態（2026-07-19）: 移植完走。** P0〜P8 完了（移植テスト 140/140 green・パリティ bit-exact 公開 8 + ローカル 2 件）、P9 は全項目見送りを判断済み（下記トリガー参照）。handball-project#49 の UniFFI PoC も完了（2026-07-15。`crates/handball-toolkit-ffi/` + `scripts/build_xcframework.sh` + `scripts/ios_poc/`）。Issue 側の残り: #52 / #53 / #57〜#59（#54 / #55 は完了）。以降の toolkit 変更は通常の開発フローで行う。
 
 セッションをまたいで移植を進めるための「現在地と次の一手」のファイル。**各セッションの冒頭でこれを読み、進捗があったらチェックを更新する**。設計判断の正典は `docs/adr/`（このファイルには理由を書かない）。
 
@@ -52,7 +52,7 @@
 - [x] P7 オラクル dump ツール（HandballRecorder の `parity/oracle-dump` ブランチ。main へ merge しない — 上記「オラクル側の運用」）+ `tests/golden/` 整備 — ADR 0003（2026-07-12。公開 8 件の golden 生成済み。出所・正規化規約・再生成手順は `crates/handball-toolkit/tests/golden/README.md`）
 - [x] P8 パリティ検証完走（公開 8 件 + ローカル `.timer` 2 件 × 5 系統 bit-exact 一致、移植テスト 140 件 green — 分母補正は下記。2026-07-12）
   - ハーネス: `tests/golden_parity_tests.rs`。**serde_json の `float_roundtrip` feature 必須**（ADR 0003 §5 追記）
-  - ローカル `.timer` は pdf-matches（旧 V2 形式）を `scripts/migrate_pdf_matches_legacy.py` で移行して使用（ADR 0003 §1 追記。importer の現行スキーマ化は別 Issue 候補）
+  - ローカル `.timer` は pdf-matches（当時は旧 V2 形式）を一時スクリプトで移行して使用（ADR 0003 §1 追記）。その後 importer の現行スキーマ化（handball-project#54、2026-07-15）で移行は不要になり、スクリプトは削除済み（handball-project#55、2026-07-19）
   - オラクル側の後始末実施済み: `parity/oracle-dump` 先端に tag `oracle-dump-final` を打ちブランチ削除（push は手動: `git push origin oracle-dump-final`）
 - [x] P9 完走後の判断（2026-07-12 実施 — **全項目見送り**。トリガー到来時に再判断）
   - OSS 公開判断: 見送り。リポは private のまま。トリガー: 公開意思が固まったとき（README 英語化・ライセンス選定とセットで実施）
