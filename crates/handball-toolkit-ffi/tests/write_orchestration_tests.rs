@@ -11,6 +11,7 @@ use std::sync::{Arc, Mutex};
 use handball_toolkit::clock::{FactAnchor, MatchClock, VideoClock};
 use handball_toolkit::configuration::{MatchConfiguration, PhaseKind, VideoProvider, VideoSource};
 use handball_toolkit::entities::{Match, RosterSelection};
+use handball_toolkit::entities::{Player, Team};
 use handball_toolkit::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
 };
@@ -18,8 +19,10 @@ use handball_toolkit::ids::{FactId, MatchId, PlayerId, TeamId};
 use handball_toolkit::validation::{DomainValidationIssue, FactValidationError};
 use handball_toolkit::write::{NewFactStamp, PlayerTeamRef, VideoSyncInput};
 use handball_toolkit_ffi::ffi_write::{
-    CoreWriteError, MatchWriteRepository, commit_video_migration, count_phase_completion_facts,
-    record_append_fact, record_delete_fact, record_fact_with_phase_completion, record_update_fact,
+    CoreWriteError, MatchWriteRepository, TeamWriteRepository, commit_video_migration,
+    count_phase_completion_facts, record_append_fact, record_delete_fact, record_delete_player,
+    record_delete_team, record_fact_with_phase_completion, record_save_player, record_save_team,
+    record_update_fact,
 };
 use uuid::Uuid;
 
@@ -548,4 +551,154 @@ fn repository_の失敗はそのまま伝播する() {
         })
     );
     assert_eq!(repo.fact_log().len(), 1, "読み取り失敗時は発火しない");
+}
+
+// ── entity CRUD 入口（実装順序 5）──
+
+/// 素朴 CRUD の team-scope fake。使用中判定がコア側にあることを削除の発火有無で観測する。
+#[derive(Debug, Default)]
+struct FakeTeamRepo {
+    match_refs: u32,
+    fact_refs: u32,
+    saved_teams: Mutex<Vec<Team>>,
+    saved_players: Mutex<Vec<Player>>,
+    deleted_teams: Mutex<Vec<TeamId>>,
+    deleted_players: Mutex<Vec<PlayerId>>,
+}
+
+#[async_trait::async_trait]
+impl TeamWriteRepository for FakeTeamRepo {
+    async fn count_matches_referencing_team(
+        &self,
+        _team_id: TeamId,
+    ) -> Result<u32, CoreWriteError> {
+        Ok(self.match_refs)
+    }
+
+    async fn count_facts_referencing_player(
+        &self,
+        _player_id: PlayerId,
+    ) -> Result<u32, CoreWriteError> {
+        Ok(self.fact_refs)
+    }
+
+    async fn save_team(&self, team: Team) -> Result<(), CoreWriteError> {
+        self.saved_teams
+            .lock()
+            .expect("テスト内で poison しない")
+            .push(team);
+        Ok(())
+    }
+
+    async fn delete_team(&self, team_id: TeamId) -> Result<(), CoreWriteError> {
+        self.deleted_teams
+            .lock()
+            .expect("テスト内で poison しない")
+            .push(team_id);
+        Ok(())
+    }
+
+    async fn save_player(&self, player: Player) -> Result<(), CoreWriteError> {
+        self.saved_players
+            .lock()
+            .expect("テスト内で poison しない")
+            .push(player);
+        Ok(())
+    }
+
+    async fn delete_player(&self, player_id: PlayerId) -> Result<(), CoreWriteError> {
+        self.deleted_players
+            .lock()
+            .expect("テスト内で poison しない")
+            .push(player_id);
+        Ok(())
+    }
+}
+
+#[test]
+fn 使用中チームの削除は発火せず_team_in_use() {
+    let repo = Arc::new(FakeTeamRepo {
+        match_refs: 3,
+        ..FakeTeamRepo::default()
+    });
+    let result = run(record_delete_team(repo.clone(), Uuid::from_u128(HOME_ID)));
+    assert_eq!(result, Err(CoreWriteError::TeamInUse { match_count: 3 }));
+    assert!(
+        repo.deleted_teams
+            .lock()
+            .expect("テスト内で poison しない")
+            .is_empty()
+    );
+}
+
+#[test]
+fn 未使用チームの削除は発火する() {
+    let repo = Arc::new(FakeTeamRepo::default());
+    let result = run(record_delete_team(repo.clone(), Uuid::from_u128(HOME_ID)));
+    assert_eq!(result, Ok(()));
+    assert_eq!(
+        repo.deleted_teams
+            .lock()
+            .expect("テスト内で poison しない")
+            .as_slice(),
+        &[Uuid::from_u128(HOME_ID)]
+    );
+}
+
+#[test]
+fn 使用中選手の削除は発火せず_player_in_use() {
+    let repo = Arc::new(FakeTeamRepo {
+        fact_refs: 2,
+        ..FakeTeamRepo::default()
+    });
+    let result = run(record_delete_player(
+        repo.clone(),
+        Uuid::from_u128(SCORER_ID),
+    ));
+    assert_eq!(result, Err(CoreWriteError::PlayerInUse { fact_count: 2 }));
+    assert!(
+        repo.deleted_players
+            .lock()
+            .expect("テスト内で poison しない")
+            .is_empty()
+    );
+}
+
+#[test]
+fn 未使用選手の削除と_save_の_passthrough_は発火する() {
+    let repo = Arc::new(FakeTeamRepo::default());
+    assert_eq!(
+        run(record_delete_player(
+            repo.clone(),
+            Uuid::from_u128(SCORER_ID)
+        )),
+        Ok(())
+    );
+    let team = Team {
+        id: Uuid::from_u128(HOME_ID),
+        name: "Tigers".to_string(),
+    };
+    assert_eq!(run(record_save_team(repo.clone(), team)), Ok(()));
+    let player = Player {
+        id: Uuid::from_u128(SCORER_ID),
+        team_id: Uuid::from_u128(HOME_ID),
+        name: "Alice".to_string(),
+        jersey_number: Some(7),
+        photo: None,
+    };
+    assert_eq!(run(record_save_player(repo.clone(), player)), Ok(()));
+    assert_eq!(
+        repo.saved_teams
+            .lock()
+            .expect("テスト内で poison しない")
+            .len(),
+        1
+    );
+    assert_eq!(
+        repo.saved_players
+            .lock()
+            .expect("テスト内で poison しない")
+            .len(),
+        1
+    );
 }

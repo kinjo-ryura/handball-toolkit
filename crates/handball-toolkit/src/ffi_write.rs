@@ -14,9 +14,9 @@
 use std::sync::Arc;
 
 use crate::configuration::{MatchConfiguration, VideoSource};
-use crate::entities::Match;
+use crate::entities::{Match, Player, Team};
 use crate::facts::MatchFact;
-use crate::ids::{FactId, MatchId, TeamId};
+use crate::ids::{FactId, MatchId, PlayerId, TeamId};
 use crate::validation::DomainValidationIssue;
 use crate::validators::{self, RosterContext};
 use crate::write::{self, NewFactStamp, PlayerTeamRef, VideoMigrationPlanError, VideoSyncInput};
@@ -244,6 +244,99 @@ pub async fn record_delete_fact(
         return Err(CoreWriteError::ValidationFailed { issues });
     }
     repo.delete_fact(match_id, fact_id).await
+}
+
+// ── entity CRUD の write 入口（ADR 0005 実装順序 5 — 第 4 段）──
+
+/// チーム / 選手スコープの write repository（シェルが実装して注入する foreign trait —
+/// ADR 0005 決定 1）。read は削除の参照整合判定の材料（カウント）に限る。
+/// `delete_team` は所属選手の cascade 削除を実装内に含む（判断ではなくストレージ操作の
+/// セマンティクス — 1 save の原子性を保つ。決定 2）。
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait TeamWriteRepository: Send + Sync + std::fmt::Debug {
+    // ── read（削除の参照整合判定の材料）──
+
+    /// このチームを home / away いずれかで参照する試合数。
+    async fn count_matches_referencing_team(&self, team_id: TeamId) -> Result<u32, CoreWriteError>;
+    /// この選手を playerID / relatedPlayerID で参照する fact 数。
+    async fn count_facts_referencing_player(
+        &self,
+        player_id: PlayerId,
+    ) -> Result<u32, CoreWriteError>;
+
+    // ── write（素朴 CRUD。delete_team は cascade 内包）──
+
+    async fn save_team(&self, team: Team) -> Result<(), CoreWriteError>;
+    async fn delete_team(&self, team_id: TeamId) -> Result<(), CoreWriteError>;
+    async fn save_player(&self, player: Player) -> Result<(), CoreWriteError>;
+    async fn delete_player(&self, player_id: PlayerId) -> Result<(), CoreWriteError>;
+}
+
+/// match ヘッダ save の write 入口（passthrough — 現行 saveMatch は検証なし。パリティ維持）。
+/// 意義は目録の単一化と可視性遮断: 全書き込みがコア入口を通ることを型で保証する（決定 2・3）。
+#[uniffi::export]
+pub async fn record_save_match(
+    repo: Arc<dyn MatchWriteRepository>,
+    match_: Match,
+) -> Result<(), CoreWriteError> {
+    repo.save_match(match_).await
+}
+
+/// match 削除の write 入口（passthrough — facts 込み削除の実体は repository 実装）。
+#[uniffi::export]
+pub async fn record_delete_match(
+    repo: Arc<dyn MatchWriteRepository>,
+    match_id: MatchId,
+) -> Result<(), CoreWriteError> {
+    repo.delete_match(match_id).await
+}
+
+/// team save の write 入口（passthrough）。
+#[uniffi::export]
+pub async fn record_save_team(
+    repo: Arc<dyn TeamWriteRepository>,
+    team: Team,
+) -> Result<(), CoreWriteError> {
+    repo.save_team(team).await
+}
+
+/// team 削除の write 入口: 使用中判定 → 合格時のみ発火（判定はコアが持つ — 決定 2）。
+///
+/// チェックと削除は 2 FFI 呼び出しに分かれ理論上の時間窓は現行より広がるが、
+/// 現行も context 間の直列化保証は無く、保証クラスは best-effort のまま変わらない（決定 2）。
+#[uniffi::export]
+pub async fn record_delete_team(
+    repo: Arc<dyn TeamWriteRepository>,
+    team_id: TeamId,
+) -> Result<(), CoreWriteError> {
+    let match_count = repo.count_matches_referencing_team(team_id).await?;
+    if match_count > 0 {
+        return Err(CoreWriteError::TeamInUse { match_count });
+    }
+    repo.delete_team(team_id).await
+}
+
+/// player save の write 入口（passthrough）。
+#[uniffi::export]
+pub async fn record_save_player(
+    repo: Arc<dyn TeamWriteRepository>,
+    player: Player,
+) -> Result<(), CoreWriteError> {
+    repo.save_player(player).await
+}
+
+/// player 削除の write 入口: 使用中判定 → 合格時のみ発火（dangling 参照の防止）。
+#[uniffi::export]
+pub async fn record_delete_player(
+    repo: Arc<dyn TeamWriteRepository>,
+    player_id: PlayerId,
+) -> Result<(), CoreWriteError> {
+    let fact_count = repo.count_facts_referencing_player(player_id).await?;
+    if fact_count > 0 {
+        return Err(CoreWriteError::PlayerInUse { fact_count });
+    }
+    repo.delete_player(player_id).await
 }
 
 /// append / update 共通の検証入力読み取り（match → fact 列 → roster の 3 read）。
