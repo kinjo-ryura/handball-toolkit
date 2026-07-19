@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 use uuid::Uuid;
 
 use crate::clock::{MatchClock, VideoClock};
-use crate::configuration::{MatchConfiguration, PhaseKind};
+use crate::configuration::{MatchConfiguration, PhaseKind, VideoSource};
 use crate::entities::{Match, Player, Team};
 use crate::facts::{ControlFact, MatchFact, PlayFact};
 use crate::ids::{FactId, PlayerId, TeamId};
@@ -30,6 +30,7 @@ use crate::sample_dto::{
 use crate::validation::DomainValidationIssue;
 use crate::validators;
 use crate::validators::RosterContext;
+use crate::write::{self, VideoMigrationDraftIssue, VideoSyncDraftInput};
 
 /// コアのバージョン文字列。FFI 疎通確認の最小関数。
 #[uniffi::export]
@@ -168,6 +169,23 @@ pub fn validate_delete(
     match_: Match,
 ) -> Vec<DomainValidationIssue> {
     validators::validate_delete(removed_fact_id, &existing_facts, &match_)
+}
+
+/// `write::validate_video_migration_draft`（移行ウィザードの draft 事前検証）。
+/// 文言と wizard step への写像はシェル所有。
+#[uniffi::export]
+pub fn validate_video_migration_draft(
+    source_configuration: MatchConfiguration,
+    video_source: Option<VideoSource>,
+    phase_syncs: Vec<VideoSyncDraftInput>,
+    stoppage_syncs: Vec<VideoSyncDraftInput>,
+) -> Vec<VideoMigrationDraftIssue> {
+    write::validate_video_migration_draft(
+        &source_configuration,
+        video_source.as_ref(),
+        &phase_syncs,
+        &stoppage_syncs,
+    )
 }
 
 // ── sample_dto（SAMPLE_DTO_V2 の parse / 変換 / export — ADR 0004 決定 2）──

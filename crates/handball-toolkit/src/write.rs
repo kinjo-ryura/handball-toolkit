@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use chrono::{DateTime, Utc};
 
 use crate::clock::{FactAnchor, MatchClock, VideoClock};
-use crate::configuration::{MatchConfiguration, PhaseKind};
+use crate::configuration::{MatchConfiguration, PhaseKind, VideoSource};
 use crate::entities::Match;
 use crate::facts::{ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload};
 use crate::ids::{FactId, PlayerId, TeamId};
@@ -301,4 +301,182 @@ pub fn video_migration_plan(
 
     updated_control.extend(updated_plays);
     Ok(updated_control)
+}
+
+// ── 移行ウィザードの draft 事前検証（移植元: VideoModeMigrationValidator）──
+
+/// video 移行のユーザー入力（wizard 編集途中）: control fact 1 件に対する video 区間。
+/// commit 用の `VideoSyncInput` と違い未入力（None）を許す。
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct VideoSyncDraftInput {
+    pub fact_id: FactId,
+    pub video_start_seconds: Option<f64>,
+    pub video_end_seconds: Option<f64>,
+}
+
+/// draft 検証の違反種別。文言と wizard step への写像はシェル所有（ADR 0002 と同じ分担）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+pub enum VideoMigrationDraftIssue {
+    /// 移行対象が `.timer` 試合でない（`.video` / `.videoHighlight` には適用不可）。
+    SourceConfigurationNotTimer,
+    /// video source が未確定（URL 未入力 / 解析不可。URL 解析はシェルの責務）。
+    MissingVideoSource,
+    /// PhaseSync の videoClock start が未入力。
+    MissingPhaseVideoStart { fact_id: FactId },
+    /// PhaseSync の videoClock end が未入力。
+    MissingPhaseVideoEnd { fact_id: FactId },
+    /// PhaseSync の videoClock end が start 以下。
+    PhaseVideoEndBeforeStart { fact_id: FactId },
+    /// 2 phase の videoClock 範囲が overlap している。
+    PhaseVideoRangesOverlap {
+        first_fact_id: FactId,
+        second_fact_id: FactId,
+    },
+    /// StoppageSync の videoClock start が未入力。
+    MissingStoppageVideoStart { fact_id: FactId },
+    /// StoppageSync の videoClock end が未入力。
+    MissingStoppageVideoEnd { fact_id: FactId },
+    /// StoppageSync の videoClock end が start 以下。
+    StoppageVideoEndBeforeStart { fact_id: FactId },
+    /// Stoppage の videoClock 範囲が phase 範囲外。
+    StoppageVideoOutsidePhaseRange { fact_id: FactId },
+    /// 2 stoppage の videoClock 範囲が overlap している。
+    StoppageVideoRangesOverlap {
+        first_fact_id: FactId,
+        second_fact_id: FactId,
+    },
+}
+
+/// 移行ウィザードの draft 全体を検証する（移植元: `VideoModeMigrationValidator.validate`。
+/// 放出順まで同セマンティクス）。
+///
+/// 検証ルール:
+/// 1. 移行対象が `.timer` 試合であること
+/// 2. video source が確定していること（有無のみ。URL 解析はシェル）
+/// 3. PhaseSync: videoStart / videoEnd 入力済み・end > start・2 phase の範囲が overlap しない
+/// 4. StoppageSync: 同上 + 範囲がいずれかの phase 範囲内に収まること
+///
+/// commit 時の安全網は `video_migration_plan`（存在・導出可否）と逐次 validation が担い、
+/// 本関数は wizard の「次へ」活性・フィールド hint のための事前検証を一手に持つ。
+pub fn validate_video_migration_draft(
+    source_configuration: &MatchConfiguration,
+    video_source: Option<&VideoSource>,
+    phase_syncs: &[VideoSyncDraftInput],
+    stoppage_syncs: &[VideoSyncDraftInput],
+) -> Vec<VideoMigrationDraftIssue> {
+    let mut issues: Vec<VideoMigrationDraftIssue> = Vec::new();
+
+    if !matches!(source_configuration, MatchConfiguration::Timer { .. }) {
+        issues.push(VideoMigrationDraftIssue::SourceConfigurationNotTimer);
+    }
+    if video_source.is_none() {
+        issues.push(VideoMigrationDraftIssue::MissingVideoSource);
+    }
+
+    validate_phase_sync_drafts(phase_syncs, &mut issues);
+    validate_stoppage_sync_drafts(stoppage_syncs, phase_syncs, &mut issues);
+    issues
+}
+
+/// 入力完了（start / end 両方あり・end > start）の sync だけを (fact_id, start, end) に絞る。
+fn completed_draft_ranges(syncs: &[VideoSyncDraftInput]) -> Vec<(FactId, f64, f64)> {
+    syncs
+        .iter()
+        .filter_map(|s| match (s.video_start_seconds, s.video_end_seconds) {
+            (Some(start), Some(end)) if end > start => Some((s.fact_id, start, end)),
+            _ => None,
+        })
+        .collect()
+}
+
+fn validate_phase_sync_drafts(
+    syncs: &[VideoSyncDraftInput],
+    issues: &mut Vec<VideoMigrationDraftIssue>,
+) {
+    for sync in syncs {
+        if sync.video_start_seconds.is_none() {
+            issues.push(VideoMigrationDraftIssue::MissingPhaseVideoStart {
+                fact_id: sync.fact_id,
+            });
+        }
+        if sync.video_end_seconds.is_none() {
+            issues.push(VideoMigrationDraftIssue::MissingPhaseVideoEnd {
+                fact_id: sync.fact_id,
+            });
+        }
+        if let (Some(start), Some(end)) = (sync.video_start_seconds, sync.video_end_seconds)
+            && end <= start
+        {
+            issues.push(VideoMigrationDraftIssue::PhaseVideoEndBeforeStart {
+                fact_id: sync.fact_id,
+            });
+        }
+    }
+
+    let completed = completed_draft_ranges(syncs);
+    for i in 0..completed.len() {
+        for j in (i + 1)..completed.len() {
+            let (id_a, start_a, end_a) = completed[i];
+            let (id_b, start_b, end_b) = completed[j];
+            if start_a < end_b && start_b < end_a {
+                issues.push(VideoMigrationDraftIssue::PhaseVideoRangesOverlap {
+                    first_fact_id: id_a,
+                    second_fact_id: id_b,
+                });
+            }
+        }
+    }
+}
+
+fn validate_stoppage_sync_drafts(
+    syncs: &[VideoSyncDraftInput],
+    phase_syncs: &[VideoSyncDraftInput],
+    issues: &mut Vec<VideoMigrationDraftIssue>,
+) {
+    for sync in syncs {
+        if sync.video_start_seconds.is_none() {
+            issues.push(VideoMigrationDraftIssue::MissingStoppageVideoStart {
+                fact_id: sync.fact_id,
+            });
+        }
+        if sync.video_end_seconds.is_none() {
+            issues.push(VideoMigrationDraftIssue::MissingStoppageVideoEnd {
+                fact_id: sync.fact_id,
+            });
+        }
+        if let (Some(start), Some(end)) = (sync.video_start_seconds, sync.video_end_seconds)
+            && end <= start
+        {
+            issues.push(VideoMigrationDraftIssue::StoppageVideoEndBeforeStart {
+                fact_id: sync.fact_id,
+            });
+        }
+    }
+
+    // Stoppage の videoClock 範囲がいずれかの phase 範囲内かチェック（入力完了分のみ）。
+    let phase_ranges = completed_draft_ranges(phase_syncs);
+    for (fact_id, start, end) in completed_draft_ranges(syncs) {
+        let contained = phase_ranges
+            .iter()
+            .any(|(_, phase_start, phase_end)| start >= *phase_start && end <= *phase_end);
+        if !contained {
+            issues.push(VideoMigrationDraftIssue::StoppageVideoOutsidePhaseRange { fact_id });
+        }
+    }
+
+    let completed = completed_draft_ranges(syncs);
+    for i in 0..completed.len() {
+        for j in (i + 1)..completed.len() {
+            let (id_a, start_a, end_a) = completed[i];
+            let (id_b, start_b, end_b) = completed[j];
+            if start_a < end_b && start_b < end_a {
+                issues.push(VideoMigrationDraftIssue::StoppageVideoRangesOverlap {
+                    first_fact_id: id_a,
+                    second_fact_id: id_b,
+                });
+            }
+        }
+    }
 }
