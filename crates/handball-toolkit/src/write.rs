@@ -6,7 +6,14 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::ids::{PlayerId, TeamId};
+use chrono::{DateTime, Utc};
+
+use crate::clock::{FactAnchor, MatchClock};
+use crate::configuration::{MatchConfiguration, PhaseKind};
+use crate::entities::Match;
+use crate::facts::{ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload};
+use crate::ids::{FactId, PlayerId, TeamId};
+use crate::projection::SegmentResolver;
 use crate::validators::RosterContext;
 
 /// home / away 所属選手 1 件の (player, team) 参照。
@@ -46,4 +53,103 @@ pub fn roster_context_from_players(
         player_team_lookup,
         known_player_ids: Some(known_player_ids),
     })
+}
+
+// ── タイマーモードの phase 自動補完（移植元: RecordingScreenStore.ensureTimerPhasesCovering）──
+
+/// コアが新規 fact を組むための (id, recorded_at) ペア。シェルが必要数だけ事前生成して渡す
+/// （ADR 0005 決定 4 — コアは now() / UUID 生成を持たない。sample_dto の
+/// `required_id_count` + `new_ids` と同型の供給契約）。
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct NewFactStamp {
+    pub id: FactId,
+    pub recorded_at: DateTime<Utc>,
+}
+
+/// 補完すべき D-snap 区間 `[(k-1)·D, k·D]`（1-based k、昇順）。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PhaseCompletionSlot {
+    pub start_seconds: f64,
+    pub end_seconds: f64,
+}
+
+/// `fact` をタイマーモードで永続化する直前に auto-create すべき regular phase 区間を返す。
+///
+/// - D = `phase_duration_seconds`、phase N = `[(N-1)·D, N·D]`。記録時刻を含む D-snap phase と
+///   その手前の欠け phase を昇順で列挙する（出現順導出とクロック位置導出を一致させる連鎖作成）
+/// - `.video` / `.videoHighlight`・D <= 0 は空（動画は videoClock 基準で明示 phase 開始）
+/// - PhaseStart fact 自身は補完しない（明示 phase 管理はユーザーダイアログ経由 — `startPhase`）
+/// - 記録時刻は `fact` の matchClock anchor から取る（無ければ 0 = phase 1 のみ確保）
+pub fn phase_completion_plan(
+    match_: &Match,
+    existing_facts: &[MatchFact],
+    fact: &MatchFact,
+) -> Vec<PhaseCompletionSlot> {
+    if matches!(
+        fact.payload,
+        MatchFactPayload::Control(ControlFact::PhaseStart(_))
+    ) {
+        return Vec::new();
+    }
+    let MatchConfiguration::Timer {
+        phase_duration_seconds: duration,
+    } = match_.configuration
+    else {
+        return Vec::new();
+    };
+    if duration <= 0.0 {
+        return Vec::new();
+    }
+
+    let seconds = fact
+        .anchor()
+        .match_clock()
+        .map(|clock| clock.elapsed_seconds)
+        .unwrap_or(0.0);
+    let target_index = (seconds.max(0.0) / duration).floor() as i64 + 1;
+    if target_index < 1 {
+        return Vec::new();
+    }
+
+    // 既存 regular phase が満たす D-snap interval index (1-based) を集める。
+    let resolver = SegmentResolver::build(existing_facts);
+    let mut covered = BTreeSet::new();
+    for phase in &resolver.phases {
+        if phase.kind != PhaseKind::Regular {
+            continue;
+        }
+        let Some(start) = phase.match_elapsed_start else {
+            continue;
+        };
+        let index = (start / duration).round() as i64 + 1;
+        if index >= 1 {
+            covered.insert(index);
+        }
+    }
+
+    (1..=target_index)
+        .filter(|k| !covered.contains(k))
+        .map(|k| PhaseCompletionSlot {
+            start_seconds: (k - 1) as f64 * duration,
+            end_seconds: k as f64 * duration,
+        })
+        .collect()
+}
+
+/// 補完 slot + スタンプから regular PhaseStart fact を組む（発火層が消費順に使う）。
+pub fn phase_completion_fact(slot: PhaseCompletionSlot, stamp: NewFactStamp) -> MatchFact {
+    MatchFact {
+        id: stamp.id,
+        recorded_at: stamp.recorded_at,
+        payload: MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
+            kind: PhaseKind::Regular,
+            start_anchor: FactAnchor::MatchClock(MatchClock {
+                elapsed_seconds: slot.start_seconds,
+            }),
+            end_anchor: FactAnchor::MatchClock(MatchClock {
+                elapsed_seconds: slot.end_seconds,
+            }),
+        })),
+    }
 }

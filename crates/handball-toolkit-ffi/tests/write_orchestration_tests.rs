@@ -16,10 +16,10 @@ use handball_toolkit::facts::{
 };
 use handball_toolkit::ids::{FactId, MatchId, PlayerId, TeamId};
 use handball_toolkit::validation::{DomainValidationIssue, FactValidationError};
-use handball_toolkit::write::PlayerTeamRef;
+use handball_toolkit::write::{NewFactStamp, PlayerTeamRef};
 use handball_toolkit_ffi::ffi_write::{
-    CoreWriteError, MatchWriteRepository, record_append_fact, record_delete_fact,
-    record_update_fact,
+    CoreWriteError, MatchWriteRepository, count_phase_completion_facts, record_append_fact,
+    record_delete_fact, record_fact_with_phase_completion, record_update_fact,
 };
 use uuid::Uuid;
 
@@ -342,6 +342,95 @@ fn play_を内包する_phase_start_の削除は発火せず拒否() {
         Err(CoreWriteError::ValidationFailed { .. })
     ));
     assert_eq!(repo.fact_log().len(), 2, "違反時は発火しない");
+}
+
+// ── phase 自動補完込み記録（実装順序 3）──
+
+fn stamp(id: u128) -> NewFactStamp {
+    NewFactStamp {
+        id: Uuid::from_u128(id),
+        recorded_at: chrono::DateTime::from_timestamp(id as i64, 0).expect("固定秒は有効"),
+    }
+}
+
+#[test]
+fn 必要数はコアが数える() {
+    let repo = Arc::new(FakeRepo::new(vec![]));
+    let count = run(count_phase_completion_facts(
+        repo.clone(),
+        match_id(),
+        goal(GOAL_ID, 1900.0, Some(Uuid::from_u128(SCORER_ID))),
+    ));
+    assert_eq!(count, Ok(2), "後半の記録は前半 + 後半の 2 phase を要する");
+}
+
+#[test]
+fn 補完込み記録は_phase_を連鎖発火してから本_fact_を発火する() {
+    let repo = Arc::new(FakeRepo::new(vec![]));
+    let result = run(record_fact_with_phase_completion(
+        repo.clone(),
+        match_id(),
+        goal(GOAL_ID, 1900.0, Some(Uuid::from_u128(SCORER_ID))),
+        vec![stamp(301), stamp(302)],
+    ));
+    assert_eq!(result, Ok(()));
+
+    let log = repo.fact_log();
+    assert_eq!(log.len(), 3, "phase 2 件 + goal 1 件");
+    // スタンプは消費順（前半 → 後半）に使われる。
+    assert_eq!(log[0].id, Uuid::from_u128(301));
+    assert_eq!(log[1].id, Uuid::from_u128(302));
+    assert_eq!(log[2].id, Uuid::from_u128(GOAL_ID));
+}
+
+#[test]
+fn 既存_phase_があれば欠けだけ補完する() {
+    let repo = Arc::new(FakeRepo::new(vec![phase_start()]));
+    let result = run(record_fact_with_phase_completion(
+        repo.clone(),
+        match_id(),
+        goal(GOAL_ID, 60.0, Some(Uuid::from_u128(SCORER_ID))),
+        vec![],
+    ));
+    assert_eq!(result, Ok(()), "phase 1 は既存なので補完 0 件で成立する");
+    assert_eq!(repo.fact_log().len(), 2);
+}
+
+#[test]
+fn スタンプ不足は発火せず_insufficient_new_ids() {
+    let repo = Arc::new(FakeRepo::new(vec![]));
+    let result = run(record_fact_with_phase_completion(
+        repo.clone(),
+        match_id(),
+        goal(GOAL_ID, 1900.0, Some(Uuid::from_u128(SCORER_ID))),
+        vec![stamp(301)],
+    ));
+    assert_eq!(
+        result,
+        Err(CoreWriteError::InsufficientNewIds {
+            required: 2,
+            provided: 1
+        })
+    );
+    assert!(repo.fact_log().is_empty(), "不足時は何も発火しない");
+}
+
+#[test]
+fn 本_fact_の違反は補完_phase_発火後でも拒否される() {
+    let repo = Arc::new(FakeRepo::new(vec![]));
+    // Goal は player 必須 → 補完 phase は発火するが本 fact は ValidationFailed。
+    let result = run(record_fact_with_phase_completion(
+        repo.clone(),
+        match_id(),
+        goal(GOAL_ID, 60.0, None),
+        vec![stamp(301)],
+    ));
+    assert!(matches!(
+        result,
+        Err(CoreWriteError::ValidationFailed { .. })
+    ));
+    // 現行挙動パリティ: 連鎖は非 atomic — 発火済み補完 phase は残る。
+    assert_eq!(repo.fact_log().len(), 1);
 }
 
 // ── repository 失敗の伝播 ──

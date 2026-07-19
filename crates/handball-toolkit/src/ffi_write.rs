@@ -18,7 +18,7 @@ use crate::facts::MatchFact;
 use crate::ids::{FactId, MatchId, TeamId};
 use crate::validation::DomainValidationIssue;
 use crate::validators::{self, RosterContext};
-use crate::write::{self, PlayerTeamRef};
+use crate::write::{self, NewFactStamp, PlayerTeamRef};
 
 /// write 入口の失敗（ADR 0005 決定 5。ADR 0002: 構造化 — コード + パラメータのみ）。
 ///
@@ -116,6 +116,62 @@ pub async fn record_update_fact(
         return Err(CoreWriteError::ValidationFailed { issues });
     }
     repo.update_fact(match_id, fact).await
+}
+
+/// phase 自動補完込み記録に必要なスタンプ数（ADR 0005 決定 4 — 必要数はコアが数える）。
+///
+/// `record_fact_with_phase_completion` と同じ読み取り（repo 経由）で補完 fact 数を返す。
+/// シェルはこの数だけ `NewFactStamp` を生成して記録入口を呼ぶ。数え時と発火時の間に
+/// fact 列が変わって不足したら、入口が `InsufficientNewIds` で拒否する（再試行可能）。
+#[uniffi::export]
+pub async fn count_phase_completion_facts(
+    repo: Arc<dyn MatchWriteRepository>,
+    match_id: MatchId,
+    fact: MatchFact,
+) -> Result<u32, CoreWriteError> {
+    let match_ = repo.load_match(match_id).await?;
+    let existing = repo.load_fact_log(match_id).await?;
+    Ok(write::phase_completion_plan(&match_, &existing, &fact).len() as u32)
+}
+
+/// phase 自動補完込みの fact append 入口（ADR 0005 実装順序 3 —
+/// 移植元: `RecordingScreenStore.ensureTimerPhasesCovering` + append の連鎖）。
+///
+/// 読む → 補完計画 → (補完 phase を 1 件ずつ 検証 → 発火) → 本 fact を検証 → 発火。
+/// 挙動パリティ（決定 7）: 連鎖は逐次・非 atomic — 途中の validation 違反は以降を発火せず
+/// 拒否するが、発火済みの補完 phase はロールバックしない（現行の連鎖 append と同じ）。
+#[uniffi::export]
+pub async fn record_fact_with_phase_completion(
+    repo: Arc<dyn MatchWriteRepository>,
+    match_id: MatchId,
+    fact: MatchFact,
+    new_stamps: Vec<NewFactStamp>,
+) -> Result<(), CoreWriteError> {
+    let (match_, existing, roster) = load_validation_inputs(repo.as_ref(), match_id).await?;
+    let plan = write::phase_completion_plan(&match_, &existing, &fact);
+    if new_stamps.len() < plan.len() {
+        return Err(CoreWriteError::InsufficientNewIds {
+            required: plan.len() as u32,
+            provided: new_stamps.len() as u32,
+        });
+    }
+
+    let mut working = existing;
+    for (slot, stamp) in plan.into_iter().zip(new_stamps) {
+        let phase_fact = write::phase_completion_fact(slot, stamp);
+        let issues = validators::validate_append(&phase_fact, &working, &match_, roster.as_ref());
+        if !issues.is_empty() {
+            return Err(CoreWriteError::ValidationFailed { issues });
+        }
+        repo.append_fact(match_id, phase_fact.clone()).await?;
+        working.push(phase_fact);
+    }
+
+    let issues = validators::validate_append(&fact, &working, &match_, roster.as_ref());
+    if !issues.is_empty() {
+        return Err(CoreWriteError::ValidationFailed { issues });
+    }
+    repo.append_fact(match_id, fact).await
 }
 
 /// fact delete の write 入口: 読む → `validate_delete` → 合格時のみ発火。
