@@ -8,18 +8,18 @@
 use std::future::Future;
 use std::sync::{Arc, Mutex};
 
-use handball_toolkit::clock::{FactAnchor, MatchClock};
-use handball_toolkit::configuration::{MatchConfiguration, PhaseKind};
+use handball_toolkit::clock::{FactAnchor, MatchClock, VideoClock};
+use handball_toolkit::configuration::{MatchConfiguration, PhaseKind, VideoProvider, VideoSource};
 use handball_toolkit::entities::{Match, RosterSelection};
 use handball_toolkit::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
 };
 use handball_toolkit::ids::{FactId, MatchId, PlayerId, TeamId};
 use handball_toolkit::validation::{DomainValidationIssue, FactValidationError};
-use handball_toolkit::write::{NewFactStamp, PlayerTeamRef};
+use handball_toolkit::write::{NewFactStamp, PlayerTeamRef, VideoSyncInput};
 use handball_toolkit_ffi::ffi_write::{
-    CoreWriteError, MatchWriteRepository, count_phase_completion_facts, record_append_fact,
-    record_delete_fact, record_fact_with_phase_completion, record_update_fact,
+    CoreWriteError, MatchWriteRepository, commit_video_migration, count_phase_completion_facts,
+    record_append_fact, record_delete_fact, record_fact_with_phase_completion, record_update_fact,
 };
 use uuid::Uuid;
 
@@ -96,6 +96,7 @@ struct FakeRepo {
     facts: Mutex<Vec<MatchFact>>,
     roster_players: Vec<PlayerTeamRef>,
     fail_load_match: bool,
+    saved_matches: Mutex<Vec<Match>>,
 }
 
 impl FakeRepo {
@@ -105,6 +106,7 @@ impl FakeRepo {
             facts: Mutex::new(facts),
             roster_players: Vec::new(),
             fail_load_match: false,
+            saved_matches: Mutex::new(Vec::new()),
         }
     }
 
@@ -136,7 +138,11 @@ impl MatchWriteRepository for FakeRepo {
         Ok(self.roster_players.clone())
     }
 
-    async fn save_match(&self, _match_: Match) -> Result<(), CoreWriteError> {
+    async fn save_match(&self, match_: Match) -> Result<(), CoreWriteError> {
+        self.saved_matches
+            .lock()
+            .expect("テスト内で poison しない")
+            .push(match_);
         Ok(())
     }
 
@@ -431,6 +437,95 @@ fn 本_fact_の違反は補完_phase_発火後でも拒否される() {
     ));
     // 現行挙動パリティ: 連鎖は非 atomic — 発火済み補完 phase は残る。
     assert_eq!(repo.fact_log().len(), 1);
+}
+
+// ── video 移行 commit（実装順序 4）──
+
+fn poc_video_source() -> VideoSource {
+    VideoSource {
+        provider: VideoProvider::Youtube,
+        external_id: "poc".to_string(),
+    }
+}
+
+#[test]
+fn video_移行_commit_は_config_先行_save_後に_facts_を計画順に更新する() {
+    let repo = Arc::new(FakeRepo::new(vec![
+        phase_start(),
+        goal(GOAL_ID, 60.0, Some(Uuid::from_u128(SCORER_ID))),
+    ]));
+    let result = run(commit_video_migration(
+        repo.clone(),
+        match_id(),
+        poc_video_source(),
+        vec![VideoSyncInput {
+            fact_id: Uuid::from_u128(PHASE_START_ID),
+            video_start_seconds: 10.0,
+            video_end_seconds: 1810.0,
+        }],
+        vec![],
+    ));
+    assert_eq!(result, Ok(()));
+
+    // config は先行 save で .video 化されている。
+    let saved = repo
+        .saved_matches
+        .lock()
+        .expect("テスト内で poison しない")
+        .clone();
+    assert_eq!(saved.len(), 1);
+    assert_eq!(
+        saved[0].configuration,
+        MatchConfiguration::Video(poc_video_source())
+    );
+
+    // facts: phase は both、goal は videoClock(10 + 60 = 70)へ変換済み。
+    let log = repo.fact_log();
+    let phase = log.iter().find(|f| f.id == Uuid::from_u128(PHASE_START_ID));
+    assert!(matches!(
+        phase.map(|f| f.anchor()),
+        Some(FactAnchor::Both { .. })
+    ));
+    let goal_fact = log
+        .iter()
+        .find(|f| f.id == Uuid::from_u128(GOAL_ID))
+        .expect("goal は存在する");
+    assert_eq!(
+        goal_fact.anchor(),
+        FactAnchor::VideoClock(VideoClock {
+            elapsed_seconds: 70.0
+        })
+    );
+}
+
+#[test]
+fn video_移行_commit_は_sync_欠落なら何も発火しない() {
+    let repo = Arc::new(FakeRepo::new(vec![
+        phase_start(),
+        goal(GOAL_ID, 60.0, Some(Uuid::from_u128(SCORER_ID))),
+    ]));
+    let result = run(commit_video_migration(
+        repo.clone(),
+        match_id(),
+        poc_video_source(),
+        vec![],
+        vec![],
+    ));
+    assert!(matches!(
+        result,
+        Err(CoreWriteError::MigrationPlanInfeasible { .. })
+    ));
+    assert!(
+        repo.saved_matches
+            .lock()
+            .expect("テスト内で poison しない")
+            .is_empty(),
+        "計画不成立なら config も書かない"
+    );
+    assert!(matches!(
+        repo.fact_log()[1].anchor(),
+        FactAnchor::MatchClock(_)
+    ));
 }
 
 // ── repository 失敗の伝播 ──

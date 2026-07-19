@@ -15,8 +15,8 @@ use handball_toolkit::facts::{
     StoppageKind, StoppagePayload,
 };
 use handball_toolkit::write::{
-    NewFactStamp, PlayerTeamRef, phase_completion_fact, phase_completion_plan,
-    roster_context_from_players,
+    NewFactStamp, PlayerTeamRef, VideoMigrationPlanError, VideoSyncInput, phase_completion_fact,
+    phase_completion_plan, roster_context_from_players, video_migration_plan,
 };
 use uuid::Uuid;
 
@@ -235,5 +235,147 @@ fn 補完_fact_はスタンプの_id_と時刻で組まれる() {
             );
         }
         other => panic!("PhaseStart を期待したが {other:?}"),
+    }
+}
+
+// ── video 移行 commit 計画（移植元: MigrateToVideoStore.buildUpdatedFacts）──
+
+fn sync(fact: &MatchFact, start: f64, end: f64) -> VideoSyncInput {
+    VideoSyncInput {
+        fact_id: fact.id,
+        video_start_seconds: start,
+        video_end_seconds: end,
+    }
+}
+
+#[test]
+fn 移行計画は_phase_start_を_both_anchor_化し_play_を_video_clock_へ変換する() {
+    let phase = phase_start(0.0, 1800.0);
+    let goal = goal_at(60.0);
+    let plan = video_migration_plan(
+        &[phase.clone(), goal.clone()],
+        &[sync(&phase, 10.0, 1810.0)],
+        &[],
+    )
+    .expect("計画成立");
+
+    assert_eq!(plan.len(), 2, "control → play の順");
+    match &plan[0].payload {
+        MatchFactPayload::Control(ControlFact::PhaseStart(payload)) => {
+            assert_eq!(
+                payload.start_anchor,
+                FactAnchor::Both {
+                    match_clock: MatchClock {
+                        elapsed_seconds: 0.0
+                    },
+                    video_clock: VideoClock {
+                        elapsed_seconds: 10.0
+                    },
+                }
+            );
+            assert_eq!(
+                payload.end_anchor,
+                FactAnchor::Both {
+                    match_clock: MatchClock {
+                        elapsed_seconds: 1800.0
+                    },
+                    video_clock: VideoClock {
+                        elapsed_seconds: 1810.0
+                    },
+                }
+            );
+        }
+        other => panic!("PhaseStart を期待したが {other:?}"),
+    }
+    match &plan[1].payload {
+        MatchFactPayload::Play(play) => {
+            // baseline rolling forward: video 10 + (mc 60 - mc 0) = 70。
+            assert_eq!(
+                play.anchor,
+                FactAnchor::VideoClock(VideoClock {
+                    elapsed_seconds: 70.0
+                })
+            );
+        }
+        other => panic!("Play を期待したが {other:?}"),
+    }
+}
+
+#[test]
+fn 移行計画は_stoppage_の_end_match_clock_を_start_と同値にする() {
+    let phase = phase_start(0.0, 1800.0);
+    let pause = MatchFact {
+        id: Uuid::from_u128(150),
+        recorded_at: chrono::DateTime::from_timestamp(5, 0).expect("固定秒は有効"),
+        payload: MatchFactPayload::Control(ControlFact::Stoppage(StoppagePayload {
+            kind: StoppageKind::Timeout,
+            start_anchor: FactAnchor::MatchClock(MatchClock {
+                elapsed_seconds: 300.0,
+            }),
+            end_anchor: None,
+            note: None,
+        })),
+    };
+    let plan = video_migration_plan(
+        &[phase.clone(), pause.clone()],
+        &[sync(&phase, 10.0, 1810.0)],
+        &[sync(&pause, 400.0, 460.0)],
+    )
+    .expect("計画成立");
+
+    match &plan[1].payload {
+        MatchFactPayload::Control(ControlFact::Stoppage(payload)) => {
+            assert_eq!(
+                payload.end_anchor,
+                Some(FactAnchor::Both {
+                    // Stoppage 中に matchClock は進まない — end の matchClock は start と同値。
+                    match_clock: MatchClock {
+                        elapsed_seconds: 300.0
+                    },
+                    video_clock: VideoClock {
+                        elapsed_seconds: 460.0
+                    },
+                })
+            );
+        }
+        other => panic!("Stoppage を期待したが {other:?}"),
+    }
+}
+
+#[test]
+fn 移行計画は_sync_欠落を拒否する() {
+    let phase = phase_start(0.0, 1800.0);
+    let result = video_migration_plan(std::slice::from_ref(&phase), &[], &[]);
+    assert_eq!(
+        result,
+        Err(VideoMigrationPlanError::MissingPhaseSync { fact_id: phase.id })
+    );
+}
+
+#[test]
+fn 移行計画は_video_anchor_済み_play_を触らない() {
+    let phase = phase_start(0.0, 1800.0);
+    let mut converted = goal_at(0.0);
+    if let MatchFactPayload::Play(play) = &mut converted.payload {
+        play.anchor = FactAnchor::VideoClock(VideoClock {
+            elapsed_seconds: 99.0,
+        });
+    }
+    let plan = video_migration_plan(
+        &[phase.clone(), converted.clone()],
+        &[sync(&phase, 10.0, 1810.0)],
+        &[],
+    )
+    .expect("計画成立");
+    match &plan[1].payload {
+        MatchFactPayload::Play(play) => {
+            assert_eq!(
+                play.anchor,
+                FactAnchor::VideoClock(VideoClock {
+                    elapsed_seconds: 99.0
+                })
+            );
+        }
+        other => panic!("Play を期待したが {other:?}"),
     }
 }

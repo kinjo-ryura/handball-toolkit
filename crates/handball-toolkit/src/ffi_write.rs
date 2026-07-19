@@ -13,12 +13,13 @@
 
 use std::sync::Arc;
 
+use crate::configuration::{MatchConfiguration, VideoSource};
 use crate::entities::Match;
 use crate::facts::MatchFact;
 use crate::ids::{FactId, MatchId, TeamId};
 use crate::validation::DomainValidationIssue;
 use crate::validators::{self, RosterContext};
-use crate::write::{self, NewFactStamp, PlayerTeamRef};
+use crate::write::{self, NewFactStamp, PlayerTeamRef, VideoMigrationPlanError, VideoSyncInput};
 
 /// write 入口の失敗（ADR 0005 決定 5。ADR 0002: 構造化 — コード + パラメータのみ）。
 ///
@@ -37,6 +38,17 @@ pub enum CoreWriteError {
     Repository { message: String },
     /// 事前生成 ID / 時刻スタンプの不足（ID 供給契約違反。シェルは再試行できる）。
     InsufficientNewIds { required: u32, provided: u32 },
+    /// video 移行 commit の計画不成立（sync 欠落・videoClock 導出不能）。wizard の
+    /// 事前 validation が通っていれば到達しない安全網（実装順序 4 で追加した variant）。
+    MigrationPlanInfeasible { message: String },
+}
+
+impl From<VideoMigrationPlanError> for CoreWriteError {
+    fn from(error: VideoMigrationPlanError) -> Self {
+        CoreWriteError::MigrationPlanInfeasible {
+            message: format!("{error:?}"),
+        }
+    }
 }
 
 // uniffi::Error は Display を要求する。開発者向け診断のみ（ユーザー向け文言は
@@ -172,6 +184,49 @@ pub async fn record_fact_with_phase_completion(
         return Err(CoreWriteError::ValidationFailed { issues });
     }
     repo.append_fact(match_id, fact).await
+}
+
+/// タイマー → 動画移行 commit の入口（ADR 0005 実装順序 4 —
+/// 移植元: `MigrateToVideoStore.commit` の保存順序設計）。
+///
+/// 順序設計をコアが所有する:
+/// 1. 更新後 facts を計画（純粋関数 `video_migration_plan` — control → play の順）
+/// 2. Match.configuration を先に `.video` へ save（素朴 CRUD・検証なし。既存 facts が
+///    matchClock anchor の途中状態でも通り、後続 update が `.video` config 下で検証される）
+/// 3. facts を計画順に逐次 validate → update（挙動パリティ: 非 atomic、途中失敗は再実行で復旧）
+#[uniffi::export]
+pub async fn commit_video_migration(
+    repo: Arc<dyn MatchWriteRepository>,
+    match_id: MatchId,
+    video_source: VideoSource,
+    phase_syncs: Vec<VideoSyncInput>,
+    stoppage_syncs: Vec<VideoSyncInput>,
+) -> Result<(), CoreWriteError> {
+    let mut match_ = repo.load_match(match_id).await?;
+    let facts = repo.load_fact_log(match_id).await?;
+    let players = repo
+        .load_roster_players(match_.home_team_id, match_.away_team_id)
+        .await?;
+    let roster =
+        write::roster_context_from_players(match_.home_team_id, match_.away_team_id, &players);
+
+    let updated = write::video_migration_plan(&facts, &phase_syncs, &stoppage_syncs)?;
+
+    match_.configuration = MatchConfiguration::Video(video_source);
+    repo.save_match(match_.clone()).await?;
+
+    let mut working = facts;
+    for fact in updated {
+        let issues = validators::validate_update(&fact, &working, &match_, roster.as_ref());
+        if !issues.is_empty() {
+            return Err(CoreWriteError::ValidationFailed { issues });
+        }
+        repo.update_fact(match_id, fact.clone()).await?;
+        if let Some(slot) = working.iter_mut().find(|f| f.id == fact.id) {
+            *slot = fact;
+        }
+    }
+    Ok(())
 }
 
 /// fact delete の write 入口: 読む → `validate_delete` → 合格時のみ発火。

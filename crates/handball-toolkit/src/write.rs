@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{DateTime, Utc};
 
-use crate::clock::{FactAnchor, MatchClock};
+use crate::clock::{FactAnchor, MatchClock, VideoClock};
 use crate::configuration::{MatchConfiguration, PhaseKind};
 use crate::entities::Match;
 use crate::facts::{ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload};
@@ -152,4 +152,153 @@ pub fn phase_completion_fact(slot: PhaseCompletionSlot, stamp: NewFactStamp) -> 
             }),
         })),
     }
+}
+
+// ── タイマー → 動画移行の commit 計画（移植元: MigrateToVideoStore.buildUpdatedFacts）──
+
+/// video 移行のユーザー入力: control fact 1 件に対する video 区間。
+/// matchClock 側は fact 自身が持つ値を使う（draft の matchClock は facts の
+/// read-only ミラーであり、コアは DB 真実から同じ値を導く）。
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct VideoSyncInput {
+    pub fact_id: FactId,
+    pub video_start_seconds: f64,
+    pub video_end_seconds: f64,
+}
+
+/// video 移行 commit の計画が成立しない理由（発火層が `CoreWriteError` へ写像する）。
+/// wizard 側の事前 validation が通っていれば実行時には到達しない安全網。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum VideoMigrationPlanError {
+    MissingPhaseSync {
+        fact_id: FactId,
+    },
+    MissingStoppageSync {
+        fact_id: FactId,
+    },
+    CannotResolveVideoClock {
+        fact_id: FactId,
+        match_clock_seconds: f64,
+    },
+}
+
+/// 更新後の facts（control 全部 → play 全部の順）を構築する。
+///
+/// - PhaseStart: anchor を `.both(matchClock: 既存, videoClock: ユーザー入力)` に書き換え
+/// - Stoppage: 同上 + endAnchor を追加（Stoppage 中に matchClock は進まないため
+///   end の matchClock は start と同値）
+/// - Play: 更新済み control から組んだ `SegmentResolver` で videoClock を導出し
+///   `.videoClock` 単独に書き換え（既に videoClock / both なら触らない — 安全側）
+///
+/// 返り順（control → play）が commit の発火順。play 変換時点で全 phase が
+/// video range 化済み = R7（play が phase range 内)も満たす順序設計。
+pub fn video_migration_plan(
+    facts: &[MatchFact],
+    phase_syncs: &[VideoSyncInput],
+    stoppage_syncs: &[VideoSyncInput],
+) -> Result<Vec<MatchFact>, VideoMigrationPlanError> {
+    let phase_by_id: BTreeMap<FactId, &VideoSyncInput> =
+        phase_syncs.iter().map(|s| (s.fact_id, s)).collect();
+    let stoppage_by_id: BTreeMap<FactId, &VideoSyncInput> =
+        stoppage_syncs.iter().map(|s| (s.fact_id, s)).collect();
+
+    let mut updated_control: Vec<MatchFact> = Vec::new();
+    let mut plays_to_convert: Vec<MatchFact> = Vec::new();
+
+    for fact in facts {
+        match &fact.payload {
+            MatchFactPayload::Control(ControlFact::PhaseStart(payload)) => {
+                let sync = phase_by_id
+                    .get(&fact.id)
+                    .ok_or(VideoMigrationPlanError::MissingPhaseSync { fact_id: fact.id })?;
+                let match_start = payload
+                    .start_anchor
+                    .match_clock()
+                    .map(|c| c.elapsed_seconds)
+                    .unwrap_or(0.0);
+                let match_end = payload
+                    .end_anchor
+                    .match_clock()
+                    .map(|c| c.elapsed_seconds)
+                    .unwrap_or(0.0);
+                let mut new_payload = *payload;
+                new_payload.start_anchor = FactAnchor::Both {
+                    match_clock: MatchClock {
+                        elapsed_seconds: match_start,
+                    },
+                    video_clock: VideoClock {
+                        elapsed_seconds: sync.video_start_seconds,
+                    },
+                };
+                new_payload.end_anchor = FactAnchor::Both {
+                    match_clock: MatchClock {
+                        elapsed_seconds: match_end,
+                    },
+                    video_clock: VideoClock {
+                        elapsed_seconds: sync.video_end_seconds,
+                    },
+                };
+                let mut new_fact = fact.clone();
+                new_fact.payload = MatchFactPayload::Control(ControlFact::PhaseStart(new_payload));
+                updated_control.push(new_fact);
+            }
+            MatchFactPayload::Control(ControlFact::Stoppage(payload)) => {
+                let sync = stoppage_by_id
+                    .get(&fact.id)
+                    .ok_or(VideoMigrationPlanError::MissingStoppageSync { fact_id: fact.id })?;
+                let match_start = payload
+                    .start_anchor
+                    .match_clock()
+                    .map(|c| c.elapsed_seconds)
+                    .unwrap_or(0.0);
+                let mut new_payload = payload.clone();
+                new_payload.start_anchor = FactAnchor::Both {
+                    match_clock: MatchClock {
+                        elapsed_seconds: match_start,
+                    },
+                    video_clock: VideoClock {
+                        elapsed_seconds: sync.video_start_seconds,
+                    },
+                };
+                new_payload.end_anchor = Some(FactAnchor::Both {
+                    match_clock: MatchClock {
+                        elapsed_seconds: match_start,
+                    },
+                    video_clock: VideoClock {
+                        elapsed_seconds: sync.video_end_seconds,
+                    },
+                });
+                let mut new_fact = fact.clone();
+                new_fact.payload = MatchFactPayload::Control(ControlFact::Stoppage(new_payload));
+                updated_control.push(new_fact);
+            }
+            MatchFactPayload::Play(_) => plays_to_convert.push(fact.clone()),
+        }
+    }
+
+    // 更新済み control 全部から SegmentResolver を構築し、play fact の anchor を変換。
+    let resolver = SegmentResolver::build(&updated_control);
+    let mut updated_plays: Vec<MatchFact> = Vec::new();
+    for mut fact in plays_to_convert {
+        let MatchFactPayload::Play(play) = &mut fact.payload else {
+            unreachable!("plays_to_convert は Play のみ");
+        };
+        let FactAnchor::MatchClock(match_clock) = play.anchor else {
+            // 既に videoClock / both なら触らない（安全側）。
+            updated_plays.push(fact);
+            continue;
+        };
+        let video = resolver.resolve_video_clock(match_clock).ok_or(
+            VideoMigrationPlanError::CannotResolveVideoClock {
+                fact_id: fact.id,
+                match_clock_seconds: match_clock.elapsed_seconds,
+            },
+        )?;
+        play.anchor = FactAnchor::VideoClock(video);
+        updated_plays.push(fact);
+    }
+
+    updated_control.extend(updated_plays);
+    Ok(updated_control)
 }
