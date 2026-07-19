@@ -14,6 +14,7 @@ use handball_toolkit::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
     StoppageKind, StoppagePayload,
 };
+use handball_toolkit::ids::{FactId, PlayerId, TeamId};
 use handball_toolkit::validation::{DomainValidationIssue, FactValidationError};
 use handball_toolkit::validators::{
     RosterContext, validate_control_fact, validate_match_fact, validate_play_fact,
@@ -21,19 +22,19 @@ use handball_toolkit::validators::{
 use uuid::Uuid;
 
 struct Ctx {
-    home_id: Uuid,
-    player1: Uuid,
-    player2: Uuid,
+    home_id: TeamId,
+    player1: PlayerId,
+    player2: PlayerId,
     timer_config: MatchConfiguration,
     video_config: MatchConfiguration,
     roster: RosterContext,
 }
 
 fn ctx() -> Ctx {
-    let home_id = Uuid::new_v4();
-    let away_id = Uuid::new_v4();
-    let player1 = Uuid::new_v4();
-    let player2 = Uuid::new_v4();
+    let home_id = TeamId(Uuid::new_v4());
+    let away_id = TeamId(Uuid::new_v4());
+    let player1 = PlayerId(Uuid::new_v4());
+    let player2 = PlayerId(Uuid::new_v4());
     Ctx {
         home_id,
         player1,
@@ -237,7 +238,7 @@ fn player_team_mismatch_is_reported() {
 #[test]
 fn unknown_team_reference_is_reported() {
     let c = ctx();
-    let foreign_team = Uuid::new_v4();
+    let foreign_team = TeamId(Uuid::new_v4());
     let fact = PlayFact {
         team_id: Some(foreign_team),
         player_id: Some(c.player1),
@@ -463,7 +464,7 @@ fn match_fact_dispatches_to_play_validation() {
     let c = ctx();
     let bad = play_base(PlayEventKind::Goal, mc(0.0));
     let fact = MatchFact {
-        id: Uuid::new_v4(),
+        id: FactId(Uuid::new_v4()),
         recorded_at: DateTime::from_timestamp(0, 0).unwrap(),
         payload: MatchFactPayload::Play(bad),
     };

@@ -10,6 +10,7 @@ use std::collections::BTreeSet;
 use handball_toolkit::clock::FactAnchorKind;
 use handball_toolkit::configuration::{MatchConfigurationKind, PhaseKind};
 use handball_toolkit::facts::{PlayEventKind, StoppageKind};
+use handball_toolkit::ids::{PlayerId, TeamId};
 use handball_toolkit::validation::{
     ConfigurationValidationError, DomainValidationIssue, FactValidationError, MatchValidationError,
     TimelineValidationError,
@@ -64,7 +65,7 @@ fn match_case_serializes_player_ids_deterministically() {
     let low = Uuid::from_u128(1);
     let high = Uuid::from_u128(2);
     let issue = DomainValidationIssue::Match(MatchValidationError::OverlappingRosterSelections {
-        player_ids: BTreeSet::from([high, low]),
+        player_ids: BTreeSet::from([PlayerId(high), PlayerId(low)]),
     });
     assert_eq!(
         serde_json::to_value(&issue).unwrap(),
@@ -90,8 +91,8 @@ fn empty_video_external_id_keeps_swift_case_name() {
 
 #[test]
 fn all_37_cases_round_trip_via_serde() {
-    let team_id = Uuid::from_u128(10);
-    let player_id = Uuid::from_u128(11);
+    let team_id = TeamId(Uuid::from_u128(10));
+    let player_id = PlayerId(Uuid::from_u128(11));
     let issues: Vec<DomainValidationIssue> = vec![
         // match: 3
         DomainValidationIssue::Match(MatchValidationError::SameTeamOnBothSides),

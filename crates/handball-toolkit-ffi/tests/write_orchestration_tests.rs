@@ -40,11 +40,11 @@ fn run<F: Future>(future: F) -> F::Output {
 
 fn timer_match() -> Match {
     Match {
-        id: Uuid::from_u128(MATCH_ID),
+        id: MatchId(Uuid::from_u128(MATCH_ID)),
         title: Some("write orchestration".to_string()),
         date: chrono::DateTime::from_timestamp(0, 0).expect("epoch は有効"),
-        home_team_id: Uuid::from_u128(HOME_ID),
-        away_team_id: Uuid::from_u128(AWAY_ID),
+        home_team_id: TeamId(Uuid::from_u128(HOME_ID)),
+        away_team_id: TeamId(Uuid::from_u128(AWAY_ID)),
         configuration: MatchConfiguration::Timer {
             phase_duration_seconds: 1800.0,
         },
@@ -55,7 +55,7 @@ fn timer_match() -> Match {
 
 fn fact(id: u128, payload: MatchFactPayload) -> MatchFact {
     MatchFact {
-        id: Uuid::from_u128(id),
+        id: FactId(Uuid::from_u128(id)),
         recorded_at: chrono::DateTime::from_timestamp(id as i64, 0).expect("固定秒は有効"),
         payload,
     }
@@ -81,7 +81,7 @@ fn goal(id: u128, elapsed_seconds: f64, player_id: Option<PlayerId>) -> MatchFac
         id,
         MatchFactPayload::Play(PlayFact {
             kind: PlayEventKind::Goal,
-            team_id: Some(Uuid::from_u128(HOME_ID)),
+            team_id: Some(TeamId(Uuid::from_u128(HOME_ID))),
             player_id,
             related_player_id: None,
             anchor: FactAnchor::MatchClock(MatchClock { elapsed_seconds }),
@@ -179,7 +179,7 @@ impl MatchWriteRepository for FakeRepo {
 }
 
 fn match_id() -> MatchId {
-    Uuid::from_u128(MATCH_ID)
+    MatchId(Uuid::from_u128(MATCH_ID))
 }
 
 // ── append ──
@@ -190,7 +190,7 @@ fn 合格した_append_は発火する() {
     let result = run(record_append_fact(
         repo.clone(),
         match_id(),
-        goal(GOAL_ID, 60.0, Some(Uuid::from_u128(SCORER_ID))),
+        goal(GOAL_ID, 60.0, Some(PlayerId(Uuid::from_u128(SCORER_ID)))),
     ));
     assert_eq!(result, Ok(()));
     assert_eq!(repo.fact_log().len(), 2);
@@ -219,7 +219,7 @@ fn validation_違反の_append_は発火せず_validation_failed() {
 
 #[test]
 fn roster_0_件なら参照整合を_skip_して発火する() {
-    let unknown_player = Uuid::from_u128(99);
+    let unknown_player = PlayerId(Uuid::from_u128(99));
     let repo = Arc::new(FakeRepo::new(vec![phase_start()]));
     let result = run(record_append_fact(
         repo.clone(),
@@ -235,12 +235,12 @@ fn roster_0_件なら参照整合を_skip_して発火する() {
 
 #[test]
 fn roster_があると_dangling_参照は発火せず拒否() {
-    let rostered = Uuid::from_u128(21);
-    let unknown_player = Uuid::from_u128(99);
+    let rostered = PlayerId(Uuid::from_u128(21));
+    let unknown_player = PlayerId(Uuid::from_u128(99));
     let mut repo = FakeRepo::new(vec![phase_start()]);
     repo.roster_players = vec![PlayerTeamRef {
         player_id: rostered,
-        team_id: Uuid::from_u128(HOME_ID),
+        team_id: TeamId(Uuid::from_u128(HOME_ID)),
     }];
     let repo = Arc::new(repo);
 
@@ -266,7 +266,7 @@ fn roster_があると_dangling_参照は発火せず拒否() {
 
 #[test]
 fn 合格した_update_は置換を発火する() {
-    let scorer = Some(Uuid::from_u128(SCORER_ID));
+    let scorer = Some(PlayerId(Uuid::from_u128(SCORER_ID)));
     let repo = Arc::new(FakeRepo::new(vec![
         phase_start(),
         goal(GOAL_ID, 60.0, scorer),
@@ -280,7 +280,7 @@ fn 合格した_update_は置換を発火する() {
     let updated = repo
         .fact_log()
         .into_iter()
-        .find(|f| f.id == Uuid::from_u128(GOAL_ID))
+        .find(|f| f.id == FactId(Uuid::from_u128(GOAL_ID)))
         .expect("置換後も存在する");
     assert_eq!(
         updated.anchor(),
@@ -308,7 +308,7 @@ fn validation_違反の_update_は発火しない() {
     let unchanged = repo
         .fact_log()
         .into_iter()
-        .find(|f| f.id == Uuid::from_u128(GOAL_ID))
+        .find(|f| f.id == FactId(Uuid::from_u128(GOAL_ID)))
         .expect("存在する");
     assert_eq!(
         unchanged.anchor(),
@@ -329,7 +329,7 @@ fn 合格した_delete_は発火する() {
     let result = run(record_delete_fact(
         repo.clone(),
         match_id(),
-        Uuid::from_u128(GOAL_ID),
+        FactId(Uuid::from_u128(GOAL_ID)),
     ));
     assert_eq!(result, Ok(()));
     assert_eq!(repo.fact_log().len(), 1);
@@ -344,7 +344,7 @@ fn play_を内包する_phase_start_の削除は発火せず拒否() {
     let result = run(record_delete_fact(
         repo.clone(),
         match_id(),
-        Uuid::from_u128(PHASE_START_ID),
+        FactId(Uuid::from_u128(PHASE_START_ID)),
     ));
     assert!(matches!(
         result,
@@ -357,7 +357,7 @@ fn play_を内包する_phase_start_の削除は発火せず拒否() {
 
 fn stamp(id: u128) -> NewFactStamp {
     NewFactStamp {
-        id: Uuid::from_u128(id),
+        id: FactId(Uuid::from_u128(id)),
         recorded_at: chrono::DateTime::from_timestamp(id as i64, 0).expect("固定秒は有効"),
     }
 }
@@ -368,7 +368,7 @@ fn 必要数はコアが数える() {
     let count = run(count_phase_completion_facts(
         repo.clone(),
         match_id(),
-        goal(GOAL_ID, 1900.0, Some(Uuid::from_u128(SCORER_ID))),
+        goal(GOAL_ID, 1900.0, Some(PlayerId(Uuid::from_u128(SCORER_ID)))),
     ));
     assert_eq!(count, Ok(2), "後半の記録は前半 + 後半の 2 phase を要する");
 }
@@ -379,7 +379,7 @@ fn 補完込み記録は_phase_を連鎖発火してから本_fact_を発火す�
     let result = run(record_fact_with_phase_completion(
         repo.clone(),
         match_id(),
-        goal(GOAL_ID, 1900.0, Some(Uuid::from_u128(SCORER_ID))),
+        goal(GOAL_ID, 1900.0, Some(PlayerId(Uuid::from_u128(SCORER_ID)))),
         vec![stamp(301), stamp(302)],
     ));
     assert_eq!(result, Ok(()));
@@ -387,9 +387,9 @@ fn 補完込み記録は_phase_を連鎖発火してから本_fact_を発火す�
     let log = repo.fact_log();
     assert_eq!(log.len(), 3, "phase 2 件 + goal 1 件");
     // スタンプは消費順（前半 → 後半）に使われる。
-    assert_eq!(log[0].id, Uuid::from_u128(301));
-    assert_eq!(log[1].id, Uuid::from_u128(302));
-    assert_eq!(log[2].id, Uuid::from_u128(GOAL_ID));
+    assert_eq!(log[0].id, FactId(Uuid::from_u128(301)));
+    assert_eq!(log[1].id, FactId(Uuid::from_u128(302)));
+    assert_eq!(log[2].id, FactId(Uuid::from_u128(GOAL_ID)));
 }
 
 #[test]
@@ -398,7 +398,7 @@ fn 既存_phase_があれば欠けだけ補完する() {
     let result = run(record_fact_with_phase_completion(
         repo.clone(),
         match_id(),
-        goal(GOAL_ID, 60.0, Some(Uuid::from_u128(SCORER_ID))),
+        goal(GOAL_ID, 60.0, Some(PlayerId(Uuid::from_u128(SCORER_ID)))),
         vec![],
     ));
     assert_eq!(result, Ok(()), "phase 1 は既存なので補完 0 件で成立する");
@@ -411,7 +411,7 @@ fn スタンプ不足は発火せず_insufficient_new_ids() {
     let result = run(record_fact_with_phase_completion(
         repo.clone(),
         match_id(),
-        goal(GOAL_ID, 1900.0, Some(Uuid::from_u128(SCORER_ID))),
+        goal(GOAL_ID, 1900.0, Some(PlayerId(Uuid::from_u128(SCORER_ID)))),
         vec![stamp(301)],
     ));
     assert_eq!(
@@ -455,14 +455,14 @@ fn poc_video_source() -> VideoSource {
 fn video_移行_commit_は_config_先行_save_後に_facts_を計画順に更新する() {
     let repo = Arc::new(FakeRepo::new(vec![
         phase_start(),
-        goal(GOAL_ID, 60.0, Some(Uuid::from_u128(SCORER_ID))),
+        goal(GOAL_ID, 60.0, Some(PlayerId(Uuid::from_u128(SCORER_ID)))),
     ]));
     let result = run(commit_video_migration(
         repo.clone(),
         match_id(),
         poc_video_source(),
         vec![VideoSyncInput {
-            fact_id: Uuid::from_u128(PHASE_START_ID),
+            fact_id: FactId(Uuid::from_u128(PHASE_START_ID)),
             video_start_seconds: 10.0,
             video_end_seconds: 1810.0,
         }],
@@ -484,14 +484,16 @@ fn video_移行_commit_は_config_先行_save_後に_facts_を計画順に更新
 
     // facts: phase は both、goal は videoClock(10 + 60 = 70)へ変換済み。
     let log = repo.fact_log();
-    let phase = log.iter().find(|f| f.id == Uuid::from_u128(PHASE_START_ID));
+    let phase = log
+        .iter()
+        .find(|f| f.id == FactId(Uuid::from_u128(PHASE_START_ID)));
     assert!(matches!(
         phase.map(|f| f.anchor()),
         Some(FactAnchor::Both { .. })
     ));
     let goal_fact = log
         .iter()
-        .find(|f| f.id == Uuid::from_u128(GOAL_ID))
+        .find(|f| f.id == FactId(Uuid::from_u128(GOAL_ID)))
         .expect("goal は存在する");
     assert_eq!(
         goal_fact.anchor(),
@@ -505,7 +507,7 @@ fn video_移行_commit_は_config_先行_save_後に_facts_を計画順に更新
 fn video_移行_commit_は_sync_欠落なら何も発火しない() {
     let repo = Arc::new(FakeRepo::new(vec![
         phase_start(),
-        goal(GOAL_ID, 60.0, Some(Uuid::from_u128(SCORER_ID))),
+        goal(GOAL_ID, 60.0, Some(PlayerId(Uuid::from_u128(SCORER_ID)))),
     ]));
     let result = run(commit_video_migration(
         repo.clone(),
@@ -621,7 +623,10 @@ fn 使用中チームの削除は発火せず_team_in_use() {
         match_refs: 3,
         ..FakeTeamRepo::default()
     });
-    let result = run(record_delete_team(repo.clone(), Uuid::from_u128(HOME_ID)));
+    let result = run(record_delete_team(
+        repo.clone(),
+        TeamId(Uuid::from_u128(HOME_ID)),
+    ));
     assert_eq!(result, Err(CoreWriteError::TeamInUse { match_count: 3 }));
     assert!(
         repo.deleted_teams
@@ -634,14 +639,17 @@ fn 使用中チームの削除は発火せず_team_in_use() {
 #[test]
 fn 未使用チームの削除は発火する() {
     let repo = Arc::new(FakeTeamRepo::default());
-    let result = run(record_delete_team(repo.clone(), Uuid::from_u128(HOME_ID)));
+    let result = run(record_delete_team(
+        repo.clone(),
+        TeamId(Uuid::from_u128(HOME_ID)),
+    ));
     assert_eq!(result, Ok(()));
     assert_eq!(
         repo.deleted_teams
             .lock()
             .expect("テスト内で poison しない")
             .as_slice(),
-        &[Uuid::from_u128(HOME_ID)]
+        &[TeamId(Uuid::from_u128(HOME_ID))]
     );
 }
 
@@ -653,7 +661,7 @@ fn 使用中選手の削除は発火せず_player_in_use() {
     });
     let result = run(record_delete_player(
         repo.clone(),
-        Uuid::from_u128(SCORER_ID),
+        PlayerId(Uuid::from_u128(SCORER_ID)),
     ));
     assert_eq!(result, Err(CoreWriteError::PlayerInUse { fact_count: 2 }));
     assert!(
@@ -670,18 +678,18 @@ fn 未使用選手の削除と_save_の_passthrough_は発火する() {
     assert_eq!(
         run(record_delete_player(
             repo.clone(),
-            Uuid::from_u128(SCORER_ID)
+            PlayerId(Uuid::from_u128(SCORER_ID))
         )),
         Ok(())
     );
     let team = Team {
-        id: Uuid::from_u128(HOME_ID),
+        id: TeamId(Uuid::from_u128(HOME_ID)),
         name: "Tigers".to_string(),
     };
     assert_eq!(run(record_save_team(repo.clone(), team)), Ok(()));
     let player = Player {
-        id: Uuid::from_u128(SCORER_ID),
-        team_id: Uuid::from_u128(HOME_ID),
+        id: PlayerId(Uuid::from_u128(SCORER_ID)),
+        team_id: TeamId(Uuid::from_u128(HOME_ID)),
         name: "Alice".to_string(),
         jersey_number: Some(7),
         photo: None,

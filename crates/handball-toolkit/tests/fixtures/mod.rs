@@ -13,7 +13,7 @@ use handball_toolkit::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
     StoppageKind, StoppagePayload,
 };
-use handball_toolkit::ids::{FactId, PlayerId, TeamId};
+use handball_toolkit::ids::{FactId, MatchId, PlayerId, TeamId};
 use uuid::Uuid;
 
 pub fn epoch() -> DateTime<Utc> {
@@ -22,7 +22,7 @@ pub fn epoch() -> DateTime<Utc> {
 
 /// SegmentResolverAdvancedTests の `videoOnlyPhase`。
 pub fn video_only_phase(start: f64, end: f64) -> MatchFact {
-    video_phase(Uuid::new_v4(), start, end)
+    video_phase(FactId(Uuid::new_v4()), start, end)
 }
 
 /// SegmentResolverAdvancedTests の `videoPhase`。
@@ -69,7 +69,7 @@ pub fn phase_start_both(
     video_end: f64,
 ) -> MatchFact {
     MatchFact {
-        id: Uuid::new_v4(),
+        id: FactId(Uuid::new_v4()),
         recorded_at: epoch(),
         payload: MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
             kind,
@@ -96,7 +96,7 @@ pub fn phase_start_both(
 /// SegmentResolverAdvancedTests の `shootoutPhase`。
 pub fn shootout_phase(start: f64, end: f64) -> MatchFact {
     MatchFact {
-        id: Uuid::new_v4(),
+        id: FactId(Uuid::new_v4()),
         recorded_at: epoch(),
         payload: MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
             kind: PhaseKind::Shootout,
@@ -130,7 +130,7 @@ pub fn timer_phase(id: FactId, start: f64, end: f64) -> MatchFact {
 /// TimelineProjectionTests の `makeVideoMatch`（Swift の Match init 既定値と同じ構成）。
 pub fn make_video_match(home_id: TeamId, away_id: TeamId) -> Match {
     Match {
-        id: Uuid::new_v4(),
+        id: MatchId(Uuid::new_v4()),
         title: None,
         date: epoch(),
         home_team_id: home_id,
@@ -147,7 +147,7 @@ pub fn make_video_match(home_id: TeamId, away_id: TeamId) -> Match {
 /// TimelineProjectionTests の `makeTimerMatch`。
 pub fn make_timer_match(home_id: TeamId, away_id: TeamId) -> Match {
     Match {
-        id: Uuid::new_v4(),
+        id: MatchId(Uuid::new_v4()),
         title: None,
         date: epoch(),
         home_team_id: home_id,
@@ -163,7 +163,7 @@ pub fn make_timer_match(home_id: TeamId, away_id: TeamId) -> Match {
 /// PlayFact の共通形（kind: goal、title / note なし）。
 fn goal_play(team_id: TeamId, player_id: PlayerId, anchor: FactAnchor) -> MatchFact {
     MatchFact {
-        id: Uuid::new_v4(),
+        id: FactId(Uuid::new_v4()),
         recorded_at: epoch(),
         payload: MatchFactPayload::Play(PlayFact {
             kind: PlayEventKind::Goal,
@@ -181,7 +181,7 @@ fn goal_play(team_id: TeamId, player_id: PlayerId, anchor: FactAnchor) -> MatchF
 pub fn video_play(team_id: TeamId, video_secs: f64) -> MatchFact {
     goal_play(
         team_id,
-        Uuid::new_v4(),
+        PlayerId(Uuid::new_v4()),
         FactAnchor::VideoClock(VideoClock {
             elapsed_seconds: video_secs,
         }),
@@ -192,7 +192,7 @@ pub fn video_play(team_id: TeamId, video_secs: f64) -> MatchFact {
 pub fn timer_play(team_id: TeamId, match_secs: f64) -> MatchFact {
     goal_play(
         team_id,
-        Uuid::new_v4(),
+        PlayerId(Uuid::new_v4()),
         FactAnchor::MatchClock(MatchClock {
             elapsed_seconds: match_secs,
         }),
@@ -203,7 +203,7 @@ pub fn timer_play(team_id: TeamId, match_secs: f64) -> MatchFact {
 pub fn play_both(team_id: TeamId, match_secs: f64, video_secs: f64) -> MatchFact {
     goal_play(
         team_id,
-        Uuid::new_v4(),
+        PlayerId(Uuid::new_v4()),
         FactAnchor::Both {
             match_clock: MatchClock {
                 elapsed_seconds: match_secs,
@@ -223,7 +223,7 @@ pub fn play_fact(
     note: Option<&str>,
 ) -> MatchFact {
     MatchFact {
-        id: Uuid::new_v4(),
+        id: FactId(Uuid::new_v4()),
         recorded_at: epoch(),
         payload: MatchFactPayload::Play(PlayFact {
             kind,
@@ -242,7 +242,7 @@ pub fn play_fact(
 /// SummaryProjectionTests の `videoPlayFact`（videoClock=300 anchor）。
 pub fn video_play_fact(kind: PlayEventKind, team: TeamId, player: PlayerId) -> MatchFact {
     MatchFact {
-        id: Uuid::new_v4(),
+        id: FactId(Uuid::new_v4()),
         recorded_at: epoch(),
         payload: MatchFactPayload::Play(PlayFact {
             kind,
@@ -261,7 +261,7 @@ pub fn video_play_fact(kind: PlayEventKind, team: TeamId, player: PlayerId) -> M
 /// SummaryProjectionTests の `phaseStart`（matchClock anchor、kind 指定）。
 pub fn phase_start_match(kind: PhaseKind, match_start: f64, match_end: f64) -> MatchFact {
     MatchFact {
-        id: Uuid::new_v4(),
+        id: FactId(Uuid::new_v4()),
         recorded_at: epoch(),
         payload: MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
             kind,
@@ -278,7 +278,7 @@ pub fn phase_start_match(kind: PhaseKind, match_start: f64, match_end: f64) -> M
 /// SummaryProjectionTests の `play`（matchClock anchor 位置指定）。
 pub fn play_at_match(kind: PlayEventKind, team: TeamId, player: PlayerId, secs: f64) -> MatchFact {
     MatchFact {
-        id: Uuid::new_v4(),
+        id: FactId(Uuid::new_v4()),
         recorded_at: epoch(),
         payload: MatchFactPayload::Play(PlayFact {
             kind,

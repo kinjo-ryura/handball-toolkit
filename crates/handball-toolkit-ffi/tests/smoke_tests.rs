@@ -7,16 +7,17 @@ use handball_toolkit_ffi::ffi_api;
 
 use handball_toolkit::configuration::MatchConfiguration;
 use handball_toolkit::entities::{Match, RosterSelection};
+use handball_toolkit::ids::{FactId, MatchId, PlayerId, TeamId};
 use handball_toolkit::projection::SegmentResolver;
 use uuid::Uuid;
 
 fn timer_match() -> Match {
     Match {
-        id: Uuid::from_u128(1),
+        id: MatchId(Uuid::from_u128(1)),
         title: Some("スモーク".to_string()),
         date: chrono::DateTime::from_timestamp(0, 0).expect("epoch は有効"),
-        home_team_id: Uuid::from_u128(2),
-        away_team_id: Uuid::from_u128(3),
+        home_team_id: TeamId(Uuid::from_u128(2)),
+        away_team_id: TeamId(Uuid::from_u128(3)),
         configuration: MatchConfiguration::Timer {
             phase_duration_seconds: 1800.0,
         },
@@ -43,7 +44,7 @@ fn 空_log_の_timeline_と_validate_delete_が疎通する() {
     let timeline = ffi_api::build_timeline(timer_match(), vec![]);
     assert!(timeline.resolved_facts.is_empty());
 
-    let issues = ffi_api::validate_delete(Uuid::from_u128(9), vec![], timer_match());
+    let issues = ffi_api::validate_delete(FactId(Uuid::from_u128(9)), vec![], timer_match());
     assert!(issues.is_empty());
 }
 
@@ -89,7 +90,10 @@ fn sample_dto_の_parse_convert_export_が疎通する() {
     let conversion =
         ffi_api::convert_sample_match("smoke".to_string(), dto, None, ids).expect("convert 成功");
     assert_eq!(conversion.home_team.name, "Tigers");
-    assert_eq!(conversion.players_by_key["p1"], Uuid::from_u128(2));
+    assert_eq!(
+        conversion.players_by_key["p1"],
+        PlayerId(Uuid::from_u128(2))
+    );
 
     // export → encode → 再 parse の round-trip
     let exported = ffi_api::export_sample_match(

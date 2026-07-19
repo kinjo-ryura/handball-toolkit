@@ -21,7 +21,7 @@ use crate::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
     StoppageKind, StoppagePayload,
 };
-use crate::ids::{PlayerId, TeamId};
+use crate::ids::{FactId, MatchId, PlayerId, TeamId};
 
 use super::sample_match_dtos::{
     SCHEMA_VERSION_CURRENT, SampleControlFactDtoV2, SampleFactAnchorDtoV2, SampleFactDtoV2,
@@ -111,7 +111,7 @@ pub fn convert(
     };
 
     let match_ = Match {
-        id: new_id(),
+        id: MatchId(new_id()),
         title: dto.r#match.display_name.clone(),
         date: dto.r#match.date,
         home_team_id: home_team.id,
@@ -149,7 +149,7 @@ fn make_team(
     new_id: &mut impl FnMut() -> Uuid,
 ) -> (Team, Vec<(String, Player)>) {
     let team = Team {
-        id: new_id(),
+        id: TeamId(new_id()),
         name: dto.name.clone(),
     };
     let players = dto
@@ -157,7 +157,7 @@ fn make_team(
         .iter()
         .map(|player_dto| {
             let player = Player {
-                id: new_id(),
+                id: PlayerId(new_id()),
                 team_id: team.id,
                 name: player_dto.name.clone(),
                 jersey_number: player_dto.jersey_number,
@@ -248,7 +248,7 @@ pub fn decode_fact(
     };
     let payload = decode_payload(&dto.payload, teams_by_key, players_by_key)?;
     Ok(MatchFact {
-        id,
+        id: FactId(id),
         recorded_at: dto.recorded_at,
         payload,
     })

@@ -16,6 +16,7 @@ use fixtures::{
 use handball_toolkit::clock::{MatchClock, VideoClock};
 use handball_toolkit::configuration::PhaseKind;
 use handball_toolkit::facts::StoppageKind;
+use handball_toolkit::ids::FactId;
 use handball_toolkit::projection::{SegmentResolver, TimeSegmentKind};
 use uuid::Uuid;
 
@@ -73,8 +74,8 @@ fn video_between_phases_returns_none() {
 #[test]
 fn stoppage_carves_running_segment_in_video_mode() {
     // Phase: video 0-1800、stoppage video 600-660 (60 秒タイムアウト)
-    let phase_id = Uuid::new_v4();
-    let stoppage_id = Uuid::new_v4();
+    let phase_id = FactId(Uuid::new_v4());
+    let stoppage_id = FactId(Uuid::new_v4());
     let facts = vec![
         video_phase(phase_id, 0.0, 1800.0),
         video_stoppage(stoppage_id, StoppageKind::Timeout, 600.0, 660.0),
@@ -110,8 +111,8 @@ fn stoppage_carves_running_segment_in_video_mode() {
 fn phase_end_match_clock_reflects_total_running() {
     // 60 秒 stoppage が 1 つあると phase end の matchClock は (1800-60) = 1740
     let facts = vec![
-        video_phase(Uuid::new_v4(), 0.0, 1800.0),
-        video_stoppage(Uuid::new_v4(), StoppageKind::Timeout, 600.0, 660.0),
+        video_phase(FactId(Uuid::new_v4()), 0.0, 1800.0),
+        video_stoppage(FactId(Uuid::new_v4()), StoppageKind::Timeout, 600.0, 660.0),
     ];
     let resolver = SegmentResolver::build(&facts);
     assert_eq!(
@@ -124,8 +125,8 @@ fn phase_end_match_clock_reflects_total_running() {
 fn video_inside_stoppage_maps_to_fixed_match_clock() {
     // stoppage 中の video=630 → matchClock = 600 (stopped 区間の固定値)
     let facts = vec![
-        video_phase(Uuid::new_v4(), 0.0, 1800.0),
-        video_stoppage(Uuid::new_v4(), StoppageKind::Timeout, 600.0, 660.0),
+        video_phase(FactId(Uuid::new_v4()), 0.0, 1800.0),
+        video_stoppage(FactId(Uuid::new_v4()), StoppageKind::Timeout, 600.0, 660.0),
     ];
     let resolver = SegmentResolver::build(&facts);
     let mc = resolver.resolve_match_clock(VideoClock {
@@ -138,9 +139,9 @@ fn video_inside_stoppage_maps_to_fixed_match_clock() {
 fn multiple_stoppages_in_single_phase_carve_correctly() {
     // Phase video 0-1800、stoppage 1: 300-360 (60s)、stoppage 2: 1000-1060 (60s)
     let facts = vec![
-        video_phase(Uuid::new_v4(), 0.0, 1800.0),
-        video_stoppage(Uuid::new_v4(), StoppageKind::Timeout, 300.0, 360.0),
-        video_stoppage(Uuid::new_v4(), StoppageKind::Pause, 1000.0, 1060.0),
+        video_phase(FactId(Uuid::new_v4()), 0.0, 1800.0),
+        video_stoppage(FactId(Uuid::new_v4()), StoppageKind::Timeout, 300.0, 360.0),
+        video_stoppage(FactId(Uuid::new_v4()), StoppageKind::Pause, 1000.0, 1060.0),
     ];
     let resolver = SegmentResolver::build(&facts);
 
@@ -246,7 +247,7 @@ fn phase_kind_returns_shootout_at_shootout_match_clock() {
 
 #[test]
 fn timer_mode_phase_produces_single_running_segment_no_video() {
-    let phase_id = Uuid::new_v4();
+    let phase_id = FactId(Uuid::new_v4());
     let facts = vec![timer_phase(phase_id, 0.0, 1800.0)];
     let resolver = SegmentResolver::build(&facts);
     assert_eq!(resolver.segments.len(), 1);
@@ -262,8 +263,8 @@ fn timer_mode_phase_produces_single_running_segment_no_video() {
 fn timer_mode_stoppage_marker_does_not_carve_segments() {
     // timer mode の stoppage は endAnchor なしの marker。segment は carve しない。
     let facts = vec![
-        timer_phase(Uuid::new_v4(), 0.0, 1800.0),
-        timer_stoppage_marker(Uuid::new_v4(), StoppageKind::Timeout, 600.0),
+        timer_phase(FactId(Uuid::new_v4()), 0.0, 1800.0),
+        timer_stoppage_marker(FactId(Uuid::new_v4()), StoppageKind::Timeout, 600.0),
     ];
     let resolver = SegmentResolver::build(&facts);
     // timer mode では segment は phase 単一 (stoppage は marker、carve しない)
@@ -279,8 +280,8 @@ fn timer_mode_stoppage_marker_does_not_carve_segments() {
 #[test]
 fn match_to_video_to_match_round_trip_with_carve() {
     let facts = vec![
-        video_phase(Uuid::new_v4(), 0.0, 1800.0),
-        video_stoppage(Uuid::new_v4(), StoppageKind::Timeout, 600.0, 660.0),
+        video_phase(FactId(Uuid::new_v4()), 0.0, 1800.0),
+        video_stoppage(FactId(Uuid::new_v4()), StoppageKind::Timeout, 600.0, 660.0),
     ];
     let resolver = SegmentResolver::build(&facts);
 
@@ -317,8 +318,8 @@ fn match_to_video_to_match_round_trip_with_carve() {
 #[test]
 fn resolve_video_clock_at_stoppage_boundary_prefers_running_resumption() {
     let facts = vec![
-        video_phase(Uuid::new_v4(), 0.0, 1800.0),
-        video_stoppage(Uuid::new_v4(), StoppageKind::Timeout, 600.0, 660.0),
+        video_phase(FactId(Uuid::new_v4()), 0.0, 1800.0),
+        video_stoppage(FactId(Uuid::new_v4()), StoppageKind::Timeout, 600.0, 660.0),
     ];
     let resolver = SegmentResolver::build(&facts);
     // matchClock=600 は stoppage 開始時刻だが、running 優先で再開後 video=660 にマップ (600 ではない)。
@@ -339,11 +340,11 @@ fn resolve_video_clock_at_stoppage_boundary_prefers_running_resumption() {
 #[test]
 fn three_phases_with_stoppages_accumulate_rolling_baseline() {
     let facts = vec![
-        video_phase(Uuid::new_v4(), 0.0, 1800.0),
-        video_stoppage(Uuid::new_v4(), StoppageKind::Timeout, 600.0, 660.0), // 60s
-        video_phase(Uuid::new_v4(), 2400.0, 4200.0),
-        video_stoppage(Uuid::new_v4(), StoppageKind::Pause, 3000.0, 3060.0), // 60s
-        video_phase(Uuid::new_v4(), 5000.0, 5600.0), // 延長 600s, stoppage なし
+        video_phase(FactId(Uuid::new_v4()), 0.0, 1800.0),
+        video_stoppage(FactId(Uuid::new_v4()), StoppageKind::Timeout, 600.0, 660.0), // 60s
+        video_phase(FactId(Uuid::new_v4()), 2400.0, 4200.0),
+        video_stoppage(FactId(Uuid::new_v4()), StoppageKind::Pause, 3000.0, 3060.0), // 60s
+        video_phase(FactId(Uuid::new_v4()), 5000.0, 5600.0), // 延長 600s, stoppage なし
     ];
     let resolver = SegmentResolver::build(&facts);
 

@@ -9,6 +9,7 @@ use fixtures::{make_timer_match, phase_start_match, play_at_match, play_fact, vi
 use handball_toolkit::configuration::PhaseKind;
 use handball_toolkit::entities::Match;
 use handball_toolkit::facts::{MatchFact, PlayEventKind};
+use handball_toolkit::ids::{PlayerId, TeamId};
 use handball_toolkit::projection::{SummaryProjection, TeamSummaryLine, TimelineProjection};
 use uuid::Uuid;
 
@@ -18,7 +19,7 @@ fn summary_with_phases(match_: &Match, facts: &[MatchFact]) -> SummaryProjection
 
 #[test]
 fn empty_match_produces_zero_summary() {
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
     let summary = SummaryProjection::build(&make_timer_match(home, away), &[]);
     assert_eq!(summary.home_score, 0);
     assert_eq!(summary.away_score, 0);
@@ -28,8 +29,12 @@ fn empty_match_produces_zero_summary() {
 
 #[test]
 fn goals_and_misses_aggregate() {
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
-    let (alice, bob, carol) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
+    let (alice, bob, carol) = (
+        PlayerId(Uuid::new_v4()),
+        PlayerId(Uuid::new_v4()),
+        PlayerId(Uuid::new_v4()),
+    );
     let facts = vec![
         play_fact(PlayEventKind::Goal, home, alice, None),
         play_fact(PlayEventKind::Goal, home, alice, None),
@@ -64,8 +69,8 @@ fn goals_and_misses_aggregate() {
 
 #[test]
 fn cards_and_free_note_are_not_counted_as_shots() {
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
-    let alice = Uuid::new_v4();
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
+    let alice = PlayerId(Uuid::new_v4());
     let facts = vec![
         play_fact(PlayEventKind::Goal, home, alice, None),
         play_fact(PlayEventKind::YellowCard, home, alice, None),
@@ -81,7 +86,7 @@ fn cards_and_free_note_are_not_counted_as_shots() {
 #[test]
 fn team_line_scoring_rate() {
     let line = TeamSummaryLine {
-        team_id: Uuid::new_v4(),
+        team_id: TeamId(Uuid::new_v4()),
         goals: 3,
         shot_misses: 2,
     };
@@ -93,7 +98,7 @@ fn team_line_scoring_rate() {
 #[test]
 fn team_line_scoring_rate_is_none_for_zero_attempts() {
     let line = TeamSummaryLine {
-        team_id: Uuid::new_v4(),
+        team_id: TeamId(Uuid::new_v4()),
         goals: 0,
         shot_misses: 0,
     };
@@ -107,8 +112,12 @@ fn team_line_scoring_rate_is_none_for_zero_attempts() {
 /// 同一の集計を返す。timer→video 移行で stats がズレないことを保証する。
 #[test]
 fn summary_is_anchor_agnostic_timer_vs_video_symmetry() {
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
-    let (alice, bob, carol) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
+    let (alice, bob, carol) = (
+        PlayerId(Uuid::new_v4()),
+        PlayerId(Uuid::new_v4()),
+        PlayerId(Uuid::new_v4()),
+    );
     let events = [
         (PlayEventKind::Goal, home, alice),
         (PlayEventKind::Goal, away, bob),
@@ -133,8 +142,8 @@ fn summary_is_anchor_agnostic_timer_vs_video_symmetry() {
 /// playerID 無しの goal は team スコアに載るが player 行は作られない。
 #[test]
 fn goal_without_player_counts_team_but_no_player_line() {
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
-    let mut fact = play_fact(PlayEventKind::Goal, home, Uuid::new_v4(), None);
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
+    let mut fact = play_fact(PlayEventKind::Goal, home, PlayerId(Uuid::new_v4()), None);
     if let handball_toolkit::facts::MatchFactPayload::Play(play) = &mut fact.payload {
         play.player_id = None;
     }
@@ -146,9 +155,14 @@ fn goal_without_player_counts_team_but_no_player_line() {
 /// home/away どちらでもない teamID の goal はチームスコアに載らない (が player 集計は team 非依存)。
 #[test]
 fn goal_with_unknown_team_counts_neither_side() {
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
-    let alice = Uuid::new_v4();
-    let facts = vec![play_fact(PlayEventKind::Goal, Uuid::new_v4(), alice, None)];
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
+    let alice = PlayerId(Uuid::new_v4());
+    let facts = vec![play_fact(
+        PlayEventKind::Goal,
+        TeamId(Uuid::new_v4()),
+        alice,
+        None,
+    )];
     let summary = SummaryProjection::build(&make_timer_match(home, away), &facts);
     assert_eq!(summary.home_score, 0);
     assert_eq!(summary.away_score, 0);
@@ -165,11 +179,11 @@ fn goal_with_unknown_team_counts_neither_side() {
 /// redCard は shot にも player 集計にも載らない。
 #[test]
 fn red_card_is_not_counted_as_shot_or_player_stat() {
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
     let facts = vec![play_fact(
         PlayEventKind::RedCard,
         home,
-        Uuid::new_v4(),
+        PlayerId(Uuid::new_v4()),
         None,
     )];
     let summary = SummaryProjection::build(&make_timer_match(home, away), &facts);
@@ -180,17 +194,17 @@ fn red_card_is_not_counted_as_shot_or_player_stat() {
 /// playerStats は playerID.uuidString の昇順で安定ソートされる。
 #[test]
 fn player_stats_sorted_by_uuid_string() {
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
-    let p1 = Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap();
-    let p2 = Uuid::parse_str("00000000-0000-0000-0000-000000000002").unwrap();
-    let p3 = Uuid::parse_str("00000000-0000-0000-0000-000000000003").unwrap();
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
+    let p1 = PlayerId(Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap());
+    let p2 = PlayerId(Uuid::parse_str("00000000-0000-0000-0000-000000000002").unwrap());
+    let p3 = PlayerId(Uuid::parse_str("00000000-0000-0000-0000-000000000003").unwrap());
     let facts = vec![
         play_fact(PlayEventKind::Goal, home, p3, None),
         play_fact(PlayEventKind::Goal, home, p1, None),
         play_fact(PlayEventKind::Goal, home, p2, None),
     ];
     let summary = SummaryProjection::build(&make_timer_match(home, away), &facts);
-    let ids: Vec<Uuid> = summary.player_stats.iter().map(|s| s.player_id).collect();
+    let ids: Vec<PlayerId> = summary.player_stats.iter().map(|s| s.player_id).collect();
     assert_eq!(ids, vec![p1, p2, p3]);
 }
 
@@ -199,8 +213,8 @@ fn player_stats_sorted_by_uuid_string() {
 /// build (facts 版) は resolver 非依存なので phase_summaries は常に空 (header は集計される)。
 #[test]
 fn facts_build_leaves_phase_summaries_empty() {
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
-    let alice = Uuid::new_v4();
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
+    let alice = PlayerId(Uuid::new_v4());
     let facts = vec![
         phase_start_match(PhaseKind::Regular, 0.0, 1800.0),
         play_at_match(PlayEventKind::Goal, home, alice, 100.0),
@@ -213,8 +227,8 @@ fn facts_build_leaves_phase_summaries_empty() {
 /// 2 phase の goal / shotMissed が phase 別に集計される。
 #[test]
 fn phase_summaries_aggregate_per_phase() {
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
-    let (alice, bob) = (Uuid::new_v4(), Uuid::new_v4());
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
+    let (alice, bob) = (PlayerId(Uuid::new_v4()), PlayerId(Uuid::new_v4()));
     let match_ = make_timer_match(home, away);
     let facts = vec![
         phase_start_match(PhaseKind::Regular, 0.0, 1800.0),
@@ -242,8 +256,8 @@ fn phase_summaries_aggregate_per_phase() {
 /// 記録のない regular phase は省かれるが、後続 phase の regularIndex は詰めずに進む。
 #[test]
 fn phase_without_records_omitted_but_index_advances() {
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
-    let alice = Uuid::new_v4();
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
+    let alice = PlayerId(Uuid::new_v4());
     let match_ = make_timer_match(home, away);
     let facts = vec![
         phase_start_match(PhaseKind::Regular, 0.0, 1800.0), // 記録なし
@@ -258,8 +272,8 @@ fn phase_without_records_omitted_but_index_advances() {
 /// matchClock を解決できない goal (phase 区間外) は phase 別から除外され、header >= Σphase。
 #[test]
 fn unresolved_goal_excluded_from_phases_but_counted_in_header() {
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
-    let alice = Uuid::new_v4();
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
+    let alice = PlayerId(Uuid::new_v4());
     let match_ = make_timer_match(home, away);
     let facts = vec![
         phase_start_match(PhaseKind::Regular, 0.0, 1800.0),
@@ -275,8 +289,8 @@ fn unresolved_goal_excluded_from_phases_but_counted_in_header() {
 /// shootout goal は shootout 行に集計され regularIndex は None。
 #[test]
 fn shootout_goals_tally_into_shootout_line_with_none_index() {
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
-    let (alice, bob) = (Uuid::new_v4(), Uuid::new_v4());
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
+    let (alice, bob) = (PlayerId(Uuid::new_v4()), PlayerId(Uuid::new_v4()));
     let match_ = make_timer_match(home, away);
     let facts = vec![
         phase_start_match(PhaseKind::Regular, 0.0, 1800.0),

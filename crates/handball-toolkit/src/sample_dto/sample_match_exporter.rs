@@ -62,7 +62,7 @@ pub fn export_match(
     let fact_dtos = sorted_facts
         .into_iter()
         .map(|fact| SampleFactDtoV2 {
-            fact_id: Some(fact.id),
+            fact_id: Some(fact.id.0),
             recorded_at: fact.recorded_at,
             payload: encode_payload(&fact.payload, &team_key_by_id, &player_key_by_id),
         })

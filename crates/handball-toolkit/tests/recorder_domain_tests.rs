@@ -7,6 +7,7 @@ use handball_toolkit::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
     StoppageKind, StoppagePayload,
 };
+use handball_toolkit::ids::{FactId, PlayerId, TeamId};
 use handball_toolkit::projection::TimeSegment;
 use uuid::Uuid;
 
@@ -46,10 +47,10 @@ fn match_configuration_round_trips_via_serde() {
 
 #[test]
 fn match_fact_payload_round_trips_via_serde() {
-    let home_id = Uuid::new_v4();
-    let player_id = Uuid::new_v4();
+    let home_id = TeamId(Uuid::new_v4());
+    let player_id = PlayerId(Uuid::new_v4());
     let fact = MatchFact {
-        id: Uuid::new_v4(),
+        id: FactId(Uuid::new_v4()),
         recorded_at: DateTime::from_timestamp(1_700_000_000, 0).unwrap(),
         payload: MatchFactPayload::Play(PlayFact {
             kind: PlayEventKind::Goal,
@@ -153,7 +154,7 @@ fn match_fact_anchor_reads_through_payload() {
     // Swift 版は `recordedAt: .init()`（現在時刻）。コアもテストも now() を持たない方針のため
     // 固定値を使う（このテストで recorded_at の値は無関係）。
     let fact = MatchFact {
-        id: Uuid::new_v4(),
+        id: FactId(Uuid::new_v4()),
         recorded_at: DateTime::from_timestamp(0, 0).unwrap(),
         payload: MatchFactPayload::Control(control),
     };

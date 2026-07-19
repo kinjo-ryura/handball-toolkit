@@ -21,9 +21,9 @@ struct Ctx {
 
 fn ctx() -> Ctx {
     Ctx {
-        home: Uuid::new_v4(),
-        away: Uuid::new_v4(),
-        rostered: Uuid::new_v4(),
+        home: TeamId(Uuid::new_v4()),
+        away: TeamId(Uuid::new_v4()),
+        rostered: PlayerId(Uuid::new_v4()),
     }
 }
 
@@ -74,7 +74,7 @@ fn has_unknown_player(issues: &[DomainValidationIssue]) -> bool {
 #[test]
 fn dangling_player_reference_is_flagged() {
     let c = ctx();
-    let dangling = Uuid::new_v4();
+    let dangling = PlayerId(Uuid::new_v4());
     let fact = play(PlayEventKind::Goal, Some(dangling), None);
     let issues = validate(&fact, &roster(&c));
     assert!(issues.contains(&DomainValidationIssue::Fact(
@@ -87,7 +87,7 @@ fn dangling_player_reference_is_flagged() {
 #[test]
 fn dangling_related_player_reference_is_flagged() {
     let c = ctx();
-    let dangling_related = Uuid::new_v4();
+    let dangling_related = PlayerId(Uuid::new_v4());
     let fact = play(
         PlayEventKind::TwoMinuteSuspension,
         Some(c.rostered),
@@ -116,7 +116,7 @@ fn rostered_player_reference_is_valid() {
 fn none_known_player_ids_skips_dangling_detection() {
     let c = ctx();
     let roster = RosterContext::empty(c.home, c.away);
-    let fact = play(PlayEventKind::Goal, Some(Uuid::new_v4()), None);
+    let fact = play(PlayEventKind::Goal, Some(PlayerId(Uuid::new_v4())), None);
     let issues = validate(&fact, &roster);
     assert!(!has_unknown_player(&issues));
 }

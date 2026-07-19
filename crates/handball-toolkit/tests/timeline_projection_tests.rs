@@ -12,6 +12,7 @@ use fixtures::{
 };
 use handball_toolkit::clock::{MatchClock, VideoClock};
 use handball_toolkit::configuration::PhaseKind;
+use handball_toolkit::ids::{FactId, TeamId};
 use handball_toolkit::projection::{SegmentResolver, TimelineProjection};
 use uuid::Uuid;
 
@@ -35,7 +36,7 @@ fn video_phase_start_both(
 
 #[test]
 fn empty_facts_builds_empty_projection() {
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
     let projection = TimelineProjection::build(&make_video_match(home, away), &[]);
     assert!(projection.resolved_facts.is_empty());
     assert!(projection.resolver.phases.is_empty());
@@ -43,7 +44,7 @@ fn empty_facts_builds_empty_projection() {
 
 #[test]
 fn phase_start_creates_phase_entry() {
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
     let facts = vec![video_only_phase(720.0, 2520.0)];
     let projection = TimelineProjection::build(&make_video_match(home, away), &facts);
     assert_eq!(projection.resolver.phases.len(), 1);
@@ -58,7 +59,7 @@ fn phase_start_creates_phase_entry() {
 #[test]
 fn video_play_resolves_match_clock_via_phase() {
     // 動画 12:00 で前半開始 (matchClock=0)、動画 12:10 ゴール (matchClock=10s 相当)
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
     let facts = vec![
         video_phase_start_both(0.0, 1800.0, 720.0, 2520.0),
         video_play(home, 730.0),
@@ -77,7 +78,7 @@ fn video_play_resolves_match_clock_via_phase() {
 
 #[test]
 fn both_anchor_is_not_overwritten_by_projection() {
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
     let facts = vec![
         video_phase_start_both(0.0, 1800.0, 720.0, 2520.0),
         play_both(home, 50.0, 800.0),
@@ -97,9 +98,9 @@ fn both_anchor_is_not_overwritten_by_projection() {
 
 #[test]
 fn match_clock_only_play_in_timer_mode_resolves_as_is() {
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
     let facts = vec![
-        timer_phase(Uuid::new_v4(), 0.0, 1800.0),
+        timer_phase(FactId(Uuid::new_v4()), 0.0, 1800.0),
         timer_play(home, 600.0),
     ];
     let projection = TimelineProjection::build(&make_timer_match(home, away), &facts);
@@ -166,9 +167,9 @@ fn phase_index_counts_regular_only() {
 /// timer mode の play は video 派生を持たない (resolved_video_clock == None)。
 #[test]
 fn timer_play_has_none_resolved_video_clock() {
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
     let facts = vec![
-        timer_phase(Uuid::new_v4(), 0.0, 1800.0),
+        timer_phase(FactId(Uuid::new_v4()), 0.0, 1800.0),
         timer_play(home, 600.0),
     ];
     let projection = TimelineProjection::build(&make_timer_match(home, away), &facts);
@@ -183,7 +184,7 @@ fn timer_play_has_none_resolved_video_clock() {
 /// resolved_fact(id) は id 一致で引け、未知 id では None。
 #[test]
 fn resolved_fact_lookup_by_id() {
-    let (home, away) = (Uuid::new_v4(), Uuid::new_v4());
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
     let goal = video_play(home, 730.0);
     let goal_id = goal.id;
     let facts = vec![video_phase_start_both(0.0, 1800.0, 720.0, 2520.0), goal];
@@ -192,5 +193,5 @@ fn resolved_fact_lookup_by_id() {
         projection.resolved_fact(goal_id).map(|r| r.fact.id),
         Some(goal_id)
     );
-    assert!(projection.resolved_fact(Uuid::new_v4()).is_none());
+    assert!(projection.resolved_fact(FactId(Uuid::new_v4())).is_none());
 }

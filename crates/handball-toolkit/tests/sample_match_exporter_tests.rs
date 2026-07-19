@@ -19,6 +19,7 @@ use handball_toolkit::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
     StoppageKind, StoppagePayload,
 };
+use handball_toolkit::ids::{FactId, MatchId, PlayerId, TeamId};
 use handball_toolkit::sample_dto::{
     SampleMatchConversionResult, SampleMatchDtoV2, convert, default_slug, encode_sample_match,
     export_match, required_id_count,
@@ -61,9 +62,9 @@ impl ExportFixture {
     }
 }
 
-fn player(id: &str, team_id: Uuid, name: &str, jersey_number: Option<i64>) -> Player {
+fn player(id: &str, team_id: TeamId, name: &str, jersey_number: Option<i64>) -> Player {
     Player {
-        id: u(id),
+        id: PlayerId(u(id)),
         team_id,
         name: name.to_owned(),
         jersey_number,
@@ -73,7 +74,7 @@ fn player(id: &str, team_id: Uuid, name: &str, jersey_number: Option<i64>) -> Pl
 
 fn fact(n: u32, secs: i64, nanos: u32, payload: MatchFactPayload) -> MatchFact {
     MatchFact {
-        id: u(&format!("fac00000-0000-0000-0000-{n:012}")),
+        id: FactId(u(&format!("fac00000-0000-0000-0000-{n:012}"))),
         recorded_at: ts(secs, nanos),
         payload,
     }
@@ -81,9 +82,9 @@ fn fact(n: u32, secs: i64, nanos: u32, payload: MatchFactPayload) -> MatchFact {
 
 fn play(
     kind: PlayEventKind,
-    team_id: Option<Uuid>,
-    player_id: Option<Uuid>,
-    related_player_id: Option<Uuid>,
+    team_id: Option<TeamId>,
+    player_id: Option<PlayerId>,
+    related_player_id: Option<PlayerId>,
     anchor: FactAnchor,
     title: Option<&str>,
     note: Option<&str>,
@@ -113,11 +114,11 @@ fn vc(seconds: f64) -> FactAnchor {
 
 fn timer_fixture() -> ExportFixture {
     let home_team = Team {
-        id: u("11111111-1111-1111-1111-111111111111"),
+        id: TeamId(u("11111111-1111-1111-1111-111111111111")),
         name: "Tigers".to_owned(),
     };
     let away_team = Team {
-        id: u("22222222-2222-2222-2222-222222222222"),
+        id: TeamId(u("22222222-2222-2222-2222-222222222222")),
         name: "Falcons".to_owned(),
     };
     let p1 = player(
@@ -140,7 +141,7 @@ fn timer_fixture() -> ExportFixture {
     );
 
     let match_ = Match {
-        id: u("33333333-3333-3333-3333-333333333333"),
+        id: MatchId(u("33333333-3333-3333-3333-333333333333")),
         title: Some("決勝 / ファイナル".to_owned()),
         date: ts(1_700_000_000, 500_000_000), // 秒未満切り捨ての釘付け
         home_team_id: home_team.id,
@@ -294,11 +295,11 @@ fn timer_fixture() -> ExportFixture {
 
 fn video_fixture() -> ExportFixture {
     let home_team = Team {
-        id: u("44444444-4444-4444-4444-444444444444"),
+        id: TeamId(u("44444444-4444-4444-4444-444444444444")),
         name: "湘南ブルー".to_owned(),
     };
     let away_team = Team {
-        id: u("55555555-5555-5555-5555-555555555555"),
+        id: TeamId(u("55555555-5555-5555-5555-555555555555")),
         name: "横浜グリーン".to_owned(),
     };
     let p4 = player(
@@ -309,7 +310,7 @@ fn video_fixture() -> ExportFixture {
     );
 
     let match_ = Match {
-        id: u("66666666-6666-6666-6666-666666666666"),
+        id: MatchId(u("66666666-6666-6666-6666-666666666666")),
         title: None, // displayName キー省略の釘付け
         date: ts(1_750_000_000, 0),
         home_team_id: home_team.id,
@@ -401,11 +402,11 @@ fn video_fixture() -> ExportFixture {
 
 fn video_highlight_fixture() -> ExportFixture {
     let home_team = Team {
-        id: u("77777777-7777-7777-7777-777777777777"),
+        id: TeamId(u("77777777-7777-7777-7777-777777777777")),
         name: "Osaka 365 Stars".to_owned(),
     };
     let away_team = Team {
-        id: u("88888888-8888-8888-8888-888888888888"),
+        id: TeamId(u("88888888-8888-8888-8888-888888888888")),
         name: "Blue Owls".to_owned(),
     };
     let p5 = player(
@@ -422,7 +423,7 @@ fn video_highlight_fixture() -> ExportFixture {
     );
 
     let match_ = Match {
-        id: u("99999999-9999-9999-9999-999999999999"),
+        id: MatchId(u("99999999-9999-9999-9999-999999999999")),
         title: Some("ハイライト集".to_owned()),
         date: ts(1_760_000_000, 999_000_000), // .999 も切り捨て（丸め上げしない）の釘付け
         home_team_id: home_team.id,
@@ -643,9 +644,9 @@ fn encode_parse_convert_round_trip_restores_domain() {
     .unwrap();
 
     // factID は保存され、recordedAt 昇順に並ぶ
-    let restored_ids: Vec<Uuid> = conversion.facts.iter().map(|fact| fact.id).collect();
-    let expected_ids: Vec<Uuid> = (1..=10)
-        .map(|n| u(&format!("fac00000-0000-0000-0000-{n:012}")))
+    let restored_ids: Vec<FactId> = conversion.facts.iter().map(|fact| fact.id).collect();
+    let expected_ids: Vec<FactId> = (1..=10)
+        .map(|n| FactId(u(&format!("fac00000-0000-0000-0000-{n:012}"))))
         .collect();
     assert_eq!(restored_ids, expected_ids);
 

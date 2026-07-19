@@ -34,10 +34,10 @@ struct Keys {
 
 fn keys() -> Keys {
     Keys {
-        home_team_id: Uuid::new_v4(),
-        away_team_id: Uuid::new_v4(),
-        alice_id: Uuid::new_v4(),
-        bob_id: Uuid::new_v4(),
+        home_team_id: TeamId(Uuid::new_v4()),
+        away_team_id: TeamId(Uuid::new_v4()),
+        alice_id: PlayerId(Uuid::new_v4()),
+        bob_id: PlayerId(Uuid::new_v4()),
     }
 }
 
@@ -809,7 +809,7 @@ fn decode_fact_preserves_provided_id() {
         Uuid::new_v4,
     )
     .unwrap();
-    assert_eq!(fact.id, id);
+    assert_eq!(fact.id.0, id);
 }
 
 #[test]

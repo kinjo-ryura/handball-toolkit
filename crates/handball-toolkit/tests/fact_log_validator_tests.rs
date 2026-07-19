@@ -11,7 +11,7 @@ use handball_toolkit::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
     StoppageKind, StoppagePayload,
 };
-use handball_toolkit::ids::TeamId;
+use handball_toolkit::ids::{FactId, MatchId, PlayerId, TeamId};
 use handball_toolkit::validation::{DomainValidationIssue, TimelineValidationError};
 use handball_toolkit::validators::validate_fact_log;
 use uuid::Uuid;
@@ -21,7 +21,7 @@ fn recorded_at() -> DateTime<Utc> {
 }
 
 struct Ctx {
-    home_id: Uuid,
+    home_id: TeamId,
     timer_match: Match,
     video_match: Match,
     highlight_match: Match,
@@ -34,7 +34,7 @@ fn make_match(
     title: Option<&str>,
 ) -> Match {
     Match {
-        id: Uuid::new_v4(),
+        id: MatchId(Uuid::new_v4()),
         title: title.map(str::to_owned),
         date: recorded_at(),
         home_team_id: home_id,
@@ -46,8 +46,8 @@ fn make_match(
 }
 
 fn ctx() -> Ctx {
-    let home_id = Uuid::new_v4();
-    let away_id = Uuid::new_v4();
+    let home_id = TeamId(Uuid::new_v4());
+    let away_id = TeamId(Uuid::new_v4());
     let youtube = |id: &str| VideoSource {
         provider: VideoProvider::Youtube,
         external_id: id.to_owned(),
@@ -79,7 +79,7 @@ fn ctx() -> Ctx {
 
 fn timer_phase_start(start: f64, end: f64, kind: PhaseKind) -> MatchFact {
     MatchFact {
-        id: Uuid::new_v4(),
+        id: FactId(Uuid::new_v4()),
         recorded_at: recorded_at(),
         payload: MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
             kind,
@@ -95,7 +95,7 @@ fn timer_phase_start(start: f64, end: f64, kind: PhaseKind) -> MatchFact {
 
 fn video_phase_start(start: f64, end: f64) -> MatchFact {
     MatchFact {
-        id: Uuid::new_v4(),
+        id: FactId(Uuid::new_v4()),
         recorded_at: recorded_at(),
         payload: MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
             kind: PhaseKind::Regular,
@@ -111,7 +111,7 @@ fn video_phase_start(start: f64, end: f64) -> MatchFact {
 
 fn video_stoppage(start: f64, end: Option<f64>, kind: StoppageKind) -> MatchFact {
     MatchFact {
-        id: Uuid::new_v4(),
+        id: FactId(Uuid::new_v4()),
         recorded_at: recorded_at(),
         payload: MatchFactPayload::Control(ControlFact::Stoppage(StoppagePayload {
             kind,
@@ -130,12 +130,12 @@ fn video_stoppage(start: f64, end: Option<f64>, kind: StoppageKind) -> MatchFact
 
 fn timer_play(kind: PlayEventKind, team: Option<TeamId>, secs: f64) -> MatchFact {
     MatchFact {
-        id: Uuid::new_v4(),
+        id: FactId(Uuid::new_v4()),
         recorded_at: recorded_at(),
         payload: MatchFactPayload::Play(PlayFact {
             kind,
             team_id: team,
-            player_id: team.map(|_| Uuid::new_v4()),
+            player_id: team.map(|_| PlayerId(Uuid::new_v4())),
             related_player_id: None,
             anchor: FactAnchor::MatchClock(MatchClock {
                 elapsed_seconds: secs,
@@ -148,12 +148,12 @@ fn timer_play(kind: PlayEventKind, team: Option<TeamId>, secs: f64) -> MatchFact
 
 fn video_play(kind: PlayEventKind, team: Option<TeamId>, video_secs: f64) -> MatchFact {
     MatchFact {
-        id: Uuid::new_v4(),
+        id: FactId(Uuid::new_v4()),
         recorded_at: recorded_at(),
         payload: MatchFactPayload::Play(PlayFact {
             kind,
             team_id: team,
-            player_id: team.map(|_| Uuid::new_v4()),
+            player_id: team.map(|_| PlayerId(Uuid::new_v4())),
             related_player_id: None,
             anchor: FactAnchor::VideoClock(VideoClock {
                 elapsed_seconds: video_secs,
@@ -260,7 +260,7 @@ fn video_highlight_without_title_is_blocking() {
     let c = ctx();
     let match_ = make_match(
         c.home_id,
-        Uuid::new_v4(),
+        TeamId(Uuid::new_v4()),
         MatchConfiguration::VideoHighlight(VideoSource {
             provider: VideoProvider::Youtube,
             external_id: "abc".to_owned(),
@@ -279,7 +279,7 @@ fn video_highlight_with_empty_title_is_blocking() {
     let c = ctx();
     let match_ = make_match(
         c.home_id,
-        Uuid::new_v4(),
+        TeamId(Uuid::new_v4()),
         MatchConfiguration::VideoHighlight(VideoSource {
             provider: VideoProvider::Youtube,
             external_id: "abc".to_owned(),

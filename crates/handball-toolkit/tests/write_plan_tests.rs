@@ -14,6 +14,7 @@ use handball_toolkit::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
     StoppageKind, StoppagePayload,
 };
+use handball_toolkit::ids::{FactId, MatchId, PlayerId, TeamId};
 use handball_toolkit::write::{
     NewFactStamp, PlayerTeamRef, VideoMigrationPlanError, VideoSyncInput, phase_completion_fact,
     phase_completion_plan, roster_context_from_players, video_migration_plan,
@@ -22,17 +23,17 @@ use uuid::Uuid;
 
 #[test]
 fn 選手_0_件なら_none_で参照整合を_skip_する() {
-    let home = Uuid::from_u128(1);
-    let away = Uuid::from_u128(2);
+    let home = TeamId(Uuid::from_u128(1));
+    let away = TeamId(Uuid::from_u128(2));
     assert_eq!(roster_context_from_players(home, away, &[]), None);
 }
 
 #[test]
 fn 選手一覧から_lookup_と_known_ids_を組む() {
-    let home = Uuid::from_u128(1);
-    let away = Uuid::from_u128(2);
-    let p1 = Uuid::from_u128(11);
-    let p2 = Uuid::from_u128(12);
+    let home = TeamId(Uuid::from_u128(1));
+    let away = TeamId(Uuid::from_u128(2));
+    let p1 = PlayerId(Uuid::from_u128(11));
+    let p2 = PlayerId(Uuid::from_u128(12));
     let players = [
         PlayerTeamRef {
             player_id: p1,
@@ -56,9 +57,9 @@ fn 選手一覧から_lookup_と_known_ids_を組む() {
 
 #[test]
 fn 同一選手の重複は先勝ちで_lookup_を組む() {
-    let home = Uuid::from_u128(1);
-    let away = Uuid::from_u128(2);
-    let p1 = Uuid::from_u128(11);
+    let home = TeamId(Uuid::from_u128(1));
+    let away = TeamId(Uuid::from_u128(2));
+    let p1 = PlayerId(Uuid::from_u128(11));
     let players = [
         PlayerTeamRef {
             player_id: p1,
@@ -79,11 +80,11 @@ fn 同一選手の重複は先勝ちで_lookup_を組む() {
 
 fn timer_match(duration: f64) -> Match {
     Match {
-        id: Uuid::from_u128(1),
+        id: MatchId(Uuid::from_u128(1)),
         title: None,
         date: chrono::DateTime::from_timestamp(0, 0).expect("epoch は有効"),
-        home_team_id: Uuid::from_u128(2),
-        away_team_id: Uuid::from_u128(3),
+        home_team_id: TeamId(Uuid::from_u128(2)),
+        away_team_id: TeamId(Uuid::from_u128(3)),
         configuration: MatchConfiguration::Timer {
             phase_duration_seconds: duration,
         },
@@ -94,12 +95,12 @@ fn timer_match(duration: f64) -> Match {
 
 fn goal_at(seconds: f64) -> MatchFact {
     MatchFact {
-        id: Uuid::from_u128(100),
+        id: FactId(Uuid::from_u128(100)),
         recorded_at: chrono::DateTime::from_timestamp(10, 0).expect("固定秒は有効"),
         payload: MatchFactPayload::Play(PlayFact {
             kind: PlayEventKind::Goal,
             team_id: None,
-            player_id: Some(Uuid::from_u128(50)),
+            player_id: Some(PlayerId(Uuid::from_u128(50))),
             related_player_id: None,
             anchor: FactAnchor::MatchClock(MatchClock {
                 elapsed_seconds: seconds,
@@ -112,7 +113,7 @@ fn goal_at(seconds: f64) -> MatchFact {
 
 fn phase_start(start: f64, end: f64) -> MatchFact {
     MatchFact {
-        id: Uuid::from_u128((start as u128) + 200),
+        id: FactId(Uuid::from_u128((start as u128) + 200)),
         recorded_at: chrono::DateTime::from_timestamp(1, 0).expect("固定秒は有効"),
         payload: MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
             kind: PhaseKind::Regular,
@@ -179,7 +180,7 @@ fn phase_start_自身の記録は補完しない() {
 #[test]
 fn stoppage_の記録も補完対象() {
     let pause = MatchFact {
-        id: Uuid::from_u128(101),
+        id: FactId(Uuid::from_u128(101)),
         recorded_at: chrono::DateTime::from_timestamp(10, 0).expect("固定秒は有効"),
         payload: MatchFactPayload::Control(ControlFact::Stoppage(StoppagePayload {
             kind: StoppageKind::Pause,
@@ -212,7 +213,7 @@ fn matchclock_anchor_が無い記録は_phase_1_のみ確保する() {
 fn 補完_fact_はスタンプの_id_と時刻で組まれる() {
     let plan = phase_completion_plan(&timer_match(1800.0), &[], &goal_at(100.0));
     let stamp = NewFactStamp {
-        id: Uuid::from_u128(77),
+        id: FactId(Uuid::from_u128(77)),
         recorded_at: chrono::DateTime::from_timestamp(42, 0).expect("固定秒は有効"),
     };
     let fact = phase_completion_fact(plan[0], stamp);
@@ -305,7 +306,7 @@ fn 移行計画は_phase_start_を_both_anchor_化し_play_を_video_clock_へ�
 fn 移行計画は_stoppage_の_end_match_clock_を_start_と同値にする() {
     let phase = phase_start(0.0, 1800.0);
     let pause = MatchFact {
-        id: Uuid::from_u128(150),
+        id: FactId(Uuid::from_u128(150)),
         recorded_at: chrono::DateTime::from_timestamp(5, 0).expect("固定秒は有効"),
         payload: MatchFactPayload::Control(ControlFact::Stoppage(StoppagePayload {
             kind: StoppageKind::Timeout,

@@ -39,7 +39,7 @@ Swift のディレクトリ構成を 1:1 でミラーする。移植レビュー
 
 | Swift | Rust | 備考 |
 |---|---|---|
-| `MatchID` / `TeamID` / `PlayerID` / `FactID`（= UUID の typealias） | `pub type MatchId = Uuid;` ほか type alias | Swift 同様 type alias で忠実移植（grill 確定 2026-07-12）。newtype 化（型安全強化）はパリティ完走後の別タスクとして Issue 化 |
+| `MatchID` / `TeamID` / `PlayerID` / `FactID`（= UUID の typealias） | `pub struct MatchId(pub Uuid);` ほか newtype | 移植期間中は Swift 同様 type alias で忠実移植（grill 確定 2026-07-12）。パリティ完走後に newtype へ切替済み（2026-07-19、handball-project#52 — Considered options の追記参照） |
 
 ### clock
 
@@ -212,6 +212,12 @@ pub fn validate_delete(removed_fact_id: FactId, existing_facts: &[MatchFact], ma
 
 - **モジュール構成を Rust 流に再編**（例: validation と validators の統合、projection のフラット化）→ 却下。移植期間中は 1:1 ミラーが差分レビューとパリティ検証の追跡性で勝る。再編は移植完了後の改善候補
 - **ID の newtype 化**（`struct MatchId(Uuid)`）→ 却下（grill 確定 2026-07-12）。Swift 側も型安全性は無く、移植期間中は「形を変えない」ことが写経ミス検出の武器になるため type alias を採る。newtype 化はパリティ完走後の型安全化タスクとして Issue 化（backlog）
+
+  追記（2026-07-19、handball-project#52 実施）: パリティ完走を受けて newtype へ切り替えた。狙いどおり包み忘れは全てコンパイルエラーで露出し、機械的に移行できた。判断メモ:
+  - serde は `#[serde(transparent)]` で内包 `Uuid` と同一表現 — ゴールデン（ADR 0003）は再生成不要で bit-exact を維持
+  - `Ord` は derive で内包 `Uuid` のバイト順（= hex 文字列順）を透過 — 「保存すべきセマンティクス」9（playerStats の決定的ソート）は不変
+  - UniFFI 境界は各 newtype を Uuid と同じ String ブリッジ + uniffi.toml で Foundation UUID へ写像 — Swift 側の API 面は newtype 化前（全部 UUID）と不変。`SampleKeyLookup` は値型が分かれたため `TeamKeyLookup` / `PlayerKeyLookup` の 2 型に分割
+  - シェルからの ID 供給（converter の `new_id` closure / FFI の `new_ids: Vec<Uuid>`）は生 `Uuid` のまま — 採番はシェルの責務で、型付けはコア入口で行う
 - **API を「JSON in → JSON out」の文字列境界にする** → 却下。Rust ネイティブ利用（CLI / テスト）で型を失う。serde 層は境界の外側（各バインディング）に置く
 - **保存コールバック注入**（シェルの save 関数をコアの `add()` に渡し、validate → save の調停をコアが担う案）→ 却下（2026-07-12 設計討議）。理由: (1) DB ハンドルがシェルにある以上「全書き込みが検証を通る」保証は結局シェル側の規約であり、強制力は現行の repository 内包方式と同質 (2) シェルから消えるのは guard 数行だけで、コールバックの trait 化・actor 境界の往復・エラー写像などの梱包材が 10 行強純増し「シェルコード削減」の目的に逆行 (3) async コールバック FFI の問題系一式（隔離・寿命・キャンセル・再入）を最も頻繁に通る書き込み経路で踏む。**再検討トリガー: Android シェル実装時に validate → save 中間役の二重実装が実際に痛いと体感したとき**。書き込み経路を repository 一本に集約し続ける限り、この移行は追加的で手戻りは小さい
 - **write-plan パターン**（`plan_append` が検証合格時のみ「書き込み券（WritePlan）」を返し、シェルの save 関数が WritePlan しか受け取らない形にして validate 忘れを型で防ぐ案）→ 今回は見送り（grill 確定 2026-07-12）。移植元 Swift に無い API を移植期間中に新設しない。既存 `validate_append` を包むだけの追加品なので、後から足しても既存境界を壊さない。再検討トリガーは保存コールバック注入と同じ（Android シェルで validate → save 中間役の痛みを体感したとき）で、**その時点で write-plan / コールバック注入のどちらを採るか比較して決める**

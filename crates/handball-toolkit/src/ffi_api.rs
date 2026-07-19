@@ -17,7 +17,7 @@ use crate::clock::{MatchClock, VideoClock};
 use crate::configuration::{MatchConfiguration, PhaseKind};
 use crate::entities::{Match, Player, Team};
 use crate::facts::{ControlFact, MatchFact, PlayFact};
-use crate::ids::FactId;
+use crate::ids::{FactId, PlayerId, TeamId};
 use crate::projection::{
     LiveMatchProjection, Phase, ScoreProgressionProjection, SegmentResolver, SummaryProjection,
     TimeSegment, TimelineProjection,
@@ -263,8 +263,8 @@ pub fn decode_sample_configuration(
 #[uniffi::export]
 pub fn decode_sample_fact(
     dto: SampleFactDtoV2,
-    teams_by_key: BTreeMap<String, Uuid>,
-    players_by_key: BTreeMap<String, Uuid>,
+    teams_by_key: BTreeMap<String, TeamId>,
+    players_by_key: BTreeMap<String, PlayerId>,
     fallback_id: Uuid,
 ) -> Result<MatchFact, SampleDtoError> {
     let mut fallback = Some(fallback_id);

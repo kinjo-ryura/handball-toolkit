@@ -252,14 +252,14 @@ impl Normalizer {
         self.team_key_by_id
             .get(&id)
             .cloned()
-            .unwrap_or_else(|| format!("unknown:{}", fact_key(id)))
+            .unwrap_or_else(|| format!("unknown:{}", fact_key(id.0)))
     }
 
     fn player_key(&self, id: PlayerId) -> String {
         self.player_key_by_id
             .get(&id)
             .cloned()
-            .unwrap_or_else(|| format!("unknown:{}", fact_key(id)))
+            .unwrap_or_else(|| format!("unknown:{}", fact_key(id.0)))
     }
 }
 
@@ -269,7 +269,7 @@ fn golden_resolver(resolver: &SegmentResolver) -> GoldenResolver {
             .phases
             .iter()
             .map(|phase| GoldenPhase {
-                fact_id: fact_key(phase.fact_id),
+                fact_id: fact_key(phase.fact_id.0),
                 kind: phase_kind_raw(phase.kind),
                 match_elapsed_start: phase.match_elapsed_start,
                 match_elapsed_end: phase.match_elapsed_end,
@@ -287,8 +287,8 @@ fn golden_resolver(resolver: &SegmentResolver) -> GoldenResolver {
                 match_elapsed_end: segment.match_elapsed_end,
                 video_elapsed_start: segment.video_elapsed_start,
                 video_elapsed_end: segment.video_elapsed_end,
-                start_fact_id: segment.start_fact_id.map(fact_key),
-                end_fact_id: segment.end_fact_id.map(fact_key),
+                start_fact_id: segment.start_fact_id.map(|id| fact_key(id.0)),
+                end_fact_id: segment.end_fact_id.map(|id| fact_key(id.0)),
                 stoppage_kind: segment.stoppage_kind.map(stoppage_kind_raw),
             })
             .collect(),
@@ -300,7 +300,7 @@ fn golden_timeline(timeline: &TimelineProjection) -> Vec<GoldenTimelineEntry> {
         .resolved_facts
         .iter()
         .map(|resolved| GoldenTimelineEntry {
-            fact_id: fact_key(resolved.fact.id),
+            fact_id: fact_key(resolved.fact.id.0),
             resolved_match_clock: resolved.resolved_match_clock.map(|c| c.elapsed_seconds),
             resolved_video_clock: resolved.resolved_video_clock.map(|c| c.elapsed_seconds),
         })
@@ -343,7 +343,7 @@ fn golden_summary(summary: &SummaryProjection, normalizer: &Normalizer) -> Golde
             .phase_summaries
             .iter()
             .map(|line| GoldenPhaseSummary {
-                phase_fact_id: fact_key(line.phase_fact_id),
+                phase_fact_id: fact_key(line.phase_fact_id.0),
                 kind: phase_kind_raw(line.kind),
                 regular_index: line.regular_index.map(|index| index as i64),
                 home_goals: line.home_goals,
@@ -375,7 +375,7 @@ fn golden_score_progression(progression: &ScoreProgressionProjection) -> GoldenS
             .phase_spans
             .iter()
             .map(|span| GoldenPhaseSpan {
-                phase_fact_id: fact_key(span.phase_fact_id),
+                phase_fact_id: fact_key(span.phase_fact_id.0),
                 regular_index: span.regular_index as i64,
                 start_seconds: span.start_seconds,
                 end_seconds: span.end_seconds,
