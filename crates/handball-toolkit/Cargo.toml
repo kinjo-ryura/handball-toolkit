@@ -6,10 +6,13 @@ edition.workspace = true
 [features]
 # UniFFI 公開型の derive を有効化する（ffi crate 専用 — ADR 0004）。
 # default off のため wasm / CLI ビルドでは uniffi が依存グラフごと消える。
-uniffi = ["dep:uniffi"]
+uniffi = ["dep:uniffi", "dep:async-trait"]
 
 [dependencies]
 # 依存は最小集合に留める（wasm 対応を壊さない — ADR 0001）。
+# async-trait は発火層（ffi_write）の async foreign trait 用。feature `uniffi` 配下のみで
+# wasm / CLI ビルドには入らない（ADR 0005）。
+async-trait = { version = "0.1", optional = true }
 # chrono は決定性のため clock 機能（now()）を外す（設計不変条件: コアは now() を持たない）。
 chrono = { version = "0.4", default-features = false, features = ["std", "serde"] }
 # rc: TimelineProjection.resolver の Arc を透過 serialize するため（ADR 0004）。

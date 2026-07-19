@@ -1,8 +1,11 @@
 //! ハンドボール試合データのツールキット。
 //!
 //! HandballRecorder の `RecorderDomain`（Swift）を移植した stateless 純粋関数コア。
-//! 公開 API はすべて「fact 列 in → 導出結果 out」の純粋関数で、
-//! 時間・乱数・I/O・永続化は持たない（timestamp / ID はシェルが発行して fact に載せて渡す）。
+//! 公開 API は「fact 列 in → 導出結果 out」の純粋関数を基本とし、
+//! 時間・乱数は持たない（timestamp / ID はシェルが発行して fact に載せて渡す）。
+//! 例外は feature `uniffi` 配下の発火層 `ffi_write`（シェルが注入した repository を
+//! await する薄い write orchestration — ADR 0005。repository を保持する long-lived
+//! object は作らない）。
 //!
 //! モジュール構成は移植元の Swift ディレクトリ構成を 1:1 でミラーする（ADR 0001 ミラー表）。
 //!
@@ -17,11 +20,14 @@ pub mod facts;
 pub mod ffi_api;
 #[cfg(feature = "uniffi")]
 mod ffi_support;
+#[cfg(feature = "uniffi")]
+pub mod ffi_write;
 pub mod ids;
 pub mod projection;
 pub mod sample_dto;
 pub mod validation;
 pub mod validators;
+pub mod write;
 
 // uniffi メタデータ（namespace: handball_toolkit）。型 derive も関数公開（ffi_api）も
 // この 1 namespace に集約する — ADR 0004（複数 namespace で module_name を共有すると

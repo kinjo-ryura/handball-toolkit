@@ -168,7 +168,7 @@ pub enum CoreWriteError {
 
 同一 feature ブランチ内でコミット順を分離する（ADR 0004 と同じ規律）:
 
-1. **機構整備**: `MatchWriteRepository` foreign trait + `CoreWriteError` + fact 3 経路の write 入口（Rust 単体テストは fake repo 実装で計画層・拒否経路を固定）。ios_poc smoke に **async 往復のランタイム検証**（Swift 実装を Rust が await して結果が返る・エラーが写る）を追加
+1. **機構整備**: `MatchWriteRepository` foreign trait + `CoreWriteError` + fact 3 経路の write 入口（Rust 単体テストは fake repo 実装で計画層・拒否経路を固定）。ios_poc smoke に **async 往復のランタイム検証**（Swift 実装を Rust が await して結果が返る・エラーが写る）を追加 → **完了（2026-07-19）**: 計画層 `write`（roster 構築の 0 件 skip / 重複先勝ちルールをコアへ移管）+ 発火層 `ffi_write`。fake repo テストで合格時のみ発火・違反不発火・repository 失敗伝播を固定し、ios_poc で発火・`ValidationFailed` 写像・未知エラーの `Repository` 畳み込みをランタイム確認
 2. **アプリ第 1 段（fact 3 経路）**: `SwiftDataMatchRepository` から validation を剥がし素朴 CRUD 化 → store をコア入口呼び出しへ → 可視性遮断（決定 3）→ アプリテスト green
 3. **アプリ第 2 段（phase 自動補完）**: `ensureTimerPhasesCovering` をコアの記録入口へ移管（ID 事前生成契約）。該当 Swift テストを Rust テスト + 境界テストへ移植 → green
 4. **アプリ第 3 段（migrate commit）**: `MigrateToVideoStore.commit` の順序 orchestration を移管 → green
