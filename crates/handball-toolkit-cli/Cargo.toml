@@ -1,0 +1,11 @@
+[package]
+name = "handball-toolkit-cli"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+# feature 指定なし = uniffi off。依存グラフに uniffi が入らない（コア Cargo.toml 参照）。
+handball-toolkit = { path = "../handball-toolkit" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1" }
+uuid = { version = "1" }

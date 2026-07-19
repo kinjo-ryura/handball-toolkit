@@ -16,10 +16,28 @@
 ```
 crates/
   handball-toolkit/       — コア crate（facts / clocks / configuration / entities / validators / projections）
+  handball-toolkit-cli/   — sample-matches 配信 JSON の検証 CLI（handball-project#58）
   handball-toolkit-ffi/   — UniFFI バインディング層（JSON in → JSON out の粗い境界 + uniffi-bindgen CLI）
 ```
 
-将来の拡張候補（必要になってから追加）: CLI（JSON 検証器）、wasm バインディング、Kotlin バインディング。
+将来の拡張候補（必要になってから追加）: wasm バインディング、Kotlin バインディング。
+
+## 検証 CLI
+
+[handball-sample-matches](https://github.com/kinjo-ryura/handball-sample-matches) の配信 JSON（SAMPLE_DTO_V2）をコアの validators で検証する。
+
+```bash
+# v2 ルートを一括検証（index ↔ ファイル突合 + スコア / factCount / hasVideo / date の転記整合）
+cargo run -p handball-toolkit-cli -- validate ../handball-sample-matches/v2
+
+# 単体ファイル（試合本体 / index をトップレベルキーで自動判別）。--json で機械可読出力
+cargo run -p handball-toolkit-cli -- validate --json path/to/match.json
+```
+
+exit code は 0 = 指摘なし / 1 = 指摘あり / 2 = 使い方・パス誤り。指摘は境界ワイヤ形式
+`{scope, code, params}`（ADR 0002）で表示する。handball-sample-matches の CI への組み込みは
+本リポの OSS 公開後に行う（private リポのままだと public リポの Actions から PAT なしで
+参照できないため。それまでは配信前に手元で本 CLI を実行する運用）。
 
 ## 開発
 

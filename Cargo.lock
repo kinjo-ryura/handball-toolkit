@@ -295,6 +295,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "handball-toolkit-cli"
+version = "0.1.0"
+dependencies = [
+ "handball-toolkit",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
 name = "handball-toolkit-ffi"
 version = "0.1.0"
 dependencies = [

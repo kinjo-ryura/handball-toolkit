@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "highlights": [
+    {
+      "slug": "2026-01-02-tigers-goal",
+      "displayName": "テストハイライト",
+      "description": null,
+      "date": "2026-01-02T09:00:00Z",
+      "homeTeamName": "Tigers",
+      "awayTeamName": "Falcons",
+      "factCount": 1,
+      "hasVideo": true
+    }
+  ]
+}

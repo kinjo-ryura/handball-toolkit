@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 2,
+  "matches": [
+    {
+      "slug": "2026-01-01-tigers-vs-falcons",
+      "displayName": "Tigers vs Falcons",
+      "date": "2026-01-01T10:00:00Z",
+      "homeScore": 1,
+      "awayScore": 0,
+      "hasVideo": true
+    }
+  ]
+}

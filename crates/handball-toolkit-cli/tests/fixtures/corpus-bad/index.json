@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 2,
+  "matches": [
+    {
+      "slug": "bad-score",
+      "displayName": "Bad Score",
+      "date": "2026-02-01T10:00:00Z",
+      "homeScore": 5,
+      "awayScore": 5,
+      "hasVideo": true
+    },
+    {
+      "slug": "missing-file",
+      "displayName": "Missing",
+      "date": "2026-02-02T10:00:00Z",
+      "homeScore": 0,
+      "awayScore": 0,
+      "hasVideo": false
+    },
+    {
+      "slug": "bad-score",
+      "displayName": "Duplicate",
+      "date": "2026-02-01T10:00:00Z",
+      "homeScore": 5,
+      "awayScore": 5,
+      "hasVideo": true
+    }
+  ]
+}

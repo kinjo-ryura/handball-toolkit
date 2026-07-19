@@ -30,12 +30,13 @@ cargo fmt             # フォーマット
 
 ## アーキテクチャ
 
-Cargo workspace。2 crate 構成:
+Cargo workspace。3 crate 構成:
 
 - `crates/handball-toolkit/` — コア crate（facts / clocks / configuration / entities / validators / projections）。feature `uniffi`（default off）でドメイン全型の UniFFI derive と FFI 関数公開（`ffi_api` / `ffi_support`）が有効になる（ADR 0004。feature off の wasm / CLI ビルドでは uniffi が依存グラフごと消える）
+- `crates/handball-toolkit-cli/` — sample-matches 配信 JSON（SAMPLE_DTO_V2）の検証 CLI（handball-project#58）。コアの validators を呼ぶだけの薄いシェルで、コアには手を入れない。使い方は README「検証 CLI」
 - `crates/handball-toolkit-ffi/` — FFI パッケージング crate。staticlib 化（XCFramework の中身）と uniffi-bindgen CLI（feature `bindgen`）のみを担い、型・関数の公開面はコア crate の namespace に集約する（ADR 0004 決定 3 実装追記）
 
-CLI（JSON 検証器）・wasm バインディング・Kotlin バインディングは将来の拡張候補で、必要になった時点で workspace member として追加する（先回りで作らない）。iOS シェル向けのドメイン全型 UniFFI 公開（本境界）は ADR 0004 で確定・実装済み。Kotlin バインディングは handball-project#59。
+wasm バインディング・Kotlin バインディングは将来の拡張候補で、必要になった時点で workspace member として追加する（先回りで作らない）。iOS シェル向けのドメイン全型 UniFFI 公開（本境界）は ADR 0004 で確定・実装済み。Kotlin バインディングは handball-project#59。
 
 ### iOS 向け XCFramework（UniFFI）
 

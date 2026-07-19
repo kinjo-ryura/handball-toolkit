@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "highlights": [
+    {
+      "slug": "with-phase",
+      "displayName": "位相入りハイライト",
+      "description": null,
+      "date": "2026-02-03T09:00:00Z",
+      "homeTeamName": "Tigers",
+      "awayTeamName": "Hawks",
+      "factCount": 3,
+      "hasVideo": true
+    }
+  ]
+}

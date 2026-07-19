@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 2,
+  "match": {
+    "displayName": "テストハイライト",
+    "date": "2026-01-02T09:00:00Z",
+    "configuration": {
+      "kind": "videoHighlight",
+      "timer": null,
+      "video": null,
+      "videoHighlight": {
+        "source": {
+          "provider": "youtube",
+          "externalID": "hl123abc000"
+        }
+      }
+    }
+  },
+  "teams": {
+    "home": {
+      "key": "home",
+      "name": "Tigers",
+      "players": [
+        {
+          "key": "H1",
+          "name": "選手A",
+          "jerseyNumber": 7
+        }
+      ]
+    },
+    "away": {
+      "key": "away",
+      "name": "Falcons",
+      "players": []
+    }
+  },
+  "facts": [
+    {
+      "factID": "33333333-3333-3333-3333-333333333333",
+      "recordedAt": "2026-01-02T09:05:00Z",
+      "payload": {
+        "kind": "play",
+        "control": null,
+        "play": {
+          "kind": "goal",
+          "teamKey": "home",
+          "playerKey": "H1",
+          "relatedPlayerKey": null,
+          "anchor": {
+            "kind": "videoClock",
+            "matchClock": null,
+            "videoClock": {
+              "elapsedSeconds": 42.0
+            },
+            "endMatchElapsedSeconds": null,
+            "endVideoElapsedSeconds": null
+          },
+          "title": null,
+          "note": null
+        }
+      }
+    }
+  ]
+}
