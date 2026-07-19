@@ -1,31 +1,7 @@
 {
   "facts": [
     {
-      "factID": "9d8f91f4-e72a-5662-930d-92efd628b5ae",
-      "payload": {
-        "control": {
-          "anchor": {
-            "endMatchElapsedSeconds": null,
-            "endVideoElapsedSeconds": 6477.581,
-            "kind": "videoClock",
-            "matchClock": null,
-            "videoClock": {
-              "elapsedSeconds": 0.0
-            }
-          },
-          "kind": "phaseStart",
-          "phaseStart": {
-            "kind": "regular"
-          },
-          "stoppage": null
-        },
-        "kind": "control",
-        "play": null
-      },
-      "recordedAt": "2026-05-10T00:51:25Z"
-    },
-    {
-      "factID": "a3a32d36-2526-5a15-a924-8cd4d8bcce76",
+      "factID": "13edc015-d551-5ced-8857-328c54b32357",
       "payload": {
         "control": null,
         "kind": "play",
@@ -50,7 +26,7 @@
       "recordedAt": "2026-05-10T06:24:10Z"
     },
     {
-      "factID": "9a78f5dc-6a62-579d-a945-a0c2b9195164",
+      "factID": "a3a32d36-2526-5a15-a924-8cd4d8bcce76",
       "payload": {
         "control": null,
         "kind": "play",
@@ -75,7 +51,7 @@
       "recordedAt": "2026-05-10T06:24:21Z"
     },
     {
-      "factID": "fda68adf-b477-5aea-8227-43f0f1fce25a",
+      "factID": "9a78f5dc-6a62-579d-a945-a0c2b9195164",
       "payload": {
         "control": null,
         "kind": "play",
@@ -100,7 +76,7 @@
       "recordedAt": "2026-05-10T06:26:24Z"
     },
     {
-      "factID": "9c88dfc2-6559-5b9a-9e11-796a9181a4a6",
+      "factID": "fda68adf-b477-5aea-8227-43f0f1fce25a",
       "payload": {
         "control": null,
         "kind": "play",
@@ -125,7 +101,7 @@
       "recordedAt": "2026-05-10T06:26:29Z"
     },
     {
-      "factID": "deb7272d-dd6a-5127-986c-c610b770ac13",
+      "factID": "9c88dfc2-6559-5b9a-9e11-796a9181a4a6",
       "payload": {
         "control": null,
         "kind": "play",
@@ -150,7 +126,7 @@
       "recordedAt": "2026-05-10T06:28:13Z"
     },
     {
-      "factID": "4f628862-d826-5ae3-9bec-3ea475f0ae90",
+      "factID": "deb7272d-dd6a-5127-986c-c610b770ac13",
       "payload": {
         "control": null,
         "kind": "play",
@@ -175,7 +151,7 @@
       "recordedAt": "2026-05-10T06:29:18Z"
     },
     {
-      "factID": "f8aa4481-1c7b-5cb3-961a-6900962e9e0a",
+      "factID": "4f628862-d826-5ae3-9bec-3ea475f0ae90",
       "payload": {
         "control": null,
         "kind": "play",
@@ -200,7 +176,7 @@
       "recordedAt": "2026-05-10T06:30:44Z"
     },
     {
-      "factID": "4e4c2100-24c9-5e0a-be19-c9fc2d28f996",
+      "factID": "f8aa4481-1c7b-5cb3-961a-6900962e9e0a",
       "payload": {
         "control": null,
         "kind": "play",
@@ -225,7 +201,7 @@
       "recordedAt": "2026-05-10T06:32:17Z"
     },
     {
-      "factID": "1af70a0b-bc6f-5a2a-9b2f-2ce5bb93d943",
+      "factID": "4e4c2100-24c9-5e0a-be19-c9fc2d28f996",
       "payload": {
         "control": null,
         "kind": "play",
@@ -250,7 +226,7 @@
       "recordedAt": "2026-05-10T06:32:59Z"
     },
     {
-      "factID": "def274d1-fec5-5ceb-a032-3dad65e2760f",
+      "factID": "1af70a0b-bc6f-5a2a-9b2f-2ce5bb93d943",
       "payload": {
         "control": null,
         "kind": "play",
@@ -275,7 +251,7 @@
       "recordedAt": "2026-05-10T06:35:12Z"
     },
     {
-      "factID": "d36ed1bb-19a2-52fc-a4c9-820449096645",
+      "factID": "def274d1-fec5-5ceb-a032-3dad65e2760f",
       "payload": {
         "control": null,
         "kind": "play",
@@ -300,7 +276,7 @@
       "recordedAt": "2026-05-10T06:48:40Z"
     },
     {
-      "factID": "41735acb-318f-5e34-b431-20d92d33b476",
+      "factID": "d36ed1bb-19a2-52fc-a4c9-820449096645",
       "payload": {
         "control": null,
         "kind": "play",
@@ -325,7 +301,7 @@
       "recordedAt": "2026-05-10T06:53:54Z"
     },
     {
-      "factID": "0d0ea487-d937-5d52-8dcd-5891f106ffaa",
+      "factID": "41735acb-318f-5e34-b431-20d92d33b476",
       "payload": {
         "control": null,
         "kind": "play",
@@ -350,7 +326,7 @@
       "recordedAt": "2026-05-10T06:56:22Z"
     },
     {
-      "factID": "709772f2-4ca5-516a-bdfd-ab6ceed2c3d2",
+      "factID": "0d0ea487-d937-5d52-8dcd-5891f106ffaa",
       "payload": {
         "control": null,
         "kind": "play",

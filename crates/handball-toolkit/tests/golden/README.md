@@ -9,9 +9,9 @@ Rust 実装の出力が `expected/` と一致することをパリティテス�
 | 項目 | 値 |
 |---|---|
 | オラクル（RecorderDomain） | HandballRecorder **main** `b7cf57e861a9100ee3f721c8c477e2aae062c3f8` |
-| dump ツール | HandballRecorder `parity/oracle-dump` ブランチの `recorder-domain-dump`（Package: `Packages/RecorderDomain`） |
-| 入力コーパス | handball-sample-matches `3e4ee6aaf542338632955d2db2ab9a2173b4893f`（`v2/matches/` 2 件 + `v2/highlights/` 6 件） |
-| 生成日 | 2026-07-12 |
+| dump ツール | HandballRecorder `parity/oracle-dump` ブランチの `recorder-domain-dump`（Package: `Packages/RecorderDomain`。ブランチ削除後は tag `oracle-dump-final`） |
+| 入力コーパス | handball-sample-matches `439e650bcbde82636b66efe8d9a9aa942149f11e`（`v2/matches/` 2 件 + `v2/highlights/` 6 件） |
+| 生成日 | 2026-07-20（highlights のみ再生成 — handball-project#71 で入力から R6 違反の phaseStart を除去。matches は 2026-07-12 生成のまま） |
 
 - 出所ハッシュは **main のコミット**を記録する（`parity/oracle-dump` はパリティ完走後に削除されるため。
   ブランチの不変条件「RecorderDomain ソース不変」により、オラクルの中身 = main の RecorderDomain）

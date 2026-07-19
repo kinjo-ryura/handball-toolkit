@@ -1,31 +1,7 @@
 {
   "facts": [
     {
-      "factID": "b44def26-fa87-5dd6-9d49-454d18794b9f",
-      "payload": {
-        "control": {
-          "anchor": {
-            "endMatchElapsedSeconds": null,
-            "endVideoElapsedSeconds": 5689.241,
-            "kind": "videoClock",
-            "matchClock": null,
-            "videoClock": {
-              "elapsedSeconds": 0.0
-            }
-          },
-          "kind": "phaseStart",
-          "phaseStart": {
-            "kind": "regular"
-          },
-          "stoppage": null
-        },
-        "kind": "control",
-        "play": null
-      },
-      "recordedAt": "2026-05-09T05:33:37Z"
-    },
-    {
-      "factID": "60521aca-1fb8-57f4-9563-32bcf870ff1a",
+      "factID": "c2715202-1802-5a8d-8a30-aab7587eebc7",
       "payload": {
         "control": null,
         "kind": "play",
@@ -50,7 +26,7 @@
       "recordedAt": "2026-05-09T05:35:54Z"
     },
     {
-      "factID": "70b4d2d4-0fe1-5217-9491-bb99187757c9",
+      "factID": "60521aca-1fb8-57f4-9563-32bcf870ff1a",
       "payload": {
         "control": null,
         "kind": "play",
@@ -75,7 +51,7 @@
       "recordedAt": "2026-05-09T05:37:43Z"
     },
     {
-      "factID": "d9db5987-bd36-5eed-8fa2-e55fbefe5806",
+      "factID": "70b4d2d4-0fe1-5217-9491-bb99187757c9",
       "payload": {
         "control": null,
         "kind": "play",
@@ -100,7 +76,7 @@
       "recordedAt": "2026-05-09T05:38:12Z"
     },
     {
-      "factID": "ec3bcbc2-0907-5c8d-bb91-7ef573b6924c",
+      "factID": "d9db5987-bd36-5eed-8fa2-e55fbefe5806",
       "payload": {
         "control": null,
         "kind": "play",
@@ -125,7 +101,7 @@
       "recordedAt": "2026-05-09T05:38:56Z"
     },
     {
-      "factID": "ce1534d1-99fa-5a18-ac24-5fa705d11eb9",
+      "factID": "ec3bcbc2-0907-5c8d-bb91-7ef573b6924c",
       "payload": {
         "control": null,
         "kind": "play",
@@ -150,7 +126,7 @@
       "recordedAt": "2026-05-09T05:39:36Z"
     },
     {
-      "factID": "c96c4c0b-85cb-5952-92c8-188e2c56391f",
+      "factID": "ce1534d1-99fa-5a18-ac24-5fa705d11eb9",
       "payload": {
         "control": null,
         "kind": "play",
@@ -175,7 +151,7 @@
       "recordedAt": "2026-05-09T05:40:08Z"
     },
     {
-      "factID": "0297552c-ff21-5e29-909e-e24259fd7353",
+      "factID": "c96c4c0b-85cb-5952-92c8-188e2c56391f",
       "payload": {
         "control": null,
         "kind": "play",
@@ -200,7 +176,7 @@
       "recordedAt": "2026-05-09T05:40:59Z"
     },
     {
-      "factID": "1812d92e-ecb2-5e28-94ff-86e263c1e2b5",
+      "factID": "0297552c-ff21-5e29-909e-e24259fd7353",
       "payload": {
         "control": null,
         "kind": "play",
@@ -225,7 +201,7 @@
       "recordedAt": "2026-05-09T05:41:40Z"
     },
     {
-      "factID": "8aaafcc5-71c3-5b2e-97c5-4463805e37b3",
+      "factID": "1812d92e-ecb2-5e28-94ff-86e263c1e2b5",
       "payload": {
         "control": null,
         "kind": "play",
@@ -250,7 +226,7 @@
       "recordedAt": "2026-05-09T05:43:03Z"
     },
     {
-      "factID": "9c35f8ac-eb6d-53f0-941a-e34a77148c49",
+      "factID": "8aaafcc5-71c3-5b2e-97c5-4463805e37b3",
       "payload": {
         "control": null,
         "kind": "play",
@@ -275,7 +251,7 @@
       "recordedAt": "2026-05-09T05:44:05Z"
     },
     {
-      "factID": "33f8540f-a6f1-53d0-a5d1-a6ca3d69e006",
+      "factID": "9c35f8ac-eb6d-53f0-941a-e34a77148c49",
       "payload": {
         "control": null,
         "kind": "play",
@@ -300,7 +276,7 @@
       "recordedAt": "2026-05-09T05:45:02Z"
     },
     {
-      "factID": "acf722c8-a5bf-5498-a8e2-d5d247b8ed2a",
+      "factID": "33f8540f-a6f1-53d0-a5d1-a6ca3d69e006",
       "payload": {
         "control": null,
         "kind": "play",
@@ -325,7 +301,7 @@
       "recordedAt": "2026-05-09T05:46:08Z"
     },
     {
-      "factID": "0ed771fe-7678-5bb0-b542-9c75a544b1ad",
+      "factID": "acf722c8-a5bf-5498-a8e2-d5d247b8ed2a",
       "payload": {
         "control": null,
         "kind": "play",
@@ -350,7 +326,7 @@
       "recordedAt": "2026-05-09T05:46:44Z"
     },
     {
-      "factID": "5bb0977b-180d-5f59-ac70-91a46b3bd4a6",
+      "factID": "0ed771fe-7678-5bb0-b542-9c75a544b1ad",
       "payload": {
         "control": null,
         "kind": "play",
@@ -375,7 +351,7 @@
       "recordedAt": "2026-05-09T05:46:46Z"
     },
     {
-      "factID": "b9323e13-b66a-5cca-b53e-88140925b1ba",
+      "factID": "5bb0977b-180d-5f59-ac70-91a46b3bd4a6",
       "payload": {
         "control": null,
         "kind": "play",
@@ -400,7 +376,7 @@
       "recordedAt": "2026-05-09T05:48:13Z"
     },
     {
-      "factID": "49a02a29-4f0e-5efc-9dbe-214ffac05c88",
+      "factID": "b9323e13-b66a-5cca-b53e-88140925b1ba",
       "payload": {
         "control": null,
         "kind": "play",
@@ -425,7 +401,7 @@
       "recordedAt": "2026-05-09T05:48:51Z"
     },
     {
-      "factID": "9b252b69-ef3f-5b73-910a-c8605b9fde74",
+      "factID": "49a02a29-4f0e-5efc-9dbe-214ffac05c88",
       "payload": {
         "control": null,
         "kind": "play",
@@ -450,7 +426,7 @@
       "recordedAt": "2026-05-09T05:48:54Z"
     },
     {
-      "factID": "6612871d-b97e-551e-a09e-a6266b3817be",
+      "factID": "9b252b69-ef3f-5b73-910a-c8605b9fde74",
       "payload": {
         "control": null,
         "kind": "play",
@@ -475,7 +451,7 @@
       "recordedAt": "2026-05-09T05:49:49Z"
     },
     {
-      "factID": "7d54afc9-6811-5a97-afc0-00173c2668ed",
+      "factID": "6612871d-b97e-551e-a09e-a6266b3817be",
       "payload": {
         "control": null,
         "kind": "play",
@@ -500,7 +476,7 @@
       "recordedAt": "2026-05-09T05:51:09Z"
     },
     {
-      "factID": "38b7a3ef-ad11-5365-bba4-ca6df4f5e632",
+      "factID": "7d54afc9-6811-5a97-afc0-00173c2668ed",
       "payload": {
         "control": null,
         "kind": "play",
@@ -525,7 +501,7 @@
       "recordedAt": "2026-05-09T05:52:20Z"
     },
     {
-      "factID": "68aa679c-0cfa-5465-b687-82adf6929828",
+      "factID": "38b7a3ef-ad11-5365-bba4-ca6df4f5e632",
       "payload": {
         "control": null,
         "kind": "play",
@@ -550,7 +526,7 @@
       "recordedAt": "2026-05-09T05:52:47Z"
     },
     {
-      "factID": "97c43729-087f-5a3e-a372-441beb7b55b0",
+      "factID": "68aa679c-0cfa-5465-b687-82adf6929828",
       "payload": {
         "control": null,
         "kind": "play",
@@ -575,7 +551,7 @@
       "recordedAt": "2026-05-09T05:53:47Z"
     },
     {
-      "factID": "150ffa2a-41c1-5853-98f5-ddfbc0ad05ad",
+      "factID": "97c43729-087f-5a3e-a372-441beb7b55b0",
       "payload": {
         "control": null,
         "kind": "play",
@@ -600,7 +576,7 @@
       "recordedAt": "2026-05-09T05:53:56Z"
     },
     {
-      "factID": "703a1e2e-0cb1-58b6-bacb-133957f93a91",
+      "factID": "150ffa2a-41c1-5853-98f5-ddfbc0ad05ad",
       "payload": {
         "control": null,
         "kind": "play",
@@ -625,7 +601,7 @@
       "recordedAt": "2026-05-09T05:54:34Z"
     },
     {
-      "factID": "92de02a7-a4ae-564c-8445-325240b698b5",
+      "factID": "703a1e2e-0cb1-58b6-bacb-133957f93a91",
       "payload": {
         "control": null,
         "kind": "play",
@@ -650,7 +626,7 @@
       "recordedAt": "2026-05-09T05:55:47Z"
     },
     {
-      "factID": "7e34b849-593a-5e67-adba-4934810b9d37",
+      "factID": "92de02a7-a4ae-564c-8445-325240b698b5",
       "payload": {
         "control": null,
         "kind": "play",
@@ -675,7 +651,7 @@
       "recordedAt": "2026-05-09T05:57:14Z"
     },
     {
-      "factID": "21aade00-e1e2-5723-880e-0d531fa38022",
+      "factID": "7e34b849-593a-5e67-adba-4934810b9d37",
       "payload": {
         "control": null,
         "kind": "play",
@@ -700,7 +676,7 @@
       "recordedAt": "2026-05-09T06:00:51Z"
     },
     {
-      "factID": "be45ad22-56e2-5c9c-b6e2-1642a870def9",
+      "factID": "21aade00-e1e2-5723-880e-0d531fa38022",
       "payload": {
         "control": null,
         "kind": "play",
@@ -725,7 +701,7 @@
       "recordedAt": "2026-05-09T06:01:49Z"
     },
     {
-      "factID": "a9a18301-8c11-5306-83a0-95a6870faabf",
+      "factID": "be45ad22-56e2-5c9c-b6e2-1642a870def9",
       "payload": {
         "control": null,
         "kind": "play",
@@ -750,7 +726,7 @@
       "recordedAt": "2026-05-09T06:02:25Z"
     },
     {
-      "factID": "fa937ddd-c948-5d4a-b2ac-2aee085062af",
+      "factID": "a9a18301-8c11-5306-83a0-95a6870faabf",
       "payload": {
         "control": null,
         "kind": "play",

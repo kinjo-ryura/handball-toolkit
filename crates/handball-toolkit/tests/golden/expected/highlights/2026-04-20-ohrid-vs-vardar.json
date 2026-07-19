@@ -10,186 +10,15 @@
         "canStartTimeout" : false
       },
       "timerState" : "beforeMatch"
-    },
-    {
-      "availableActions" : {
-        "canRecordFreeNote" : true,
-        "canRecordGoal" : true,
-        "canRecordShotMissed" : true,
-        "canResume" : false,
-        "canStartNextPhase" : false,
-        "canStartTimeout" : true
-      },
-      "currentMatchClockSeconds" : 0,
-      "currentPhaseIndex" : 0,
-      "currentPhaseKind" : "regular",
-      "timerState" : "playing",
-      "videoElapsedSeconds" : 0
-    },
-    {
-      "availableActions" : {
-        "canRecordFreeNote" : true,
-        "canRecordGoal" : true,
-        "canRecordShotMissed" : true,
-        "canResume" : false,
-        "canStartNextPhase" : false,
-        "canStartTimeout" : true
-      },
-      "currentMatchClockSeconds" : 4182,
-      "currentPhaseIndex" : 0,
-      "currentPhaseKind" : "regular",
-      "timerState" : "playing",
-      "videoElapsedSeconds" : 4182
-    },
-    {
-      "availableActions" : {
-        "canRecordFreeNote" : true,
-        "canRecordGoal" : true,
-        "canRecordShotMissed" : true,
-        "canResume" : false,
-        "canStartNextPhase" : false,
-        "canStartTimeout" : true
-      },
-      "currentMatchClockSeconds" : 8363.999999999998,
-      "currentPhaseIndex" : 0,
-      "currentPhaseKind" : "regular",
-      "timerState" : "playing",
-      "videoElapsedSeconds" : 8363.999999999998
-    },
-    {
-      "availableActions" : {
-        "canRecordFreeNote" : true,
-        "canRecordGoal" : false,
-        "canRecordShotMissed" : false,
-        "canResume" : false,
-        "canStartNextPhase" : true,
-        "canStartTimeout" : false
-      },
-      "timerState" : "ended",
-      "videoElapsedSeconds" : 8364
-    },
-    {
-      "availableActions" : {
-        "canRecordFreeNote" : true,
-        "canRecordGoal" : false,
-        "canRecordShotMissed" : false,
-        "canResume" : false,
-        "canStartNextPhase" : true,
-        "canStartTimeout" : false
-      },
-      "timerState" : "ended",
-      "videoElapsedSeconds" : 8365
     }
   ],
   "resolver" : {
     "phases" : [
-      {
-        "factID" : "92d0d37a-4811-5a63-81c7-4115b0f345a9",
-        "kind" : "regular",
-        "matchElapsedEnd" : 8364,
-        "matchElapsedStart" : 0,
-        "videoElapsedEnd" : 8364,
-        "videoElapsedStart" : 0
-      }
+
     ],
     "segments" : [
-      {
-        "endFactID" : "92d0d37a-4811-5a63-81c7-4115b0f345a9",
-        "kind" : "running",
-        "matchElapsedEnd" : 8364,
-        "matchElapsedStart" : 0,
-        "phaseKind" : "regular",
-        "startFactID" : "92d0d37a-4811-5a63-81c7-4115b0f345a9",
-        "videoElapsedEnd" : 8364,
-        "videoElapsedStart" : 0
-      }
+
     ]
-  },
-  "scoreProgression" : {
-    "maxAbsDiff" : 5,
-    "phaseSpans" : [
-      {
-        "endSeconds" : 8364,
-        "phaseFactID" : "92d0d37a-4811-5a63-81c7-4115b0f345a9",
-        "regularIndex" : 0,
-        "startSeconds" : 0
-      }
-    ],
-    "points" : [
-      {
-        "awayScore" : 0,
-        "cumulativeSeconds" : 0,
-        "diff" : 0,
-        "homeScore" : 0
-      },
-      {
-        "awayScore" : 0,
-        "cumulativeSeconds" : 2460.071703264233,
-        "diff" : 0,
-        "homeScore" : 0
-      },
-      {
-        "awayScore" : 0,
-        "cumulativeSeconds" : 2460.071703264233,
-        "diff" : -1,
-        "homeScore" : 1
-      },
-      {
-        "awayScore" : 0,
-        "cumulativeSeconds" : 3121.0321740762943,
-        "diff" : -1,
-        "homeScore" : 1
-      },
-      {
-        "awayScore" : 0,
-        "cumulativeSeconds" : 3121.0321740762943,
-        "diff" : -2,
-        "homeScore" : 2
-      },
-      {
-        "awayScore" : 0,
-        "cumulativeSeconds" : 4915.622092310363,
-        "diff" : -2,
-        "homeScore" : 2
-      },
-      {
-        "awayScore" : 0,
-        "cumulativeSeconds" : 4915.622092310363,
-        "diff" : -3,
-        "homeScore" : 3
-      },
-      {
-        "awayScore" : 0,
-        "cumulativeSeconds" : 5273.623042716654,
-        "diff" : -3,
-        "homeScore" : 3
-      },
-      {
-        "awayScore" : 0,
-        "cumulativeSeconds" : 5273.623042716654,
-        "diff" : -4,
-        "homeScore" : 4
-      },
-      {
-        "awayScore" : 0,
-        "cumulativeSeconds" : 6567.656353874219,
-        "diff" : -4,
-        "homeScore" : 4
-      },
-      {
-        "awayScore" : 0,
-        "cumulativeSeconds" : 6567.656353874219,
-        "diff" : -5,
-        "homeScore" : 5
-      },
-      {
-        "awayScore" : 0,
-        "cumulativeSeconds" : 8364,
-        "diff" : -5,
-        "homeScore" : 5
-      }
-    ],
-    "totalSeconds" : 8364
   },
   "summary" : {
     "awayScore" : 0,
@@ -208,18 +37,7 @@
       "teamKey" : "home"
     },
     "phaseSummaries" : [
-      {
-        "awayAttempts" : 0,
-        "awayGoals" : 0,
-        "awayShotMisses" : 0,
-        "homeAttempts" : 6,
-        "homeGoals" : 5,
-        "homeRate" : 0.8333333333333334,
-        "homeShotMisses" : 1,
-        "kind" : "regular",
-        "phaseFactID" : "92d0d37a-4811-5a63-81c7-4115b0f345a9",
-        "regularIndex" : 0
-      }
+
     ],
     "playerStats" : [
       {
@@ -233,108 +51,83 @@
   },
   "timeline" : [
     {
-      "factID" : "92d0d37a-4811-5a63-81c7-4115b0f345a9",
-      "resolvedMatchClock" : 0,
-      "resolvedVideoClock" : 0
-    },
-    {
-      "factID" : "60b94c05-38c4-5d10-b863-cd2eda32e083",
-      "resolvedMatchClock" : 2460.071703264233,
+      "factID" : "d0d70ae8-4709-581e-af57-78c6d61c0ec5",
       "resolvedVideoClock" : 2460.071703264233
     },
     {
-      "factID" : "f8455ed0-8084-511b-8770-040076d71e3b",
-      "resolvedMatchClock" : 2538,
+      "factID" : "60b94c05-38c4-5d10-b863-cd2eda32e083",
       "resolvedVideoClock" : 2538
     },
     {
-      "factID" : "b4db9e94-67f8-5436-b2d5-261a6e08cb52",
-      "resolvedMatchClock" : 2712.0408979717845,
+      "factID" : "f8455ed0-8084-511b-8770-040076d71e3b",
       "resolvedVideoClock" : 2712.0408979717845
     },
     {
-      "factID" : "5abf71b6-7742-5dfc-8a92-54427a16454f",
-      "resolvedMatchClock" : 3121.0321740762943,
+      "factID" : "b4db9e94-67f8-5436-b2d5-261a6e08cb52",
       "resolvedVideoClock" : 3121.0321740762943
     },
     {
-      "factID" : "35af77a6-ec8e-5e9a-b75b-b668184edf06",
-      "resolvedMatchClock" : 4256,
+      "factID" : "5abf71b6-7742-5dfc-8a92-54427a16454f",
       "resolvedVideoClock" : 4256
     },
     {
-      "factID" : "433b2bbd-fd3b-5128-97b5-5dffe1cb73c3",
-      "resolvedMatchClock" : 4915.622092310363,
+      "factID" : "35af77a6-ec8e-5e9a-b75b-b668184edf06",
       "resolvedVideoClock" : 4915.622092310363
     },
     {
-      "factID" : "9ca24644-fddd-5c59-a5cb-b61217f43098",
-      "resolvedMatchClock" : 5056,
+      "factID" : "433b2bbd-fd3b-5128-97b5-5dffe1cb73c3",
       "resolvedVideoClock" : 5056
     },
     {
-      "factID" : "218e73d1-1990-55aa-998b-2ba8aa97b435",
-      "resolvedMatchClock" : 5127.133673290278,
+      "factID" : "9ca24644-fddd-5c59-a5cb-b61217f43098",
       "resolvedVideoClock" : 5127.133673290278
     },
     {
-      "factID" : "7f78d5c8-0abf-56bb-a4d4-aae75b3adae3",
-      "resolvedMatchClock" : 5273.623042716654,
+      "factID" : "218e73d1-1990-55aa-998b-2ba8aa97b435",
       "resolvedVideoClock" : 5273.623042716654
     },
     {
-      "factID" : "218cdc6f-12f5-5063-9818-b140a0745551",
-      "resolvedMatchClock" : 5356,
+      "factID" : "7f78d5c8-0abf-56bb-a4d4-aae75b3adae3",
       "resolvedVideoClock" : 5356
     },
     {
-      "factID" : "e84d3a23-7b10-50ad-a12a-41b65036c21e",
-      "resolvedMatchClock" : 5882,
+      "factID" : "218cdc6f-12f5-5063-9818-b140a0745551",
       "resolvedVideoClock" : 5882
     },
     {
-      "factID" : "d01da0eb-f6da-5ebb-bc09-da1a7a74b496",
-      "resolvedMatchClock" : 6127.511479933231,
+      "factID" : "e84d3a23-7b10-50ad-a12a-41b65036c21e",
       "resolvedVideoClock" : 6127.511479933231
     },
     {
-      "factID" : "b73d43b6-5c29-5128-b4cd-2d271267c63f",
-      "resolvedMatchClock" : 6156,
+      "factID" : "d01da0eb-f6da-5ebb-bc09-da1a7a74b496",
       "resolvedVideoClock" : 6156
     },
     {
-      "factID" : "9a07ddce-3ae6-59e7-9a86-9aea2f6e66ce",
-      "resolvedMatchClock" : 6237.494287276793,
+      "factID" : "b73d43b6-5c29-5128-b4cd-2d271267c63f",
       "resolvedVideoClock" : 6237.494287276793
     },
     {
-      "factID" : "61915c55-f3ba-5ee7-ab9b-0f27ce0c8292",
-      "resolvedMatchClock" : 6511,
+      "factID" : "9a07ddce-3ae6-59e7-9a86-9aea2f6e66ce",
       "resolvedVideoClock" : 6511
     },
     {
-      "factID" : "d5ab4389-0e7b-5287-a046-e127af238f6d",
-      "resolvedMatchClock" : 6567.656353874219,
+      "factID" : "61915c55-f3ba-5ee7-ab9b-0f27ce0c8292",
       "resolvedVideoClock" : 6567.656353874219
     },
     {
-      "factID" : "bb25612c-ac15-5fac-9277-85bb89ad5a73",
-      "resolvedMatchClock" : 6738.243385648619,
+      "factID" : "d5ab4389-0e7b-5287-a046-e127af238f6d",
       "resolvedVideoClock" : 6738.243385648619
     },
     {
-      "factID" : "39471c36-ffba-5e2a-908d-bd2419731aff",
-      "resolvedMatchClock" : 6770.722731646869,
+      "factID" : "bb25612c-ac15-5fac-9277-85bb89ad5a73",
       "resolvedVideoClock" : 6770.722731646869
     },
     {
-      "factID" : "9d865539-891c-5b6b-98c1-377cca2051a9",
-      "resolvedMatchClock" : 6883.4900004981055,
+      "factID" : "39471c36-ffba-5e2a-908d-bd2419731aff",
       "resolvedVideoClock" : 6883.4900004981055
     },
     {
-      "factID" : "c7f2b422-bcfb-5911-bfc2-d7ad874e444e",
-      "resolvedMatchClock" : 7035,
+      "factID" : "9d865539-891c-5b6b-98c1-377cca2051a9",
       "resolvedVideoClock" : 7035
     }
   ]

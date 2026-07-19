@@ -1,31 +1,7 @@
 {
   "facts": [
     {
-      "factID": "b3cbf6c3-0773-5d41-b4c0-42f993712127",
-      "payload": {
-        "control": {
-          "anchor": {
-            "endMatchElapsedSeconds": null,
-            "endVideoElapsedSeconds": 5821.0,
-            "kind": "videoClock",
-            "matchClock": null,
-            "videoClock": {
-              "elapsedSeconds": 0.0
-            }
-          },
-          "kind": "phaseStart",
-          "phaseStart": {
-            "kind": "regular"
-          },
-          "stoppage": null
-        },
-        "kind": "control",
-        "play": null
-      },
-      "recordedAt": "2026-05-05T09:30:35Z"
-    },
-    {
-      "factID": "f9055216-2db4-5354-8005-cc077275f6d7",
+      "factID": "77704d82-095b-58f5-8230-4658ff2a8764",
       "payload": {
         "control": null,
         "kind": "play",

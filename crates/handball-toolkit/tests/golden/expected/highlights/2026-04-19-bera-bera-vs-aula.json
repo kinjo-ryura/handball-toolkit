@@ -10,138 +10,15 @@
         "canStartTimeout" : false
       },
       "timerState" : "beforeMatch"
-    },
-    {
-      "availableActions" : {
-        "canRecordFreeNote" : true,
-        "canRecordGoal" : true,
-        "canRecordShotMissed" : true,
-        "canResume" : false,
-        "canStartNextPhase" : false,
-        "canStartTimeout" : true
-      },
-      "currentMatchClockSeconds" : 0,
-      "currentPhaseIndex" : 0,
-      "currentPhaseKind" : "regular",
-      "timerState" : "playing",
-      "videoElapsedSeconds" : 0
-    },
-    {
-      "availableActions" : {
-        "canRecordFreeNote" : true,
-        "canRecordGoal" : true,
-        "canRecordShotMissed" : true,
-        "canResume" : false,
-        "canStartNextPhase" : false,
-        "canStartTimeout" : true
-      },
-      "currentMatchClockSeconds" : 2910.5,
-      "currentPhaseIndex" : 0,
-      "currentPhaseKind" : "regular",
-      "timerState" : "playing",
-      "videoElapsedSeconds" : 2910.5
-    },
-    {
-      "availableActions" : {
-        "canRecordFreeNote" : true,
-        "canRecordGoal" : true,
-        "canRecordShotMissed" : true,
-        "canResume" : false,
-        "canStartNextPhase" : false,
-        "canStartTimeout" : true
-      },
-      "currentMatchClockSeconds" : 5820.999999999999,
-      "currentPhaseIndex" : 0,
-      "currentPhaseKind" : "regular",
-      "timerState" : "playing",
-      "videoElapsedSeconds" : 5820.999999999999
-    },
-    {
-      "availableActions" : {
-        "canRecordFreeNote" : true,
-        "canRecordGoal" : false,
-        "canRecordShotMissed" : false,
-        "canResume" : false,
-        "canStartNextPhase" : true,
-        "canStartTimeout" : false
-      },
-      "timerState" : "ended",
-      "videoElapsedSeconds" : 5821
-    },
-    {
-      "availableActions" : {
-        "canRecordFreeNote" : true,
-        "canRecordGoal" : false,
-        "canRecordShotMissed" : false,
-        "canResume" : false,
-        "canStartNextPhase" : true,
-        "canStartTimeout" : false
-      },
-      "timerState" : "ended",
-      "videoElapsedSeconds" : 5822
     }
   ],
   "resolver" : {
     "phases" : [
-      {
-        "factID" : "b3cbf6c3-0773-5d41-b4c0-42f993712127",
-        "kind" : "regular",
-        "matchElapsedEnd" : 5821,
-        "matchElapsedStart" : 0,
-        "videoElapsedEnd" : 5821,
-        "videoElapsedStart" : 0
-      }
+
     ],
     "segments" : [
-      {
-        "endFactID" : "b3cbf6c3-0773-5d41-b4c0-42f993712127",
-        "kind" : "running",
-        "matchElapsedEnd" : 5821,
-        "matchElapsedStart" : 0,
-        "phaseKind" : "regular",
-        "startFactID" : "b3cbf6c3-0773-5d41-b4c0-42f993712127",
-        "videoElapsedEnd" : 5821,
-        "videoElapsedStart" : 0
-      }
+
     ]
-  },
-  "scoreProgression" : {
-    "maxAbsDiff" : 1,
-    "phaseSpans" : [
-      {
-        "endSeconds" : 5821,
-        "phaseFactID" : "b3cbf6c3-0773-5d41-b4c0-42f993712127",
-        "regularIndex" : 0,
-        "startSeconds" : 0
-      }
-    ],
-    "points" : [
-      {
-        "awayScore" : 0,
-        "cumulativeSeconds" : 0,
-        "diff" : 0,
-        "homeScore" : 0
-      },
-      {
-        "awayScore" : 0,
-        "cumulativeSeconds" : 4264.884848278387,
-        "diff" : 0,
-        "homeScore" : 0
-      },
-      {
-        "awayScore" : 0,
-        "cumulativeSeconds" : 4264.884848278387,
-        "diff" : -1,
-        "homeScore" : 1
-      },
-      {
-        "awayScore" : 0,
-        "cumulativeSeconds" : 5821,
-        "diff" : -1,
-        "homeScore" : 1
-      }
-    ],
-    "totalSeconds" : 5821
   },
   "summary" : {
     "awayScore" : 0,
@@ -160,18 +37,7 @@
       "teamKey" : "home"
     },
     "phaseSummaries" : [
-      {
-        "awayAttempts" : 0,
-        "awayGoals" : 0,
-        "awayShotMisses" : 0,
-        "homeAttempts" : 1,
-        "homeGoals" : 1,
-        "homeRate" : 1,
-        "homeShotMisses" : 0,
-        "kind" : "regular",
-        "phaseFactID" : "b3cbf6c3-0773-5d41-b4c0-42f993712127",
-        "regularIndex" : 0
-      }
+
     ],
     "playerStats" : [
       {
@@ -185,13 +51,7 @@
   },
   "timeline" : [
     {
-      "factID" : "b3cbf6c3-0773-5d41-b4c0-42f993712127",
-      "resolvedMatchClock" : 0,
-      "resolvedVideoClock" : 0
-    },
-    {
-      "factID" : "f9055216-2db4-5354-8005-cc077275f6d7",
-      "resolvedMatchClock" : 4264.884848278387,
+      "factID" : "77704d82-095b-58f5-8230-4658ff2a8764",
       "resolvedVideoClock" : 4264.884848278387
     }
   ]
