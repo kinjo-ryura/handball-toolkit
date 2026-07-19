@@ -12,3 +12,4 @@
 
 // staticlib にコアの uniffi scaffolding（メタデータ・extern "C" 関数）を含めるための再エクスポート。
 pub use handball_toolkit::ffi_api;
+pub use handball_toolkit::ffi_write;

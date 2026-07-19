@@ -28,14 +28,14 @@ let match = Match(
     isHomeOnLeft: true
 )
 
-func playFact(kind: PlayEventKind, team: UUID, videoSeconds: Double) -> MatchFact {
+func playFact(kind: PlayEventKind, team: UUID, videoSeconds: Double, player: UUID? = nil) -> MatchFact {
     MatchFact(
         id: UUID(),
         recordedAt: Date(),
         payload: .play(PlayFact(
             kind: kind,
             teamId: team,
-            playerId: nil,
+            playerId: player,
             relatedPlayerId: nil,
             anchor: .videoClock(VideoClock(elapsedSeconds: videoSeconds)),
             title: nil,
@@ -175,8 +175,91 @@ do {
     check("不正 JSON は SampleDtoError (実際: \(error))", false)
 }
 
+// 9) write orchestration（発火層 — ADR 0005 実装順序 1）:
+//    Swift 実装の repository（foreign trait）を Rust の write 入口が await する async 往復の
+//    ランタイム検証。合格時のみ発火・ValidationFailed の写像・未知エラーの Repository 畳み込み
+//    （From<UnexpectedUniFFICallbackError> — panic=abort でのクラッシュ防止線）を確認する。
+print("\n== write orchestration ==")
+
+struct PlainSwiftError: Error {}
+
+final class MemoryWriteRepository: MatchWriteRepository, @unchecked Sendable {
+    // smoke 用の素朴 in-memory fake。並行アクセスは無い前提（実アプリの adapter は
+    // SwiftData の fresh ModelContext 方式で Sendable を担保する）。
+    var storedMatch: Match
+    var storedFacts: [MatchFact]
+    var throwUnexpectedOnAppend = false
+
+    init(match: Match, facts: [MatchFact]) {
+        storedMatch = match
+        storedFacts = facts
+    }
+
+    func loadMatch(matchId: UUID) async throws -> Match { storedMatch }
+    func loadFactLog(matchId: UUID) async throws -> [MatchFact] { storedFacts }
+    func loadRosterPlayers(homeTeamId: UUID, awayTeamId: UUID) async throws -> [PlayerTeamRef] { [] }
+    func saveMatch(match: Match) async throws { storedMatch = match }
+    func deleteMatch(matchId: UUID) async throws {}
+    func appendFact(matchId: UUID, fact: MatchFact) async throws {
+        if throwUnexpectedOnAppend { throw PlainSwiftError() }
+        storedFacts.append(fact)
+    }
+    func updateFact(matchId: UUID, fact: MatchFact) async throws {
+        if let index = storedFacts.firstIndex(where: { $0.id == fact.id }) {
+            storedFacts[index] = fact
+        }
+    }
+    func deleteFact(matchId: UUID, factId: UUID) async throws {
+        storedFacts.removeAll { $0.id == factId }
+    }
+}
+
+let writeRepo = MemoryWriteRepository(match: match, facts: facts)
+
+// 合格 append: Rust が Swift 実装を await して読む → 検証 → 発火の一巡が完了する
+// （Goal kind は player 必須。roster 0 件のため参照整合は skip される — 後方互換ルール）
+do {
+    try await recordAppendFact(repo: writeRepo, matchId: match.id, fact: playFact(kind: .goal, team: homeTeam, videoSeconds: 60, player: UUID()))
+    check("合格 append は発火する（3 → 4 件）", writeRepo.storedFacts.count == 4)
+} catch {
+    check("合格 append で例外なし (実際: \(error))", false)
+}
+
+// validation 違反: 発火せず ValidationFailed が Swift throws に写る
+do {
+    try await recordAppendFact(repo: writeRepo, matchId: match.id, fact: playFact(kind: .goal, team: homeTeam, videoSeconds: -1))
+    check("違反 append は throw", false)
+} catch CoreWriteError.ValidationFailed(let issues) {
+    check("違反は ValidationFailed（negativeVideoClock）", issues.contains(.fact(FactValidationError.negativeVideoClock)))
+    check("違反時は発火しない（4 件のまま）", writeRepo.storedFacts.count == 4)
+} catch {
+    check("違反は CoreWriteError.ValidationFailed (実際: \(error))", false)
+}
+
+// Swift 実装が CoreWriteError 以外を投げても Repository へ畳まれて返る（クラッシュしない）
+writeRepo.throwUnexpectedOnAppend = true
+do {
+    try await recordAppendFact(repo: writeRepo, matchId: match.id, fact: playFact(kind: .goal, team: homeTeam, videoSeconds: 62, player: UUID()))
+    check("未知エラーは throw", false)
+} catch CoreWriteError.Repository {
+    check("未知エラーは Repository へ畳まれる", true)
+} catch {
+    check("未知エラーは CoreWriteError.Repository (実際: \(error))", false)
+}
+writeRepo.throwUnexpectedOnAppend = false
+
+// delete 往復: play を内包する phaseStart の削除は whole-log 検証で拒否される
+do {
+    try await recordDeleteFact(repo: writeRepo, matchId: match.id, factId: facts[0].id)
+    check("内包 play ありの phaseStart 削除は throw", false)
+} catch CoreWriteError.ValidationFailed {
+    check("phaseStart 削除は ValidationFailed", true)
+} catch {
+    check("phaseStart 削除は ValidationFailed (実際: \(error))", false)
+}
+
 if failures > 0 {
     print("\nNG: \(failures) 件失敗")
     exit(1)
 }
-print("\n本境界 smoke 完了: 生成型 → projection / validator / object ハンドル / sample_dto の一巡を確認")
+print("\n本境界 smoke 完了: 生成型 → projection / validator / object ハンドル / sample_dto / write orchestration の一巡を確認")

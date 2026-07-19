@@ -48,7 +48,7 @@ XCFramework は ios / ios-sim / macos の 3 スライス構成（HandballRecorde
 
 ### 設計不変条件（コアに入れてよいもの / いけないもの）
 
-1. **stateless 純粋関数コア** — 公開 API はすべて「fact 列 in → 導出結果 out」。状態を所有しない。fact ログの永続化は各 OS ネイティブ、UI 状態はシェル側。コアに状態を持たせる拡張（Store ロジックの昇格など）は移植完了後に別途判断であり、このリポの現フェーズではやらない
+1. **状態を所有しない stateless コア** — コアは DB ハンドル・保存実体・UI 状態を所有しない。判断・計画（何をどの順に保存すべきか）は「fact 列 in → 導出結果 out」の純粋関数として置く。ただし**永続化の発火 orchestration**（注入された repository を await する薄い export 関数）は feature `uniffi` 配下の境界層として持てる（ADR 0005）。repository を保持する long-lived object は作らない
 2. **決定性** — `now()` / UUID 生成をコアに置かない。timestamp / ID はシェルが発行して fact に載せて渡す（ゴールデンテストの安定と wasm 対応のため）
 3. **エラーは構造化** — エラーコード + パラメータのみを返す。日本語等のユーザー向け文言をコアに焼き込まない（文言は各シェルが持つ）。移植元の `DomainValidationMessage` をそのまま写さないこと — ここは意図的な再設計ポイント
 4. **境界は粗い粒度** — FFI / JNI / wasm 越えを前提に、細かい getter の応酬ではなく「fact 列 in → projection out」の同期バッチ形状を保つ
