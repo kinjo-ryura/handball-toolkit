@@ -1,11 +1,13 @@
 # 移植作業ガイド — RecorderDomain → Rust
 
-> **状態（2026-07-19）: 移植完走。** P0〜P8 完了（移植テスト 140/140 green・パリティ bit-exact 公開 8 + ローカル 2 件）、P9 は全項目見送りを判断済み（下記トリガー参照）。handball-project#49 の UniFFI PoC も完了（2026-07-15。`crates/handball-toolkit-ffi/` + `scripts/build_xcframework.sh` + `scripts/ios_poc/`）。Issue 側の残り: #52 / #53 / #57〜#59（#54 / #55 は完了）。以降の toolkit 変更は通常の開発フローで行う。
+> **状態: 移植完走（2026-07-19）。本ファイルは完了した移植作業の記録であり、現在地の管理台帳ではない。** P0〜P8 完了（移植テスト 140/140 green・パリティ bit-exact 一致）、P9 は全項目見送りを判断済み（下記トリガー参照）。
+>
+> **完走後の設計変更はここで追跡していない。** iOS シェル向けの FFI 本境界は [ADR 0004](adr/0004-ios-full-boundary.md)、保存・更新発火のコア移管は [ADR 0005](adr/0005-core-write-orchestration.md)（各 ADR の「実装追記」が進捗を持つ）。2026-07-15 の UniFFI PoC 境界（JSON in → JSON out）は ADR 0004 で廃止済み。**進行中・未着手の作業は GitHub Issues が正**（完走時点の残りのうち #52 / #54 / #55 / #58 は完了、#53 / #57 / #59 は open）。
 
 セッションをまたいで移植を進めるための「現在地と次の一手」のファイル。**各セッションの冒頭でこれを読み、進捗があったらチェックを更新する**。設計判断の正典は `docs/adr/`（このファイルには理由を書かない）。
 
 - 背景・経緯: handball-project#49 / `handball-project/docs/research/handballrecorder-rust-core.md`
-- 設計: [ADR 0001](adr/0001-boundary-api.md)（境界 API 目録）/ [ADR 0002](adr/0002-error-model.md)（エラー体系）/ [ADR 0003](adr/0003-parity-verification.md)（パリティ検証）— すべて accepted（2026-07-12）
+- 設計: [ADR 0001](adr/0001-boundary-api.md)（境界 API 目録）/ [ADR 0002](adr/0002-error-model.md)（エラー体系）/ [ADR 0003](adr/0003-parity-verification.md)（パリティ検証）— すべて accepted（2026-07-12）。完走後に [ADR 0004](adr/0004-ios-full-boundary.md)（FFI 本境界）/ [ADR 0005](adr/0005-core-write-orchestration.md)（write orchestration）が accepted（2026-07-18）
 - 移植元（真実の仕様）: `../HandballRecorder/Packages/RecorderDomain/`（sibling submodule）。挙動に迷ったら Swift 実装とそのテストを読む。**「改善」しない**
 
 ## 作業規律
@@ -50,13 +52,13 @@
 - [x] P5 validators（fact / fact_log / match_write / configuration / match の 5 種。2026-07-12）
 - [x] P6 `sample_dto` モジュール（SAMPLE_DTO_V2 準拠の serde 型 + converter。依存は domain への一方通行厳守 — ADR 0003。ID 供給はシェル注入・変換結果に逆写像同梱 — ADR 0003 §2 追記。2026-07-12）
 - [x] P7 オラクル dump ツール（HandballRecorder の `parity/oracle-dump` ブランチ。main へ merge しない — 上記「オラクル側の運用」）+ `tests/golden/` 整備 — ADR 0003（2026-07-12。公開 8 件の golden 生成済み。出所・正規化規約・再生成手順は `crates/handball-toolkit/tests/golden/README.md`）
-- [x] P8 パリティ検証完走（公開 8 件 + ローカル `.timer` 2 件 × 5 系統 bit-exact 一致、移植テスト 140 件 green — 分母補正は下記。2026-07-12）
+- [x] P8 パリティ検証完走（完走時点で公開 8 件 + ローカル `.timer` 2 件 × 5 系統 bit-exact 一致、移植テスト 140 件 green — 分母補正は下記。2026-07-12）。**現在のコーパス件数は `tests/golden_parity_tests.rs` の assert が正**（列挙漏れ検知を兼ねる。ローカル分は gitignore なので手元の `tests/golden/local/` を見る）
   - ハーネス: `tests/golden_parity_tests.rs`。**serde_json の `float_roundtrip` feature 必須**（ADR 0003 §5 追記）
   - ローカル `.timer` は pdf-matches（当時は旧 V2 形式）を一時スクリプトで移行して使用（ADR 0003 §1 追記）。その後 importer の現行スキーマ化（handball-project#54、2026-07-15）で移行は不要になり、スクリプトは削除済み（handball-project#55、2026-07-19）
   - オラクル側の後始末実施済み: `parity/oracle-dump` 先端に tag `oracle-dump-final` を打ちブランチ削除（push は手動: `git push origin oracle-dump-final`）
 - [x] P9 完走後の判断（2026-07-12 実施 — **全項目見送り**。トリガー到来時に再判断）
   - OSS 公開判断: 見送り。リポは private のまま。トリガー: 公開意思が固まったとき（README 英語化・ライセンス選定とセットで実施）
-  - ID の newtype 化: 見送り（handball-project#52 で管理）。依存（#49 パリティ完走）は解消済みでいつでも着手可
+  - ID の newtype 化: 見送り（handball-project#52 で管理）→ **2026-07-19 に実施済み**（ADR 0001 の追記を参照）
   - `.timer` 公開サンプル追加: 見送り（handball-project#53）。importer 現行スキーマ化（handball-project#54）の後に正規生成で進める
   - 境界拡張候補: 見送り（ADR 0001「将来の境界拡張候補」どおり）。トリガー: Android シェル実装時
 

@@ -16,8 +16,10 @@
 ```
 crates/
   handball-toolkit/       — コア crate（facts / clocks / configuration / entities / validators / projections）
+                            feature `uniffi`（default off）でドメイン全型の UniFFI 公開が有効になる（ADR 0004）
   handball-toolkit-cli/   — sample-matches 配信 JSON の検証 CLI（handball-project#58）
-  handball-toolkit-ffi/   — UniFFI バインディング層（JSON in → JSON out の粗い境界 + uniffi-bindgen CLI）
+  handball-toolkit-ffi/   — FFI パッケージング crate（staticlib 化 + uniffi-bindgen CLI）
+                            型・関数の公開面はコア crate の namespace に集約する（ADR 0004）
 ```
 
 将来の拡張候補（必要になってから追加）: wasm バインディング、Kotlin バインディング。
@@ -61,4 +63,4 @@ direnv を使わない場合は `nix develop` で同じシェルに入れる。�
 
 ## ステータス
 
-開発初期（private）。OSS 公開はパリティ検証の完走後に判断し、その際に README の英語化とライセンス選定（MIT / Apache-2.0 デュアル想定）を行う。
+private。パリティ検証は完走済みで、iOS シェル（HandballRecorder）は本コアで動いている。OSS 公開は完走時点の判断で見送り（`docs/PORTING.md` P9）。公開意思が固まった時点で README の英語化とライセンス選定（MIT / Apache-2.0 デュアル想定）とセットで再判断する。
