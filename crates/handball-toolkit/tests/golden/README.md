@@ -10,8 +10,8 @@ Rust 実装の出力が `expected/` と一致することをパリティテス�
 |---|---|
 | オラクル（RecorderDomain） | HandballRecorder **main** `b7cf57e861a9100ee3f721c8c477e2aae062c3f8` |
 | dump ツール | HandballRecorder `parity/oracle-dump` ブランチの `recorder-domain-dump`（Package: `Packages/RecorderDomain`。ブランチ削除後は tag `oracle-dump-final`） |
-| 入力コーパス | handball-sample-matches `439e650bcbde82636b66efe8d9a9aa942149f11e`（`v2/matches/` 2 件 + `v2/highlights/` 6 件） |
-| 生成日 | 2026-07-20（highlights のみ再生成 — handball-project#71 で入力から R6 違反の phaseStart を除去。matches は 2026-07-12 生成のまま） |
+| 入力コーパス | handball-sample-matches `6a8e71388f851edb7fa4029a3d35c4c4396ae926`（`v2/matches/` 4 件 = `.video` 2 + `.timer` 2、`v2/highlights/` 6 件） |
+| 生成日 | 2026-07-20（`.timer` 2 件を追加 — handball-project#53。期待値は昇格前に `local/` で生成済みのものを、入力 byte 一致のまま流用したので再 dump していない。highlights は #71 で再生成、`.video` matches は 2026-07-12 生成のまま） |
 
 - 出所ハッシュは **main のコミット**を記録する（`parity/oracle-dump` はパリティ完走後に削除されるため。
   ブランチの不変条件「RecorderDomain ソース不変」により、オラクルの中身 = main の RecorderDomain）
@@ -55,15 +55,20 @@ swift run recorder-domain-dump --out <出力先>/highlights <handball-sample-mat
 
 ```
 inputs/
-  matches/     — フル試合（.video）2 件: 実 JHL 試合
+  matches/     — フル試合 4 件: `.video` 2 件（実 JHL 試合を動画から手記録）
+                 + `.timer` 2 件（JHA 公式ランニングスコア PDF 由来）
   highlights/  — ハイライト（.videoHighlight）6 件
 expected/
   matches/     — 対応する期待出力
   highlights/  — 対応する期待出力
 ```
 
-ローカル `.timer` コーパス（handball-sample-matches の gitignore 済み `pdf-matches/`）は
-コミットしない（ADR 0003 §1 — ローカル実行専用の拡張コーパス）。
+`.timer` 2 件は handball-project#53 で公開コーパスへ昇格した。同一試合の `.video` 版と
+背番号別の得点内訳が全選手一致することを確認済み（手記録と公式 PDF という独立 2 経路の突き合わせ）。
+これにより ADR 0003 §1 が挙げていた「公開コーパスに `.timer` 試合が無い」gap は解消し、
+standalone clone でも 3 モードすべてのパリティ検証が再現できる。
+
+未昇格の `.timer`（JHL 由来など）は引き続き `local/` に置きコミットしない（ADR 0003 §1）。
 
 ## ローカル `.timer` コーパス（`local/` — gitignore 済み）
 

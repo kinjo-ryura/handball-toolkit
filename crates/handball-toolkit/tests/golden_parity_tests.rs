@@ -561,11 +561,11 @@ fn golden_root() -> PathBuf {
 
 // ── テスト ──
 
-/// 公開コーパス 8 件（matches 2 + highlights 6）の 5 系統 bit-exact 照合。
+/// 公開コーパス 10 件（matches 4 = .video 2 + .timer 2、highlights 6）の 5 系統 bit-exact 照合。
 #[test]
 fn public_corpus_matches_oracle() {
     let verified = verify_corpus_dir(&golden_root());
-    assert_eq!(verified, 8, "公開コーパスは 8 件のはず（列挙漏れ検知）");
+    assert_eq!(verified, 10, "公開コーパスは 10 件のはず（列挙漏れ検知）");
 }
 
 /// ローカル `.timer` コーパス（tests/golden/local/ — gitignore 済み）の照合。

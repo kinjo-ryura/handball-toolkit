@@ -1,0 +1,1382 @@
+{
+  "liveSamples" : [
+    {
+      "availableActions" : {
+        "canRecordFreeNote" : false,
+        "canRecordGoal" : false,
+        "canRecordShotMissed" : false,
+        "canResume" : false,
+        "canStartNextPhase" : true,
+        "canStartTimeout" : false
+      },
+      "timerState" : "beforeMatch"
+    }
+  ],
+  "resolver" : {
+    "phases" : [
+      {
+        "factID" : "939ab43a-d20c-54f5-b721-d360ba780d92",
+        "kind" : "regular",
+        "matchElapsedEnd" : 1800,
+        "matchElapsedStart" : 0
+      },
+      {
+        "factID" : "f20b5e53-2439-54c2-a158-f479b44b2e51",
+        "kind" : "regular",
+        "matchElapsedEnd" : 3600,
+        "matchElapsedStart" : 1800
+      }
+    ],
+    "segments" : [
+      {
+        "endFactID" : "939ab43a-d20c-54f5-b721-d360ba780d92",
+        "kind" : "running",
+        "matchElapsedEnd" : 1800,
+        "matchElapsedStart" : 0,
+        "phaseKind" : "regular",
+        "startFactID" : "939ab43a-d20c-54f5-b721-d360ba780d92"
+      },
+      {
+        "endFactID" : "f20b5e53-2439-54c2-a158-f479b44b2e51",
+        "kind" : "running",
+        "matchElapsedEnd" : 3600,
+        "matchElapsedStart" : 1800,
+        "phaseKind" : "regular",
+        "startFactID" : "f20b5e53-2439-54c2-a158-f479b44b2e51"
+      }
+    ]
+  },
+  "scoreProgression" : {
+    "maxAbsDiff" : 4,
+    "phaseSpans" : [
+      {
+        "endSeconds" : 1800,
+        "phaseFactID" : "939ab43a-d20c-54f5-b721-d360ba780d92",
+        "regularIndex" : 0,
+        "startSeconds" : 0
+      },
+      {
+        "endSeconds" : 3600,
+        "phaseFactID" : "f20b5e53-2439-54c2-a158-f479b44b2e51",
+        "regularIndex" : 1,
+        "startSeconds" : 1800
+      }
+    ],
+    "points" : [
+      {
+        "awayScore" : 0,
+        "cumulativeSeconds" : 0,
+        "diff" : 0,
+        "homeScore" : 0
+      },
+      {
+        "awayScore" : 0,
+        "cumulativeSeconds" : 48,
+        "diff" : 0,
+        "homeScore" : 0
+      },
+      {
+        "awayScore" : 0,
+        "cumulativeSeconds" : 48,
+        "diff" : -1,
+        "homeScore" : 1
+      },
+      {
+        "awayScore" : 0,
+        "cumulativeSeconds" : 107,
+        "diff" : -1,
+        "homeScore" : 1
+      },
+      {
+        "awayScore" : 1,
+        "cumulativeSeconds" : 107,
+        "diff" : 0,
+        "homeScore" : 1
+      },
+      {
+        "awayScore" : 1,
+        "cumulativeSeconds" : 204,
+        "diff" : 0,
+        "homeScore" : 1
+      },
+      {
+        "awayScore" : 1,
+        "cumulativeSeconds" : 204,
+        "diff" : -1,
+        "homeScore" : 2
+      },
+      {
+        "awayScore" : 1,
+        "cumulativeSeconds" : 264,
+        "diff" : -1,
+        "homeScore" : 2
+      },
+      {
+        "awayScore" : 2,
+        "cumulativeSeconds" : 264,
+        "diff" : 0,
+        "homeScore" : 2
+      },
+      {
+        "awayScore" : 2,
+        "cumulativeSeconds" : 296,
+        "diff" : 0,
+        "homeScore" : 2
+      },
+      {
+        "awayScore" : 2,
+        "cumulativeSeconds" : 296,
+        "diff" : -1,
+        "homeScore" : 3
+      },
+      {
+        "awayScore" : 2,
+        "cumulativeSeconds" : 382,
+        "diff" : -1,
+        "homeScore" : 3
+      },
+      {
+        "awayScore" : 2,
+        "cumulativeSeconds" : 382,
+        "diff" : -2,
+        "homeScore" : 4
+      },
+      {
+        "awayScore" : 2,
+        "cumulativeSeconds" : 422,
+        "diff" : -2,
+        "homeScore" : 4
+      },
+      {
+        "awayScore" : 3,
+        "cumulativeSeconds" : 422,
+        "diff" : -1,
+        "homeScore" : 4
+      },
+      {
+        "awayScore" : 3,
+        "cumulativeSeconds" : 527,
+        "diff" : -1,
+        "homeScore" : 4
+      },
+      {
+        "awayScore" : 3,
+        "cumulativeSeconds" : 527,
+        "diff" : -2,
+        "homeScore" : 5
+      },
+      {
+        "awayScore" : 3,
+        "cumulativeSeconds" : 572,
+        "diff" : -2,
+        "homeScore" : 5
+      },
+      {
+        "awayScore" : 3,
+        "cumulativeSeconds" : 572,
+        "diff" : -3,
+        "homeScore" : 6
+      },
+      {
+        "awayScore" : 3,
+        "cumulativeSeconds" : 641,
+        "diff" : -3,
+        "homeScore" : 6
+      },
+      {
+        "awayScore" : 3,
+        "cumulativeSeconds" : 641,
+        "diff" : -4,
+        "homeScore" : 7
+      },
+      {
+        "awayScore" : 3,
+        "cumulativeSeconds" : 701,
+        "diff" : -4,
+        "homeScore" : 7
+      },
+      {
+        "awayScore" : 4,
+        "cumulativeSeconds" : 701,
+        "diff" : -3,
+        "homeScore" : 7
+      },
+      {
+        "awayScore" : 4,
+        "cumulativeSeconds" : 724,
+        "diff" : -3,
+        "homeScore" : 7
+      },
+      {
+        "awayScore" : 4,
+        "cumulativeSeconds" : 724,
+        "diff" : -4,
+        "homeScore" : 8
+      },
+      {
+        "awayScore" : 4,
+        "cumulativeSeconds" : 787,
+        "diff" : -4,
+        "homeScore" : 8
+      },
+      {
+        "awayScore" : 5,
+        "cumulativeSeconds" : 787,
+        "diff" : -3,
+        "homeScore" : 8
+      },
+      {
+        "awayScore" : 5,
+        "cumulativeSeconds" : 805,
+        "diff" : -3,
+        "homeScore" : 8
+      },
+      {
+        "awayScore" : 5,
+        "cumulativeSeconds" : 805,
+        "diff" : -4,
+        "homeScore" : 9
+      },
+      {
+        "awayScore" : 5,
+        "cumulativeSeconds" : 967,
+        "diff" : -4,
+        "homeScore" : 9
+      },
+      {
+        "awayScore" : 6,
+        "cumulativeSeconds" : 967,
+        "diff" : -3,
+        "homeScore" : 9
+      },
+      {
+        "awayScore" : 6,
+        "cumulativeSeconds" : 999,
+        "diff" : -3,
+        "homeScore" : 9
+      },
+      {
+        "awayScore" : 6,
+        "cumulativeSeconds" : 999,
+        "diff" : -4,
+        "homeScore" : 10
+      },
+      {
+        "awayScore" : 6,
+        "cumulativeSeconds" : 1031,
+        "diff" : -4,
+        "homeScore" : 10
+      },
+      {
+        "awayScore" : 7,
+        "cumulativeSeconds" : 1031,
+        "diff" : -3,
+        "homeScore" : 10
+      },
+      {
+        "awayScore" : 7,
+        "cumulativeSeconds" : 1075,
+        "diff" : -3,
+        "homeScore" : 10
+      },
+      {
+        "awayScore" : 7,
+        "cumulativeSeconds" : 1075,
+        "diff" : -4,
+        "homeScore" : 11
+      },
+      {
+        "awayScore" : 7,
+        "cumulativeSeconds" : 1120,
+        "diff" : -4,
+        "homeScore" : 11
+      },
+      {
+        "awayScore" : 8,
+        "cumulativeSeconds" : 1120,
+        "diff" : -3,
+        "homeScore" : 11
+      },
+      {
+        "awayScore" : 8,
+        "cumulativeSeconds" : 1136,
+        "diff" : -3,
+        "homeScore" : 11
+      },
+      {
+        "awayScore" : 8,
+        "cumulativeSeconds" : 1136,
+        "diff" : -4,
+        "homeScore" : 12
+      },
+      {
+        "awayScore" : 8,
+        "cumulativeSeconds" : 1163,
+        "diff" : -4,
+        "homeScore" : 12
+      },
+      {
+        "awayScore" : 9,
+        "cumulativeSeconds" : 1163,
+        "diff" : -3,
+        "homeScore" : 12
+      },
+      {
+        "awayScore" : 9,
+        "cumulativeSeconds" : 1178,
+        "diff" : -3,
+        "homeScore" : 12
+      },
+      {
+        "awayScore" : 9,
+        "cumulativeSeconds" : 1178,
+        "diff" : -4,
+        "homeScore" : 13
+      },
+      {
+        "awayScore" : 9,
+        "cumulativeSeconds" : 1261,
+        "diff" : -4,
+        "homeScore" : 13
+      },
+      {
+        "awayScore" : 10,
+        "cumulativeSeconds" : 1261,
+        "diff" : -3,
+        "homeScore" : 13
+      },
+      {
+        "awayScore" : 10,
+        "cumulativeSeconds" : 1273,
+        "diff" : -3,
+        "homeScore" : 13
+      },
+      {
+        "awayScore" : 10,
+        "cumulativeSeconds" : 1273,
+        "diff" : -4,
+        "homeScore" : 14
+      },
+      {
+        "awayScore" : 10,
+        "cumulativeSeconds" : 1289,
+        "diff" : -4,
+        "homeScore" : 14
+      },
+      {
+        "awayScore" : 11,
+        "cumulativeSeconds" : 1289,
+        "diff" : -3,
+        "homeScore" : 14
+      },
+      {
+        "awayScore" : 11,
+        "cumulativeSeconds" : 1378,
+        "diff" : -3,
+        "homeScore" : 14
+      },
+      {
+        "awayScore" : 12,
+        "cumulativeSeconds" : 1378,
+        "diff" : -2,
+        "homeScore" : 14
+      },
+      {
+        "awayScore" : 12,
+        "cumulativeSeconds" : 1438,
+        "diff" : -2,
+        "homeScore" : 14
+      },
+      {
+        "awayScore" : 12,
+        "cumulativeSeconds" : 1438,
+        "diff" : -3,
+        "homeScore" : 15
+      },
+      {
+        "awayScore" : 12,
+        "cumulativeSeconds" : 1542,
+        "diff" : -3,
+        "homeScore" : 15
+      },
+      {
+        "awayScore" : 12,
+        "cumulativeSeconds" : 1542,
+        "diff" : -4,
+        "homeScore" : 16
+      },
+      {
+        "awayScore" : 12,
+        "cumulativeSeconds" : 1579,
+        "diff" : -4,
+        "homeScore" : 16
+      },
+      {
+        "awayScore" : 13,
+        "cumulativeSeconds" : 1579,
+        "diff" : -3,
+        "homeScore" : 16
+      },
+      {
+        "awayScore" : 13,
+        "cumulativeSeconds" : 1621,
+        "diff" : -3,
+        "homeScore" : 16
+      },
+      {
+        "awayScore" : 14,
+        "cumulativeSeconds" : 1621,
+        "diff" : -2,
+        "homeScore" : 16
+      },
+      {
+        "awayScore" : 14,
+        "cumulativeSeconds" : 1673,
+        "diff" : -2,
+        "homeScore" : 16
+      },
+      {
+        "awayScore" : 14,
+        "cumulativeSeconds" : 1673,
+        "diff" : -3,
+        "homeScore" : 17
+      },
+      {
+        "awayScore" : 14,
+        "cumulativeSeconds" : 1714,
+        "diff" : -3,
+        "homeScore" : 17
+      },
+      {
+        "awayScore" : 15,
+        "cumulativeSeconds" : 1714,
+        "diff" : -2,
+        "homeScore" : 17
+      },
+      {
+        "awayScore" : 15,
+        "cumulativeSeconds" : 1748,
+        "diff" : -2,
+        "homeScore" : 17
+      },
+      {
+        "awayScore" : 15,
+        "cumulativeSeconds" : 1748,
+        "diff" : -3,
+        "homeScore" : 18
+      },
+      {
+        "awayScore" : 15,
+        "cumulativeSeconds" : 1762,
+        "diff" : -3,
+        "homeScore" : 18
+      },
+      {
+        "awayScore" : 16,
+        "cumulativeSeconds" : 1762,
+        "diff" : -2,
+        "homeScore" : 18
+      },
+      {
+        "awayScore" : 16,
+        "cumulativeSeconds" : 1784,
+        "diff" : -2,
+        "homeScore" : 18
+      },
+      {
+        "awayScore" : 16,
+        "cumulativeSeconds" : 1784,
+        "diff" : -3,
+        "homeScore" : 19
+      },
+      {
+        "awayScore" : 16,
+        "cumulativeSeconds" : 1820,
+        "diff" : -3,
+        "homeScore" : 19
+      },
+      {
+        "awayScore" : 17,
+        "cumulativeSeconds" : 1820,
+        "diff" : -2,
+        "homeScore" : 19
+      },
+      {
+        "awayScore" : 17,
+        "cumulativeSeconds" : 1857,
+        "diff" : -2,
+        "homeScore" : 19
+      },
+      {
+        "awayScore" : 17,
+        "cumulativeSeconds" : 1857,
+        "diff" : -3,
+        "homeScore" : 20
+      },
+      {
+        "awayScore" : 17,
+        "cumulativeSeconds" : 1944,
+        "diff" : -3,
+        "homeScore" : 20
+      },
+      {
+        "awayScore" : 17,
+        "cumulativeSeconds" : 1944,
+        "diff" : -4,
+        "homeScore" : 21
+      },
+      {
+        "awayScore" : 17,
+        "cumulativeSeconds" : 1972,
+        "diff" : -4,
+        "homeScore" : 21
+      },
+      {
+        "awayScore" : 18,
+        "cumulativeSeconds" : 1972,
+        "diff" : -3,
+        "homeScore" : 21
+      },
+      {
+        "awayScore" : 18,
+        "cumulativeSeconds" : 2019,
+        "diff" : -3,
+        "homeScore" : 21
+      },
+      {
+        "awayScore" : 19,
+        "cumulativeSeconds" : 2019,
+        "diff" : -2,
+        "homeScore" : 21
+      },
+      {
+        "awayScore" : 19,
+        "cumulativeSeconds" : 2088,
+        "diff" : -2,
+        "homeScore" : 21
+      },
+      {
+        "awayScore" : 20,
+        "cumulativeSeconds" : 2088,
+        "diff" : -1,
+        "homeScore" : 21
+      },
+      {
+        "awayScore" : 20,
+        "cumulativeSeconds" : 2111,
+        "diff" : -1,
+        "homeScore" : 21
+      },
+      {
+        "awayScore" : 20,
+        "cumulativeSeconds" : 2111,
+        "diff" : -2,
+        "homeScore" : 22
+      },
+      {
+        "awayScore" : 20,
+        "cumulativeSeconds" : 2170,
+        "diff" : -2,
+        "homeScore" : 22
+      },
+      {
+        "awayScore" : 21,
+        "cumulativeSeconds" : 2170,
+        "diff" : -1,
+        "homeScore" : 22
+      },
+      {
+        "awayScore" : 21,
+        "cumulativeSeconds" : 2239,
+        "diff" : -1,
+        "homeScore" : 22
+      },
+      {
+        "awayScore" : 21,
+        "cumulativeSeconds" : 2239,
+        "diff" : -2,
+        "homeScore" : 23
+      },
+      {
+        "awayScore" : 21,
+        "cumulativeSeconds" : 2264,
+        "diff" : -2,
+        "homeScore" : 23
+      },
+      {
+        "awayScore" : 22,
+        "cumulativeSeconds" : 2264,
+        "diff" : -1,
+        "homeScore" : 23
+      },
+      {
+        "awayScore" : 22,
+        "cumulativeSeconds" : 2300,
+        "diff" : -1,
+        "homeScore" : 23
+      },
+      {
+        "awayScore" : 22,
+        "cumulativeSeconds" : 2300,
+        "diff" : -2,
+        "homeScore" : 24
+      },
+      {
+        "awayScore" : 22,
+        "cumulativeSeconds" : 2315,
+        "diff" : -2,
+        "homeScore" : 24
+      },
+      {
+        "awayScore" : 23,
+        "cumulativeSeconds" : 2315,
+        "diff" : -1,
+        "homeScore" : 24
+      },
+      {
+        "awayScore" : 23,
+        "cumulativeSeconds" : 2370,
+        "diff" : -1,
+        "homeScore" : 24
+      },
+      {
+        "awayScore" : 23,
+        "cumulativeSeconds" : 2370,
+        "diff" : -2,
+        "homeScore" : 25
+      },
+      {
+        "awayScore" : 23,
+        "cumulativeSeconds" : 2400,
+        "diff" : -2,
+        "homeScore" : 25
+      },
+      {
+        "awayScore" : 24,
+        "cumulativeSeconds" : 2400,
+        "diff" : -1,
+        "homeScore" : 25
+      },
+      {
+        "awayScore" : 24,
+        "cumulativeSeconds" : 2455,
+        "diff" : -1,
+        "homeScore" : 25
+      },
+      {
+        "awayScore" : 25,
+        "cumulativeSeconds" : 2455,
+        "diff" : 0,
+        "homeScore" : 25
+      },
+      {
+        "awayScore" : 25,
+        "cumulativeSeconds" : 2489,
+        "diff" : 0,
+        "homeScore" : 25
+      },
+      {
+        "awayScore" : 26,
+        "cumulativeSeconds" : 2489,
+        "diff" : 1,
+        "homeScore" : 25
+      },
+      {
+        "awayScore" : 26,
+        "cumulativeSeconds" : 2508,
+        "diff" : 1,
+        "homeScore" : 25
+      },
+      {
+        "awayScore" : 26,
+        "cumulativeSeconds" : 2508,
+        "diff" : 0,
+        "homeScore" : 26
+      },
+      {
+        "awayScore" : 26,
+        "cumulativeSeconds" : 2556,
+        "diff" : 0,
+        "homeScore" : 26
+      },
+      {
+        "awayScore" : 26,
+        "cumulativeSeconds" : 2556,
+        "diff" : -1,
+        "homeScore" : 27
+      },
+      {
+        "awayScore" : 26,
+        "cumulativeSeconds" : 2637,
+        "diff" : -1,
+        "homeScore" : 27
+      },
+      {
+        "awayScore" : 27,
+        "cumulativeSeconds" : 2637,
+        "diff" : 0,
+        "homeScore" : 27
+      },
+      {
+        "awayScore" : 27,
+        "cumulativeSeconds" : 2720,
+        "diff" : 0,
+        "homeScore" : 27
+      },
+      {
+        "awayScore" : 27,
+        "cumulativeSeconds" : 2720,
+        "diff" : -1,
+        "homeScore" : 28
+      },
+      {
+        "awayScore" : 27,
+        "cumulativeSeconds" : 2789,
+        "diff" : -1,
+        "homeScore" : 28
+      },
+      {
+        "awayScore" : 27,
+        "cumulativeSeconds" : 2789,
+        "diff" : -2,
+        "homeScore" : 29
+      },
+      {
+        "awayScore" : 27,
+        "cumulativeSeconds" : 2850,
+        "diff" : -2,
+        "homeScore" : 29
+      },
+      {
+        "awayScore" : 28,
+        "cumulativeSeconds" : 2850,
+        "diff" : -1,
+        "homeScore" : 29
+      },
+      {
+        "awayScore" : 28,
+        "cumulativeSeconds" : 2909,
+        "diff" : -1,
+        "homeScore" : 29
+      },
+      {
+        "awayScore" : 28,
+        "cumulativeSeconds" : 2909,
+        "diff" : -2,
+        "homeScore" : 30
+      },
+      {
+        "awayScore" : 28,
+        "cumulativeSeconds" : 2944,
+        "diff" : -2,
+        "homeScore" : 30
+      },
+      {
+        "awayScore" : 29,
+        "cumulativeSeconds" : 2944,
+        "diff" : -1,
+        "homeScore" : 30
+      },
+      {
+        "awayScore" : 29,
+        "cumulativeSeconds" : 3021,
+        "diff" : -1,
+        "homeScore" : 30
+      },
+      {
+        "awayScore" : 30,
+        "cumulativeSeconds" : 3021,
+        "diff" : 0,
+        "homeScore" : 30
+      },
+      {
+        "awayScore" : 30,
+        "cumulativeSeconds" : 3086,
+        "diff" : 0,
+        "homeScore" : 30
+      },
+      {
+        "awayScore" : 31,
+        "cumulativeSeconds" : 3086,
+        "diff" : 1,
+        "homeScore" : 30
+      },
+      {
+        "awayScore" : 31,
+        "cumulativeSeconds" : 3112,
+        "diff" : 1,
+        "homeScore" : 30
+      },
+      {
+        "awayScore" : 31,
+        "cumulativeSeconds" : 3112,
+        "diff" : 0,
+        "homeScore" : 31
+      },
+      {
+        "awayScore" : 31,
+        "cumulativeSeconds" : 3166,
+        "diff" : 0,
+        "homeScore" : 31
+      },
+      {
+        "awayScore" : 31,
+        "cumulativeSeconds" : 3166,
+        "diff" : -1,
+        "homeScore" : 32
+      },
+      {
+        "awayScore" : 31,
+        "cumulativeSeconds" : 3195,
+        "diff" : -1,
+        "homeScore" : 32
+      },
+      {
+        "awayScore" : 32,
+        "cumulativeSeconds" : 3195,
+        "diff" : 0,
+        "homeScore" : 32
+      },
+      {
+        "awayScore" : 32,
+        "cumulativeSeconds" : 3345,
+        "diff" : 0,
+        "homeScore" : 32
+      },
+      {
+        "awayScore" : 33,
+        "cumulativeSeconds" : 3345,
+        "diff" : 1,
+        "homeScore" : 32
+      },
+      {
+        "awayScore" : 33,
+        "cumulativeSeconds" : 3453,
+        "diff" : 1,
+        "homeScore" : 32
+      },
+      {
+        "awayScore" : 33,
+        "cumulativeSeconds" : 3453,
+        "diff" : 0,
+        "homeScore" : 33
+      },
+      {
+        "awayScore" : 33,
+        "cumulativeSeconds" : 3599,
+        "diff" : 0,
+        "homeScore" : 33
+      },
+      {
+        "awayScore" : 33,
+        "cumulativeSeconds" : 3599,
+        "diff" : -1,
+        "homeScore" : 34
+      },
+      {
+        "awayScore" : 33,
+        "cumulativeSeconds" : 3600,
+        "diff" : -1,
+        "homeScore" : 34
+      }
+    ],
+    "totalSeconds" : 3600
+  },
+  "summary" : {
+    "awayScore" : 33,
+    "awayTeam" : {
+      "goals" : 33,
+      "scoringRate" : 0.9705882352941176,
+      "shotAttempts" : 34,
+      "shotMisses" : 1,
+      "teamKey" : "away"
+    },
+    "homeScore" : 34,
+    "homeTeam" : {
+      "goals" : 34,
+      "scoringRate" : 1,
+      "shotAttempts" : 34,
+      "shotMisses" : 0,
+      "teamKey" : "home"
+    },
+    "phaseSummaries" : [
+      {
+        "awayAttempts" : 17,
+        "awayGoals" : 16,
+        "awayRate" : 0.9411764705882353,
+        "awayShotMisses" : 1,
+        "homeAttempts" : 19,
+        "homeGoals" : 19,
+        "homeRate" : 1,
+        "homeShotMisses" : 0,
+        "kind" : "regular",
+        "phaseFactID" : "939ab43a-d20c-54f5-b721-d360ba780d92",
+        "regularIndex" : 0
+      },
+      {
+        "awayAttempts" : 17,
+        "awayGoals" : 17,
+        "awayRate" : 1,
+        "awayShotMisses" : 0,
+        "homeAttempts" : 15,
+        "homeGoals" : 15,
+        "homeRate" : 1,
+        "homeShotMisses" : 0,
+        "kind" : "regular",
+        "phaseFactID" : "f20b5e53-2439-54c2-a158-f479b44b2e51",
+        "regularIndex" : 1
+      }
+    ],
+    "playerStats" : [
+      {
+        "goals" : 5,
+        "playerKey" : "away_03",
+        "scoringRate" : 0.8333333333333334,
+        "shotAttempts" : 6,
+        "shotMisses" : 1
+      },
+      {
+        "goals" : 1,
+        "playerKey" : "away_08",
+        "scoringRate" : 1,
+        "shotAttempts" : 1,
+        "shotMisses" : 0
+      },
+      {
+        "goals" : 1,
+        "playerKey" : "away_10",
+        "scoringRate" : 1,
+        "shotAttempts" : 1,
+        "shotMisses" : 0
+      },
+      {
+        "goals" : 1,
+        "playerKey" : "away_20",
+        "scoringRate" : 1,
+        "shotAttempts" : 1,
+        "shotMisses" : 0
+      },
+      {
+        "goals" : 8,
+        "playerKey" : "away_23",
+        "scoringRate" : 1,
+        "shotAttempts" : 8,
+        "shotMisses" : 0
+      },
+      {
+        "goals" : 2,
+        "playerKey" : "away_24",
+        "scoringRate" : 1,
+        "shotAttempts" : 2,
+        "shotMisses" : 0
+      },
+      {
+        "goals" : 1,
+        "playerKey" : "away_25",
+        "scoringRate" : 1,
+        "shotAttempts" : 1,
+        "shotMisses" : 0
+      },
+      {
+        "goals" : 9,
+        "playerKey" : "away_27",
+        "scoringRate" : 1,
+        "shotAttempts" : 9,
+        "shotMisses" : 0
+      },
+      {
+        "goals" : 1,
+        "playerKey" : "away_30",
+        "scoringRate" : 1,
+        "shotAttempts" : 1,
+        "shotMisses" : 0
+      },
+      {
+        "goals" : 4,
+        "playerKey" : "away_34",
+        "scoringRate" : 1,
+        "shotAttempts" : 4,
+        "shotMisses" : 0
+      },
+      {
+        "goals" : 7,
+        "playerKey" : "home_03",
+        "scoringRate" : 1,
+        "shotAttempts" : 7,
+        "shotMisses" : 0
+      },
+      {
+        "goals" : 2,
+        "playerKey" : "home_07",
+        "scoringRate" : 1,
+        "shotAttempts" : 2,
+        "shotMisses" : 0
+      },
+      {
+        "goals" : 1,
+        "playerKey" : "home_08",
+        "scoringRate" : 1,
+        "shotAttempts" : 1,
+        "shotMisses" : 0
+      },
+      {
+        "goals" : 2,
+        "playerKey" : "home_13",
+        "scoringRate" : 1,
+        "shotAttempts" : 2,
+        "shotMisses" : 0
+      },
+      {
+        "goals" : 5,
+        "playerKey" : "home_17",
+        "scoringRate" : 1,
+        "shotAttempts" : 5,
+        "shotMisses" : 0
+      },
+      {
+        "goals" : 1,
+        "playerKey" : "home_19",
+        "scoringRate" : 1,
+        "shotAttempts" : 1,
+        "shotMisses" : 0
+      },
+      {
+        "goals" : 5,
+        "playerKey" : "home_24",
+        "scoringRate" : 1,
+        "shotAttempts" : 5,
+        "shotMisses" : 0
+      },
+      {
+        "goals" : 1,
+        "playerKey" : "home_32",
+        "scoringRate" : 1,
+        "shotAttempts" : 1,
+        "shotMisses" : 0
+      },
+      {
+        "goals" : 3,
+        "playerKey" : "home_35",
+        "scoringRate" : 1,
+        "shotAttempts" : 3,
+        "shotMisses" : 0
+      },
+      {
+        "goals" : 6,
+        "playerKey" : "home_44",
+        "scoringRate" : 1,
+        "shotAttempts" : 6,
+        "shotMisses" : 0
+      },
+      {
+        "goals" : 1,
+        "playerKey" : "home_55",
+        "scoringRate" : 1,
+        "shotAttempts" : 1,
+        "shotMisses" : 0
+      }
+    ]
+  },
+  "timeline" : [
+    {
+      "factID" : "939ab43a-d20c-54f5-b721-d360ba780d92",
+      "resolvedMatchClock" : 0
+    },
+    {
+      "factID" : "b2a95eab-06e0-5b37-8939-bbdba87b9d42",
+      "resolvedMatchClock" : 48
+    },
+    {
+      "factID" : "e95e5bef-e2a4-57f7-875f-a13aa864548e",
+      "resolvedMatchClock" : 107
+    },
+    {
+      "factID" : "5f89fd22-f463-5d1e-897f-ddb10633ebd1",
+      "resolvedMatchClock" : 204
+    },
+    {
+      "factID" : "6ada2931-b96d-53ac-b60d-4c6ff58ede82",
+      "resolvedMatchClock" : 264
+    },
+    {
+      "factID" : "6eda0392-b54f-5ba1-ad57-ba0e67eb9154",
+      "resolvedMatchClock" : 296
+    },
+    {
+      "factID" : "b7de8777-40b6-557e-b22e-b072133546ea",
+      "resolvedMatchClock" : 382
+    },
+    {
+      "factID" : "e7d59566-5a57-541c-a7e2-aeec3d7fca9f",
+      "resolvedMatchClock" : 422
+    },
+    {
+      "factID" : "946e56b9-70ec-5e85-b5c2-f1692b8cd7e7",
+      "resolvedMatchClock" : 527
+    },
+    {
+      "factID" : "17a197d5-fa4f-5d15-9bfc-f1df98e83d81",
+      "resolvedMatchClock" : 572
+    },
+    {
+      "factID" : "89c79ce4-d2e1-5ae7-a80b-ff569080a3b4",
+      "resolvedMatchClock" : 572
+    },
+    {
+      "factID" : "933211d4-b1dc-5d06-856c-64fc01debd30",
+      "resolvedMatchClock" : 641
+    },
+    {
+      "factID" : "9114eddb-d99f-53fa-8b34-73442f198ce5",
+      "resolvedMatchClock" : 701
+    },
+    {
+      "factID" : "8d257eea-b490-51b3-9005-e977cc9ee807",
+      "resolvedMatchClock" : 724
+    },
+    {
+      "factID" : "591c8baf-46f5-58f0-a20d-2cef6b50586e",
+      "resolvedMatchClock" : 787
+    },
+    {
+      "factID" : "29f6efcd-f694-55c4-956b-fd224e2dec7a",
+      "resolvedMatchClock" : 805
+    },
+    {
+      "factID" : "f482916a-402c-5cb0-884c-5468dea45e70",
+      "resolvedMatchClock" : 967
+    },
+    {
+      "factID" : "2a234242-e410-5da8-a2a4-50486f836b7e",
+      "resolvedMatchClock" : 999
+    },
+    {
+      "factID" : "b11c3d0c-61a4-5056-bdae-eea1108eea2f",
+      "resolvedMatchClock" : 1031
+    },
+    {
+      "factID" : "d830eba7-f882-596f-91b3-0e6f0dc38195",
+      "resolvedMatchClock" : 1075
+    },
+    {
+      "factID" : "594fabe7-7ad2-505c-a752-89d2e18b5c58",
+      "resolvedMatchClock" : 1120
+    },
+    {
+      "factID" : "cba67c1e-b2e0-56c5-9bd9-6c45cd767329",
+      "resolvedMatchClock" : 1136
+    },
+    {
+      "factID" : "92621d24-9c07-522f-8b7f-c08b1b1da6bb",
+      "resolvedMatchClock" : 1163
+    },
+    {
+      "factID" : "3107ab5c-bd25-5d1b-9bf4-ef1463ed07f6",
+      "resolvedMatchClock" : 1178
+    },
+    {
+      "factID" : "72ff1057-eca3-5711-8bd7-97cc43bb4680",
+      "resolvedMatchClock" : 1261
+    },
+    {
+      "factID" : "cb3d20a7-d279-5320-808d-3595ff88fffa",
+      "resolvedMatchClock" : 1273
+    },
+    {
+      "factID" : "1f0fa830-ae58-5527-938a-248664049494",
+      "resolvedMatchClock" : 1289
+    },
+    {
+      "factID" : "433dd7c9-d8ca-5e8d-91f0-76553d904d52",
+      "resolvedMatchClock" : 1378
+    },
+    {
+      "factID" : "82613deb-d565-59ab-965c-c478d6d66276",
+      "resolvedMatchClock" : 1438
+    },
+    {
+      "factID" : "a10efdc3-a759-5758-b28a-e9b6aca02080",
+      "resolvedMatchClock" : 1542
+    },
+    {
+      "factID" : "a6a31dec-fb92-595e-b64f-797bf4ef445c",
+      "resolvedMatchClock" : 1579
+    },
+    {
+      "factID" : "41c007ee-4c6c-5f89-bf7f-4029c3df54d2",
+      "resolvedMatchClock" : 1621
+    },
+    {
+      "factID" : "3bf7cfd5-46a8-58dd-a6cb-3a4a4a1e2a3b",
+      "resolvedMatchClock" : 1673
+    },
+    {
+      "factID" : "39a85d1b-b492-5b68-965c-cf6fc8b71483",
+      "resolvedMatchClock" : 1714
+    },
+    {
+      "factID" : "80ca6744-906d-57dc-9aa1-3d32126e8857",
+      "resolvedMatchClock" : 1727
+    },
+    {
+      "factID" : "3e23220f-9108-50b5-9299-f1ff8f3e9b00",
+      "resolvedMatchClock" : 1748
+    },
+    {
+      "factID" : "beb22f1b-cba6-5e6f-b895-8e3b4d98db2b",
+      "resolvedMatchClock" : 1762
+    },
+    {
+      "factID" : "d8c2933d-cfe3-5d5e-9f69-ceae6ab4c6dd",
+      "resolvedMatchClock" : 1784
+    },
+    {
+      "factID" : "cb7da576-3b0d-5af5-8d6a-dfe9cceb371f",
+      "resolvedMatchClock" : 1795
+    },
+    {
+      "factID" : "f20b5e53-2439-54c2-a158-f479b44b2e51",
+      "resolvedMatchClock" : 1800
+    },
+    {
+      "factID" : "49c1defd-7420-5cac-a41d-82bc173d1cb5",
+      "resolvedMatchClock" : 1820
+    },
+    {
+      "factID" : "e71b0f66-663d-5a7d-a1e4-941a86201ca7",
+      "resolvedMatchClock" : 1857
+    },
+    {
+      "factID" : "4b03c650-50bb-5022-8054-cbb3de5e70c4",
+      "resolvedMatchClock" : 1944
+    },
+    {
+      "factID" : "7eacdea3-f646-526f-a87f-18d944d81af1",
+      "resolvedMatchClock" : 1972
+    },
+    {
+      "factID" : "33e2e57b-2527-5b66-956c-3c5b03a5e2a4",
+      "resolvedMatchClock" : 2019
+    },
+    {
+      "factID" : "a6af238c-647d-52ac-9efe-731378bd0ab9",
+      "resolvedMatchClock" : 2088
+    },
+    {
+      "factID" : "6657982a-8cfa-59b3-b270-181ca3fd006c",
+      "resolvedMatchClock" : 2111
+    },
+    {
+      "factID" : "0704776c-c671-52ae-8e4b-4caae39e7f01",
+      "resolvedMatchClock" : 2170
+    },
+    {
+      "factID" : "02475e39-6220-5d74-b63f-f60d0ddfaff5",
+      "resolvedMatchClock" : 2239
+    },
+    {
+      "factID" : "895bff8a-6784-55e5-8204-d6867fa54036",
+      "resolvedMatchClock" : 2264
+    },
+    {
+      "factID" : "19c470d4-fa9a-549d-aa7d-272e9b1d8c74",
+      "resolvedMatchClock" : 2300
+    },
+    {
+      "factID" : "e943f27d-be7b-5803-87e0-77245ac5622a",
+      "resolvedMatchClock" : 2315
+    },
+    {
+      "factID" : "94a14e8b-b68f-5a6f-95b8-76f3bcf1f674",
+      "resolvedMatchClock" : 2370
+    },
+    {
+      "factID" : "98e2edc7-0c47-59fe-8cab-fae8cba6eebd",
+      "resolvedMatchClock" : 2400
+    },
+    {
+      "factID" : "00a09655-c0db-5744-93ca-e35b99d3ef7e",
+      "resolvedMatchClock" : 2455
+    },
+    {
+      "factID" : "bba3235f-a533-5b29-8a80-fd46f63a3d31",
+      "resolvedMatchClock" : 2489
+    },
+    {
+      "factID" : "c1561afe-13eb-5a30-b47d-cb4d5fe2c4ee",
+      "resolvedMatchClock" : 2489
+    },
+    {
+      "factID" : "bcf68bf0-22af-5209-9cbb-a68ad019134c",
+      "resolvedMatchClock" : 2508
+    },
+    {
+      "factID" : "bcde3f42-5058-5c99-8f23-84628138e0d4",
+      "resolvedMatchClock" : 2556
+    },
+    {
+      "factID" : "f7275c8f-88ba-5641-8fd5-70909b75072d",
+      "resolvedMatchClock" : 2637
+    },
+    {
+      "factID" : "1c752dc0-aedd-5fbc-b0fc-3080b1c3c4ab",
+      "resolvedMatchClock" : 2720
+    },
+    {
+      "factID" : "d6b121eb-a071-597a-b7af-1c95102e34c4",
+      "resolvedMatchClock" : 2789
+    },
+    {
+      "factID" : "9d7aebae-fdfe-599c-be64-4e19470019a3",
+      "resolvedMatchClock" : 2850
+    },
+    {
+      "factID" : "3187352b-621c-5f2a-a6ee-6622b8760ca0",
+      "resolvedMatchClock" : 2909
+    },
+    {
+      "factID" : "1698690a-5e06-55be-9174-fc0218ef1406",
+      "resolvedMatchClock" : 2944
+    },
+    {
+      "factID" : "9eba148e-b10d-579f-b991-41e533291a55",
+      "resolvedMatchClock" : 3021
+    },
+    {
+      "factID" : "5ccba904-921c-5c83-bdf2-7df8d49b2e82",
+      "resolvedMatchClock" : 3086
+    },
+    {
+      "factID" : "469f1d92-4281-54d9-94ff-58c986daafa8",
+      "resolvedMatchClock" : 3112
+    },
+    {
+      "factID" : "59f1839f-9811-50fc-af00-ef770ae16b14",
+      "resolvedMatchClock" : 3166
+    },
+    {
+      "factID" : "1d68cb7b-4948-576a-8143-4d6c1b8ab7f4",
+      "resolvedMatchClock" : 3195
+    },
+    {
+      "factID" : "f0c4c11c-6490-55a7-973e-ac0a225b9c7a",
+      "resolvedMatchClock" : 3345
+    },
+    {
+      "factID" : "4ecf6b8d-ec41-5752-b689-32034433f05a",
+      "resolvedMatchClock" : 3453
+    },
+    {
+      "factID" : "e8102f7f-d88c-56a6-a915-c19afc064268",
+      "resolvedMatchClock" : 3536
+    },
+    {
+      "factID" : "57a021bb-f2d4-50a8-9a6c-d22d4de965b6",
+      "resolvedMatchClock" : 3599
+    },
+    {
+      "factID" : "ea6a7962-c236-59cc-88ab-92ff686b92bf",
+      "resolvedMatchClock" : 3599
+    }
+  ]
+}
