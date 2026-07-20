@@ -20,9 +20,37 @@ crates/
   handball-toolkit-cli/   — sample-matches 配信 JSON の検証 CLI（handball-project#58）
   handball-toolkit-ffi/   — FFI パッケージング crate（staticlib 化 + uniffi-bindgen CLI）
                             型・関数の公開面はコア crate の namespace に集約する（ADR 0004）
+  handball-toolkit-wasm/  — wasm パッケージング crate（handball-project#57）
+                            JS 向けの粗粒度エントリとマーシャリングのみ。コアには触れない
 ```
 
-将来の拡張候補（必要になってから追加）: wasm バインディング、Kotlin バインディング。
+将来の拡張候補（必要になってから追加）: Kotlin バインディング。
+
+## Web 向け wasm
+
+コアを wasm 化して、配信 JSON から projection をブラウザ内で組み立てる。サーバーは要らない。
+
+```bash
+./scripts/build_wasm.sh   # target/wasm/ に .wasm + ES module の JS グルー + .d.ts
+```
+
+公開面は 3 関数だけで、「配信 JSON in → projection out」の同期バッチ 1 往復に閉じている
+（ADR 0001 設計不変条件 4）:
+
+```js
+import init, { requiredIdCount, buildMatchView } from './handball_toolkit_wasm.js';
+await init();
+
+const json = await (await fetch('.../v2/matches/foo.json')).text();
+// コアは UUID を生成しない（設計不変条件 2）ので、新規 ID はシェルが事前生成して渡す
+const ids = Array.from({ length: requiredIdCount(json) }, () => crypto.randomUUID());
+const view = JSON.parse(buildMatchView('foo', json, ids));
+// view = { match, homeTeam, awayTeam, players, summary, timeline }
+```
+
+失敗は例外で返り、`message` に構造化エラーの JSON（`{code, ...params}`）が載る。表示文言は
+シェルが持つ（ADR 0002 決定 3）。`wasm-bindgen` crate と `wasm-bindgen-cli` は**バージョン
+完全一致**が必要なため、Cargo.toml で `=` ピン留めし flake の nixpkgs 版と揃えている。
 
 ## 検証 CLI
 

@@ -4,6 +4,7 @@ members = [
     "crates/handball-toolkit",
     "crates/handball-toolkit-cli",
     "crates/handball-toolkit-ffi",
+    "crates/handball-toolkit-wasm",
 ]
 
 [workspace.package]

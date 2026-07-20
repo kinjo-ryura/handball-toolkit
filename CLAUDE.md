@@ -30,13 +30,14 @@ cargo fmt             # フォーマット
 
 ## アーキテクチャ
 
-Cargo workspace。3 crate 構成:
+Cargo workspace。4 crate 構成:
 
 - `crates/handball-toolkit/` — コア crate（facts / clocks / configuration / entities / validators / projections）。feature `uniffi`（default off）でドメイン全型の UniFFI derive と FFI 関数公開（`ffi_api` / `ffi_support`）が有効になる（ADR 0004。feature off の wasm / CLI ビルドでは uniffi が依存グラフごと消える）
 - `crates/handball-toolkit-cli/` — sample-matches 配信 JSON（SAMPLE_DTO_V2）の検証 CLI（handball-project#58）。コアの validators を呼ぶだけの薄いシェルで、コアには手を入れない。使い方は README「検証 CLI」
 - `crates/handball-toolkit-ffi/` — FFI パッケージング crate。staticlib 化（XCFramework の中身）と uniffi-bindgen CLI（feature `bindgen`）のみを担い、型・関数の公開面はコア crate の namespace に集約する（ADR 0004 決定 3 実装追記）
+- `crates/handball-toolkit-wasm/` — wasm パッケージング crate（handball-project#57）。JS 向けの粗粒度エントリ（`toolkitVersion` / `requiredIdCount` / `buildMatchView`）とマーシャリングだけを担い、コアには触れない。**ID 生成はシェル（JS の `crypto.randomUUID()`）が行う** — コアは UUID を生成しない（設計不変条件 2）ので、この crate も乱数を引かず `getrandom` の wasm バックエンド設定が不要
 
-wasm バインディング・Kotlin バインディングは将来の拡張候補で、必要になった時点で workspace member として追加する（先回りで作らない）。iOS シェル向けのドメイン全型 UniFFI 公開（本境界）は ADR 0004 で確定・実装済み。Kotlin バインディングは handball-project#59。
+Kotlin バインディングは将来の拡張候補で、必要になった時点で workspace member として追加する（先回りで作らない。handball-project#59）。iOS シェル向けのドメイン全型 UniFFI 公開（本境界）は ADR 0004 で確定・実装済み。
 
 ### iOS 向け XCFramework（UniFFI）
 
@@ -44,6 +45,14 @@ wasm バインディング・Kotlin バインディングは将来の拡張候�
 ./scripts/build_xcframework.sh   # target/xcframework/ に HandballToolkit.xcframework + 生成 Swift API 層
 ./scripts/ios_poc/run.sh         # 本境界 smoke をビルドして iOS シミュレータ内で実行
 ```
+
+### Web 向け wasm（wasm-bindgen）
+
+```bash
+./scripts/build_wasm.sh   # target/wasm/ に .wasm + ES module の JS グルー + .d.ts
+```
+
+`wasm-bindgen` crate と `wasm-bindgen-cli`（flake が nixpkgs から入れる）は**バージョン完全一致**が必要。Cargo.toml 側は `=` でピン留めしてあるので、nixpkgs が上がったら両方を同時に合わせる（不一致は生成時の schema version mismatch で落ちる）。
 
 XCFramework は ios / ios-sim / macos の 3 スライス構成（HandballRecorderMac も同じ枠組み）。サイズ最適化はワークスペース Cargo.toml の `[profile.release]`（LTO / codegen-units=1 / panic=abort。実測と代償は ADR 0004 実装追記）。生成 Swift（`HandballToolkit.swift`）は XCFramework に入らない。「バイナリ + C モジュール」が XCFramework、Swift API 層はソースとして利用側が一緒にコンパイルする 2 段構え（UniFFI の標準配布形）。
 

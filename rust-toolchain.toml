@@ -3,6 +3,7 @@
 [toolchain]
 channel = "1.97.0"
 components = ["clippy", "rustfmt", "rust-analyzer"]
-# クロスターゲット（必要になったら足す。例: "wasm32-unknown-unknown"）。
+# クロスターゲット。
 # iOS の 2 つは UniFFI → XCFramework 用（実機 / Apple Silicon シミュレータ。ABI が別物なので両方要る）。
-targets = ["aarch64-apple-ios", "aarch64-apple-ios-sim"]
+# wasm32 は wasm-bindgen → Web デモ用（handball-project#57）。
+targets = ["aarch64-apple-ios", "aarch64-apple-ios-sim", "wasm32-unknown-unknown"]

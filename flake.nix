@@ -34,7 +34,14 @@
     {
       # mkShellNoCC: シェル自体にも Nix の cc を入れない。
       devShells.${system}.default = pkgs.mkShellNoCC {
-        packages = [ toolchain ];
+        packages = [
+          toolchain
+          # wasm バインディングの JS グルー生成（handball-project#57）。
+          # crates/handball-toolkit-wasm の wasm-bindgen 依存と**バージョン完全一致**が要る
+          # （不一致だと生成時に schema version mismatch で落ちる）。nixpkgs 側が上がったら
+          # Cargo.toml の `=` ピンも同時に合わせること。
+          pkgs.wasm-bindgen-cli
+        ];
       };
     };
 }

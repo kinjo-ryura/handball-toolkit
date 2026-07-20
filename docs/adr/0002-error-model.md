@@ -83,6 +83,8 @@ FFI / JSON 境界でのエラー表現（serde 形式）:
 | `ffi_support.rs` `u32::try_from(obj).expect` | 対象は phase 数とコアが数える ID 個数。いずれも u32 を越えない構造 |
 | `write.rs` `unreachable!("plays_to_convert は Play のみ")` | 直前に `MatchFactPayload::Play` で filter 済み |
 | `sample_match_encoder.rs` の `expect` 3 箇所 | `SampleMatchDtoV2` は derive `Serialize` の plain struct（String / f64 / Option / Vec）で `to_value` は失敗しない。**非有限 f64 も Err ではなく `null` になる**（実測）。`Value` の再 serialize も失敗せず、serde_json の出力は常に UTF-8 |
+| （wasm）`lib.rs` `build_match_view` の `ids.next().expect` | `ffi_api.rs` の同型（直前の `required_id_count` 検査で `InsufficientNewIds` に落とす）。個数一致は `wasm_binding_tests.rs` の `insufficient_ids_boundary` が required-1 / required の両側で assert |
+| （wasm）`lib.rs` `build_match_view_js` の `to_string().expect` | `MatchView` はコアの derive `Serialize` 型を束ねた plain struct。根拠は `sample_match_encoder.rs` の行と同じ |
 
 **注**: 最後の行の「非有限 f64 は `null` になる」は panic しない代わりに **export を静かに壊す**（読み戻せない JSON を成功として書く）。これは panic 境界ではなく validation の穴であり、handball-project#91 で別途扱う。
 
