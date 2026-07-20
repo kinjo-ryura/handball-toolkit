@@ -194,14 +194,16 @@ pub fn validate_video_migration_draft(
 
 // ── 記録入口（記録操作 in → fact / anchor out — handball-project#69）──
 
-/// `write::capture_play_anchor`（記録 offset の減算 + 0 クランプ + anchor 組み立て）。
+/// `write::capture_play_anchor`（記録 offset の減算 + 0 クランプ + phase / stoppage 境界での
+/// クランプ + anchor 組み立て）。境界クランプに fact 列が要る（handball-project#101）。
 #[uniffi::export]
 pub fn capture_play_anchor(
     base_seconds: f64,
     recording_offset_seconds: f64,
     clock_kind: CaptureClockKind,
+    facts: Vec<MatchFact>,
 ) -> FactAnchor {
-    write::capture_play_anchor(base_seconds, recording_offset_seconds, clock_kind)
+    write::capture_play_anchor(base_seconds, recording_offset_seconds, clock_kind, &facts)
 }
 
 /// `write::initial_timer_seconds`（記録画面を開いたときのタイマー初期累積秒）。

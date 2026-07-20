@@ -202,6 +202,12 @@ pub fn validate_delete(removed_fact_id: FactId, existing_facts: &[MatchFact], ma
 8. **ScoreProgression の step-doubling** — 各 goal 時刻に前後 2 点、先頭 (0,0)・末尾 (total, 最終)、`diff = away - home`、`maxAbsDiff = max(1, …)`、regular phase 無し / goal 0 件は None
 9. **playerStats の決定的ソート** — Swift `uuidString` 昇順相当
 
+### 移植完了後に意図的に変えた挙動
+
+上のリストは移植期間中の凍結対象。移植完走後に**意図して**変えたものはここに積む（パリティ検証で「移植バグ」と誤認しないため）。
+
+- **記録オフセットの境界クランプ（2026-07-20、handball-project#101）** — 移植元 Swift は `max(0, base - offset)` だけで、phase / stoppage の文脈を見ていなかった。現在は `capture_play_anchor(base, offset, clock_kind, facts)` が「押した位置が属する phase の開始」「押した位置より手前で閉じた stoppage の終了」でも下限クランプする。理由は、越えさせると動画モードで R7 / R8 により保存が拒否されて記録そのものが失われ、タイマーモードでは前 phase の得点として静かに集計されるため。**影響は capture 時の anchor 生成のみ**で、既存 fact の projection は不変 → ADR 0003 のゴールデンコーパス（保存済み fact 列 → projection）には影響しない。
+
 ## 将来の境界拡張候補（移植完了後）
 
 移植期間中の境界はこの目録で凍結する（忠実移植）。完了後の拡張は「**プラットフォーム API を使わない純粋ロジックはコアへ沈め、シェルの二重実装を減らす**」を判断ルールとする（2026-07-12 設計討議）。現時点の候補:

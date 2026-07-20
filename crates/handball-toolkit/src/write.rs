@@ -506,16 +506,86 @@ pub enum CaptureClockKind {
 ///
 /// `recording_offset_seconds` は「事象が起きてからボタンを押すまでの遅れ」の補正で、
 /// 基準秒から引く。結果が負になったら 0 にクランプする（時計は負にならない）。
+///
+/// さらに **オフセットは phase 境界と stoppage 区間を越えない**（handball-project#101）。
+/// 越えさせると害が出る:
+///
+/// - 動画モード: anchor が phase 範囲外 / stoppage の内側に落ち、R7 / R8 で保存が拒否される。
+///   ユーザーのタップは正しいのに、アプリ自身が加えた補正で記録そのものが失われる。
+/// - タイマーモード: phase は matchClock 上で連続する（前 phase の end == 次 phase の start）ため、
+///   後半開始直後の記録が前半の領域に入り、前半の得点として静かに集計される。
+///
+/// 下限を 0 で止める既存の考え方を、「いま有効な区間の開始」まで広げたもの。
 pub fn capture_play_anchor(
     base_seconds: f64,
     recording_offset_seconds: f64,
     clock_kind: CaptureClockKind,
+    facts: &[MatchFact],
 ) -> FactAnchor {
-    let elapsed_seconds = (base_seconds - recording_offset_seconds).max(0.0);
+    let raw_seconds = (base_seconds - recording_offset_seconds).max(0.0);
+    let elapsed_seconds = clamp_into_recordable_range(raw_seconds, base_seconds, clock_kind, facts);
     match clock_kind {
         CaptureClockKind::MatchClock => FactAnchor::MatchClock(MatchClock { elapsed_seconds }),
         CaptureClockKind::VideoClock => FactAnchor::VideoClock(VideoClock { elapsed_seconds }),
     }
+}
+
+/// オフセットで戻した秒を、記録可能な範囲の下限まで押し戻す。
+///
+/// 下限は 2 つ。いずれも `base_seconds`（＝ボタンを押した位置）を基準に「どの区間にいるか」を
+/// 決めてから、`raw_seconds` がその手前に出ていたら引き戻す:
+///
+/// 1. 押した位置が属する PhaseStart fact の開始位置
+/// 2. 押した位置より手前で閉じている Stoppage fact の終了位置
+///
+/// `clock_kind` と異なる時計しか持たない anchor は評価対象外（例: タイマーモードの
+/// matchClock 記録に対して、videoClock だけの fact は無関係）。
+fn clamp_into_recordable_range(
+    raw_seconds: f64,
+    base_seconds: f64,
+    clock_kind: CaptureClockKind,
+    facts: &[MatchFact],
+) -> f64 {
+    let seconds_of = |anchor: &FactAnchor| match clock_kind {
+        CaptureClockKind::MatchClock => anchor.match_elapsed_seconds(),
+        CaptureClockKind::VideoClock => anchor.video_elapsed_seconds(),
+    };
+
+    let mut lower_bound = raw_seconds;
+
+    for fact in facts {
+        match &fact.payload {
+            MatchFactPayload::Control(ControlFact::PhaseStart(payload)) => {
+                let (Some(start), Some(end)) = (
+                    seconds_of(&payload.start_anchor),
+                    seconds_of(&payload.end_anchor),
+                ) else {
+                    continue;
+                };
+                // phase 境界ちょうどで押した場合は両 phase が該当しうる。max を取ることで
+                // 「いま開始したばかりの phase」側に寄せる。
+                if base_seconds >= start && base_seconds <= end && lower_bound < start {
+                    lower_bound = start;
+                }
+            }
+            MatchFactPayload::Control(ControlFact::Stoppage(payload)) => {
+                let Some(start) = seconds_of(&payload.start_anchor) else {
+                    continue;
+                };
+                let Some(end) = payload.end_anchor.and_then(|anchor| seconds_of(&anchor)) else {
+                    continue;
+                };
+                // 停止明けに押したのに、戻した先が停止区間の内側に入ってしまう場合のみ引き戻す。
+                // R8 の判定（strict inside）と不等号を揃える。
+                if base_seconds >= end && lower_bound > start && lower_bound < end {
+                    lower_bound = end;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    lower_bound
 }
 
 /// 記録画面を開いたときのタイマー初期累積秒（移植元: `RecordingScreenStore.lastPlayMatchClock`

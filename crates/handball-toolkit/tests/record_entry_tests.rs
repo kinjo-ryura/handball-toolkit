@@ -12,7 +12,7 @@ use handball_toolkit::clock::{FactAnchor, MatchClock, VideoClock};
 use handball_toolkit::configuration::PhaseKind;
 use handball_toolkit::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
-    StoppageKind,
+    StoppageKind, StoppagePayload,
 };
 use handball_toolkit::ids::{FactId, PlayerId, TeamId};
 use handball_toolkit::write::{
@@ -80,7 +80,7 @@ fn phase_start(start: f64, end: f64) -> MatchFact {
 
 #[test]
 fn 記録_offset_を基準秒から引いて_match_clock_anchor_を組む() {
-    let anchor = capture_play_anchor(600.0, 5.0, CaptureClockKind::MatchClock);
+    let anchor = capture_play_anchor(600.0, 5.0, CaptureClockKind::MatchClock, &[]);
     assert_eq!(
         anchor,
         FactAnchor::MatchClock(MatchClock {
@@ -91,7 +91,7 @@ fn 記録_offset_を基準秒から引いて_match_clock_anchor_を組む() {
 
 #[test]
 fn 記録_offset_を基準秒から引いて_video_clock_anchor_を組む() {
-    let anchor = capture_play_anchor(300.0, 5.0, CaptureClockKind::VideoClock);
+    let anchor = capture_play_anchor(300.0, 5.0, CaptureClockKind::VideoClock, &[]);
     assert_eq!(
         anchor,
         FactAnchor::VideoClock(VideoClock {
@@ -102,7 +102,7 @@ fn 記録_offset_を基準秒から引いて_video_clock_anchor_を組む() {
 
 #[test]
 fn offset_が基準秒を上回っても_0_にクランプする() {
-    let anchor = capture_play_anchor(3.0, 5.0, CaptureClockKind::MatchClock);
+    let anchor = capture_play_anchor(3.0, 5.0, CaptureClockKind::MatchClock, &[]);
     assert_eq!(
         anchor,
         FactAnchor::MatchClock(MatchClock {
@@ -113,13 +113,126 @@ fn offset_が基準秒を上回っても_0_にクランプする() {
 
 #[test]
 fn offset_0_なら基準秒がそのまま_anchor_になる() {
-    let anchor = capture_play_anchor(42.5, 0.0, CaptureClockKind::VideoClock);
+    let anchor = capture_play_anchor(42.5, 0.0, CaptureClockKind::VideoClock, &[]);
     assert_eq!(
         anchor,
         FactAnchor::VideoClock(VideoClock {
             elapsed_seconds: 42.5
         })
     );
+}
+
+// ── capture_play_anchor の境界クランプ（handball-project#101）──
+//
+// オフセットは phase 境界 / stoppage 区間を越えない。越えると動画モードでは R7 / R8 で
+// 保存が拒否されて記録が失われ、タイマーモードでは前 phase の得点として静かに集計される。
+
+fn video_phase_start(id: u128, start: f64, end: f64) -> MatchFact {
+    MatchFact {
+        id: FactId(Uuid::from_u128(id)),
+        recorded_at: epoch(),
+        payload: MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
+            kind: PhaseKind::Regular,
+            start_anchor: FactAnchor::VideoClock(VideoClock {
+                elapsed_seconds: start,
+            }),
+            end_anchor: FactAnchor::VideoClock(VideoClock {
+                elapsed_seconds: end,
+            }),
+        })),
+    }
+}
+
+fn video_stoppage(id: u128, start: f64, end: f64) -> MatchFact {
+    MatchFact {
+        id: FactId(Uuid::from_u128(id)),
+        recorded_at: epoch(),
+        payload: MatchFactPayload::Control(ControlFact::Stoppage(StoppagePayload {
+            kind: StoppageKind::Timeout,
+            start_anchor: FactAnchor::VideoClock(VideoClock {
+                elapsed_seconds: start,
+            }),
+            end_anchor: Some(FactAnchor::VideoClock(VideoClock {
+                elapsed_seconds: end,
+            })),
+            note: None,
+        })),
+    }
+}
+
+fn video_seconds(anchor: FactAnchor) -> f64 {
+    match anchor {
+        FactAnchor::VideoClock(clock) => clock.elapsed_seconds,
+        other => panic!("videoClock anchor を期待したが {other:?} だった"),
+    }
+}
+
+fn match_seconds(anchor: FactAnchor) -> f64 {
+    match anchor {
+        FactAnchor::MatchClock(clock) => clock.elapsed_seconds,
+        other => panic!("matchClock anchor を期待したが {other:?} だった"),
+    }
+}
+
+#[test]
+fn 動画_phase_開始直後の記録は_phase_開始で止まる() {
+    let facts = vec![video_phase_start(801, 600.0, 2400.0)];
+    // 開始 1 秒後にタップ。素の減算なら 598.0 で phase 範囲外 → R7 で拒否されていた。
+    let anchor = capture_play_anchor(601.0, 3.0, CaptureClockKind::VideoClock, &facts);
+    assert_eq!(video_seconds(anchor), 600.0);
+}
+
+#[test]
+fn 動画_phase_内に余裕があればクランプしない() {
+    let facts = vec![video_phase_start(801, 600.0, 2400.0)];
+    let anchor = capture_play_anchor(620.0, 3.0, CaptureClockKind::VideoClock, &facts);
+    assert_eq!(video_seconds(anchor), 617.0);
+}
+
+#[test]
+fn 動画_停止明け直後の記録は_停止終了で止まる() {
+    let facts = vec![
+        video_phase_start(801, 0.0, 1800.0),
+        video_stoppage(802, 500.0, 600.0),
+    ];
+    // 停止明け 1 秒後にタップ。素の減算なら 598.0 で停止区間の内側 → R8 で拒否されていた。
+    let anchor = capture_play_anchor(601.0, 3.0, CaptureClockKind::VideoClock, &facts);
+    assert_eq!(video_seconds(anchor), 600.0);
+}
+
+#[test]
+fn 動画_停止区間より十分後ならクランプしない() {
+    let facts = vec![
+        video_phase_start(801, 0.0, 1800.0),
+        video_stoppage(802, 500.0, 600.0),
+    ];
+    let anchor = capture_play_anchor(700.0, 3.0, CaptureClockKind::VideoClock, &facts);
+    assert_eq!(video_seconds(anchor), 697.0);
+}
+
+#[test]
+fn タイマー_後半開始直後の記録が前半に食い込まない() {
+    // phase は matchClock 上で連続する（前 phase の end == 次 phase の start）。
+    let facts = vec![phase_start(1800.0, 3600.0)];
+    let anchor = capture_play_anchor(1801.0, 3.0, CaptureClockKind::MatchClock, &facts);
+    assert_eq!(match_seconds(anchor), 1800.0);
+}
+
+#[test]
+fn 押した位置がどの_phase_にも属さないならクランプしない() {
+    // ハーフタイム中の記録などは validation に委ねる。ここで境界へ寄せると
+    // 「範囲外に記録した」事実が消えてしまう。
+    let facts = vec![video_phase_start(801, 0.0, 1800.0)];
+    let anchor = capture_play_anchor(1900.0, 3.0, CaptureClockKind::VideoClock, &facts);
+    assert_eq!(video_seconds(anchor), 1897.0);
+}
+
+#[test]
+fn 時計種別が異なる_fact_は境界に使わない() {
+    // タイマーモードの記録に対して videoClock だけの phase fact は無関係。
+    let facts = vec![video_phase_start(801, 600.0, 2400.0)];
+    let anchor = capture_play_anchor(601.0, 3.0, CaptureClockKind::MatchClock, &facts);
+    assert_eq!(match_seconds(anchor), 598.0);
 }
 
 // ── initial_timer_seconds（移植元: lastPlayMatchClock + load() の ?? 0）──
