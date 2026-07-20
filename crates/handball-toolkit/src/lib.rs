@@ -9,6 +9,10 @@
 //!
 //! モジュール構成は移植元の Swift ディレクトリ構成を 1:1 でミラーする（ADR 0001 ミラー表）。
 //!
+//! release は `panic = abort` なので、**コアの panic はアプリの abort に直結する**。
+//! FFI から到達可能なコードに `expect` / `unwrap` / `unreachable!` を足すときは、
+//! 到達不能である根拠をコードかテストで示し、ADR 0002 決定 6 の表に行を追加すること。
+//!
 //! 設計方針の背景: handball-project#49 と
 //! `handball-project/docs/research/handballrecorder-rust-core.md` を参照。
 

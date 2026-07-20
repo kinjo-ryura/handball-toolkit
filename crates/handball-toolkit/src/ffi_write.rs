@@ -58,8 +58,8 @@ impl From<VideoMigrationPlanError> for CoreWriteError {
     }
 }
 
-// uniffi::Error は Display を要求する。開発者向け診断のみ（ユーザー向け文言は
-// シェル所有 — 設計不変条件 3）なので Debug 表現をそのまま使う。
+// uniffi::Error が要求する Display。**開発者向け診断のみで、ユーザーに見せない**
+// （方針と根拠は ADR 0002 決定 5）。`Repository` 等の `message` も同じ扱い。
 impl std::fmt::Display for CoreWriteError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self:?}")

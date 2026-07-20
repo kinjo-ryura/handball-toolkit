@@ -55,6 +55,37 @@ FFI / JSON 境界でのエラー表現（serde 形式）:
 
 `validate_append` / `validate_update` / `validate_delete` が非空の `Vec<DomainValidationIssue>` を返したら、シェルは書き込みを拒否する（Swift では repository が throw する契約に対応）。コアは Result ではなく issue の列を返す — 「複数の問題を一度に報告する」挙動を保存するため。
 
+### 5. `uniffi::Error` の `Display` は開発者診断のみ（Debug 表現を流用する）
+
+**実装追記（2026-07-20、handball-project#70）**: 本 ADR 起草時は validation issue（値）だけを想定していたが、ADR 0004 / 0005 で **throw されるエラー型**（`CoreWriteError` / `SampleDtoError`）が境界に増えた。`uniffi::Error` derive は `Display` 実装を要求するため、ここに何を書くかの方針を決める。
+
+- **`Display` は `{self:?}`（Debug 表現）を流用する**。決定 3「文言はシェルが所有する」により、コアはユーザー向け文言を持てない。かといって `Display` を空にすると開発時のログが無価値になるため、**開発者向け診断としてのみ**機能させる
+- **この `Display` の出力をユーザーに見せてはならない**。シェルはエラー種別（Swift の `case` パターン）で分岐して自前の文言を出す。`Repository { message }` / `MigrationPlanInfeasible { message }` / `ImportDecodeFailed { message }` の `message` も同様に診断文字列であり、UI へそのまま流さない
+- 根拠をコード側に重複させない。各 `Display` 実装のコメントは本項を参照する（従来は同一のコメントが `ffi_api.rs` と `ffi_write.rs` に一字一句複製されていた）
+
+### 6. panic 境界 — コアの panic は「到達不能」を根拠に許容し、根拠を明文化する
+
+**実装追記（2026-07-20、handball-project#70）**: `[profile.release]` は `panic = abort`（ADR 0004 決定 7）なので、**コアの panic はアプリの abort に直結する**。write 入口は `From<UnexpectedUniFFICallbackError>`（シェル実装が投げた例外）を `CoreWriteError::Repository` へ畳むが、これは「シェル側の失敗」の受け口であって、コア自身の panic を救うものではない。
+
+方針:
+
+- **コア自身の panic は救済しない**。`Result` へ畳むと「起きるはずのないこと」を型に載せることになり、シェルに無意味な分岐を強いる
+- 代わりに **panic を残してよいのは「到達不能である根拠を、コードかテストで示せるもの」に限る**。根拠は `expect` のメッセージではなく、下表のいずれかで担保する
+- 新しい `expect` / `unwrap` / `unreachable!` を FFI から到達可能なコードへ足すときは、この表に行を追加できることを条件とする
+
+現行の全 panic 箇所と根拠（2026-07-20 時点）:
+
+| 箇所 | 根拠 |
+|---|---|
+| `ffi_api.rs` `convert_sample_match` の `ids.next().expect` | 直前の `required_id_count` 検査で不足を `InsufficientNewIds` に落とす。数える側と消費する側の一致は `sample_match_exporter_tests.rs` がコーパス横断で assert |
+| `ffi_api.rs` `decode_sample_fact` の `fallback.take().expect` | `decode_fact` が `new_id()` を呼ぶのは `fact_id` が None の 1 回だけ（`sample_match_converter.rs`）。`Option::take` が上限を型で保証 |
+| `ffi_write.rs` `commit_sample_match_import` の `ids.next().expect` | 同上（`required_import_id_count` 検査 + `sample_import_tests.rs` の一致 assert） |
+| `ffi_support.rs` `u32::try_from(obj).expect` | 対象は phase 数とコアが数える ID 個数。いずれも u32 を越えない構造 |
+| `write.rs` `unreachable!("plays_to_convert は Play のみ")` | 直前に `MatchFactPayload::Play` で filter 済み |
+| `sample_match_encoder.rs` の `expect` 3 箇所 | `SampleMatchDtoV2` は derive `Serialize` の plain struct（String / f64 / Option / Vec）で `to_value` は失敗しない。**非有限 f64 も Err ではなく `null` になる**（実測）。`Value` の再 serialize も失敗せず、serde_json の出力は常に UTF-8 |
+
+**注**: 最後の行の「非有限 f64 は `null` になる」は panic しない代わりに **export を静かに壊す**（読み戻せない JSON を成功として書く）。これは panic 境界ではなく validation の穴であり、handball-project#91 で別途扱う。
+
 ## Considered options
 
 - **`code` を snake_case / dot 区切り（例 `fact.negative_match_clock`）にする** → 却下。Swift case 名との一致を崩すと文言正典・テスト・ドキュメントの相互参照に恒常的な変換層が要る。scope は別フィールドにあるため prefix も不要
