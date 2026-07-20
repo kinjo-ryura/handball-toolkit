@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use handball_toolkit::configuration::MatchConfiguration;
-use handball_toolkit::facts::MatchFact;
+use handball_toolkit::persistence_order::persistence_ordered;
 use handball_toolkit::projection::SummaryProjection;
 use handball_toolkit::sample_dto::{
     SCHEMA_VERSION_CURRENT, SampleHighlightIndexDtoV2, SampleIndexDtoV2, SampleMatchDtoV2, convert,
@@ -256,24 +256,4 @@ fn check_duplicate_slugs<'a>(
 
 fn domain_issue(issue: &DomainValidationIssue) -> Value {
     serde_json::to_value(issue).expect("DomainValidationIssue は常に serialize 可能")
-}
-
-/// validators の入力契約（永続化順）に合わせて並べ直す。オラクルは
-/// `SwiftDataMatchRepository.factRecordOrder`（anchor 秒 → recordedAt → id）。
-/// `FactId` の Ord は UUID バイト順 = Swift `uuidString` 昇順と同順。
-fn persistence_ordered(facts: &[MatchFact]) -> Vec<MatchFact> {
-    let seconds = |fact: &MatchFact| {
-        fact.anchor()
-            .match_elapsed_seconds()
-            .or_else(|| fact.anchor().video_elapsed_seconds())
-            .unwrap_or(f64::INFINITY)
-    };
-    let mut ordered = facts.to_vec();
-    ordered.sort_by(|a, b| {
-        seconds(a)
-            .total_cmp(&seconds(b))
-            .then_with(|| a.recorded_at.cmp(&b.recorded_at))
-            .then_with(|| a.id.cmp(&b.id))
-    });
-    ordered
 }

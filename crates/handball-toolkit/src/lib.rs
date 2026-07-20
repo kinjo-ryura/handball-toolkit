@@ -23,6 +23,7 @@ mod ffi_support;
 #[cfg(feature = "uniffi")]
 pub mod ffi_write;
 pub mod ids;
+pub mod persistence_order;
 pub mod projection;
 pub mod sample_dto;
 pub mod sample_import;
