@@ -41,7 +41,7 @@ pub enum CoreWriteError {
     /// シェル repository 実装の失敗（診断文字列のみ — ユーザー向け文言はシェル所有）。
     Repository { message: String },
     /// 事前生成 ID / 時刻スタンプの不足（ID 供給契約違反。シェルは再試行できる）。
-    InsufficientNewIds { required: u32, provided: u32 },
+    InsufficientNewIds { required: usize, provided: usize },
     /// video 移行 commit の計画不成立（sync 欠落・videoClock 導出不能）。wizard の
     /// 事前 validation が通っていれば到達しない安全網（実装順序 4 で追加した variant）。
     MigrationPlanInfeasible { message: String },
@@ -147,10 +147,10 @@ pub async fn count_phase_completion_facts(
     repo: Arc<dyn MatchWriteRepository>,
     match_id: MatchId,
     fact: MatchFact,
-) -> Result<u32, CoreWriteError> {
+) -> Result<usize, CoreWriteError> {
     let match_ = repo.load_match(match_id).await?;
     let existing = repo.load_fact_log(match_id).await?;
-    Ok(write::phase_completion_plan(&match_, &existing, &fact).len() as u32)
+    Ok(write::phase_completion_plan(&match_, &existing, &fact).len())
 }
 
 /// phase 自動補完込みの fact append 入口（ADR 0005 実装順序 3 —
@@ -170,8 +170,8 @@ pub async fn record_fact_with_phase_completion(
     let plan = write::phase_completion_plan(&match_, &existing, &fact);
     if new_stamps.len() < plan.len() {
         return Err(CoreWriteError::InsufficientNewIds {
-            required: plan.len() as u32,
-            provided: new_stamps.len() as u32,
+            required: plan.len(),
+            provided: new_stamps.len(),
         });
     }
 
@@ -265,8 +265,8 @@ pub async fn commit_sample_match_import(
     let required = sample_import::required_import_id_count(&dto, &decisions);
     if new_ids.len() < required {
         return Err(CoreWriteError::InsufficientNewIds {
-            required: required as u32,
-            provided: new_ids.len() as u32,
+            required,
+            provided: new_ids.len(),
         });
     }
     let mut ids = new_ids.into_iter();

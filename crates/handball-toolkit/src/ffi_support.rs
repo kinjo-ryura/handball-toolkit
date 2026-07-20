@@ -66,13 +66,25 @@ uniffi::custom_type!(FactAnchorKindSet, Vec<FactAnchorKind>, {
     lower: |obj| obj.into_iter().collect(),
 });
 
-/// `usize`（phase index 用途）は u32 でブリッジ（ADR 0004 決定 6）。
-/// phase 数が u32 を越えることは構造的にない。Swift の Int 変換はシムが提供する。
-pub type PhaseIndex = usize;
-uniffi::custom_type!(PhaseIndex, u32, {
+/// `usize` は u32 でブリッジし、Swift では `Int` になる（ADR 0004 決定 6 / uniffi.toml）。
+///
+/// この別名は crate 内の `usize` 全体に効く。用途は phase index（`currentPhaseIndex` /
+/// `regularIndex`）と、コアが数える個数（`InsufficientNewIds` の required / provided、
+/// `count_phase_completion_facts` 等）の 2 系統。旧名は `PhaseIndex` だったが、
+/// index 以外にも効くため実態に合わせて改名した（handball-project#70）。
+///
+/// どちらの用途も u32 を越えることは構造的にない（phase 数・1 回の記録で必要な ID 数）。
+///
+/// `u32` を直接使わず custom_type を挟んでいるのは、**言語ごとに慣習の整数型へ写像する余地を
+/// 残すため**。組み込み型の `u32` には再写像のフックが無く、UniFFI の既定で Swift は
+/// `UInt32`、Kotlin は `UInt` に固定される。Kotlin バインディング（handball-project#59）を
+/// 足すときは `uniffi.toml` に `[bindings.kotlin.custom_types.CoreInt]` を追加して
+/// `Int`（Kotlin の `List.size` と同じ型）へ写すこと — 足さないと `UInt` になる。
+pub type CoreInt = usize;
+uniffi::custom_type!(CoreInt, u32, {
     remote,
     try_lift: |val| Ok(val as usize),
-    lower: |obj| u32::try_from(obj).expect("phase index は u32 に収まる"),
+    lower: |obj| u32::try_from(obj).expect("phase index / 個数は u32 に収まる"),
 });
 
 /// `BTreeMap<PlayerId, TeamId>`（RosterContext の lookup）は HashMap でブリッジ
