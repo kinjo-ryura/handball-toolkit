@@ -49,6 +49,8 @@ serde 層を境界の外側に置く原則（ADR 0001）は変わらない — U
 
 なお repository / DB に触る `MatchImporterV2` / `MatchMergerV2` の調停ロジックはシェルの責務のまま（純変換部分だけが Rust へ移る）。
 
+**この残置判断は撤回済み（2026-07-20 追記 — handball-project#67 / ADR 0005 決定 2 追記）**: 棚卸しで `MatchMergerV2` は snapshot を受け取る純粋関数（DB に触らない）と判明し、`MatchImporterV2` の残りも ID 割当と保存順序 = ADR 0005 と同型の write orchestration だった。merge 調停・import commit ともコアへ移し、シェルには取得（HTTP / Bundle）・decisions の UI 選択・表示名の解決だけが残る。
+
 **実装追記（2026-07-18 実装で確定）**: 実装時の具体化は次のとおり。
 
 - **オラクル golden はバイト一致**: 決定的試合 3 件を Swift `MatchExporterV2` で encode した出力を fixture（`tests/golden/export/`）としてコミットし、Rust 側は文字列一致で検証。JSON 構造比較では見えない `JSONEncoder` の書式仕様（UUID **大文字** / `.iso8601` の**秒未満切り捨て** / 整数値 double の `.0` 省略 / nil キー省略 / 空コンテナの `[\n\n  ]` 形）を釘付けするため、Rust に Swift 互換 encoder（`sample_match_encoder` + DTO の `swift_wire` serialize）を新設した。配信ファイルの形式は Swift 時代から不変

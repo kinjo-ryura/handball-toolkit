@@ -107,8 +107,24 @@ pub async fn record_append_fact(
 | fact 3 経路（append / update / delete） | **第 1 段** | validate → save 調停の所在を Swift 実装層からコアへ。`SwiftDataMatchRepository` は検証なしの素朴 CRUD（foreign trait 実装）になる |
 | タイマーモードの phase 自動補完（`ensureTimerPhasesCovering`） | **第 2 段** | D-snap index・被覆差分・連鎖 append はドメイン規則を含む発火 orchestration の典型。「記録操作 in → 補完 append 込みの発火」をコア入口に |
 | タイマー→動画移行の commit（`MigrateToVideoStore.commit`） | **第 3 段** | anchor 変換（SegmentResolver — 既に Rust）と保存順序設計（config 先行 save → fact 逐次 update）をコアへ |
-| match ヘッダ保存 / team・player CRUD | **第 4 段** | コア入口（passthrough + 削除の使用中判定）へ。削除の参照整合判定は**コアが持つ**（下記）。呼び出し元（store / `EditMatchViewV2` / importer / migrator）は呼び先をコア入口へ機械的に置換（merge 調停・フォーム判断はシェルのまま） |
+| match ヘッダ保存 / team・player CRUD | **第 4 段** | コア入口（passthrough + 削除の使用中判定）へ。削除の参照整合判定は**コアが持つ**（下記）。呼び出し元（store / `EditMatchViewV2` / importer / migrator）は呼び先をコア入口へ機械的に置換（フォーム判断はシェルのまま） |
+| サンプル試合 import の merge 調停 + commit | **第 5 段**（2026-07-20 追加） | 起草時は「シェル残置」と判断したが撤回した（下記）。merge 候補算出を純粋関数、import commit を write orchestration としてコアへ |
 | 観測（`observeMatches` / `observeTeams`） | 残置 | 書き込みではない。AsyncThrowingStream は境界に乗せず、SwiftData の通知機構と密結合のまま |
+
+**import 経路の merge 調停もコアへ（2026-07-20 追記 — handball-project#67）**: 起草時（および ADR 0004 決定 2）は「repository / DB に触る `MatchImporterV2` / `MatchMergerV2` の調停はシェルの責務のまま」としていたが、棚卸しの結果この判断を撤回する。`MatchMergerV2`（約 230 行）は背番号 + 正規化名の exact / partial 照合・候補ソート・default decisions・名前カノニカライズという**プラットフォーム非依存の純粋ドメインロジック**で、DB には一切触らない（呼び出し側が snapshot を渡す形）。`MatchImporterV2` も decode 本体はコア呼び出し済みで、残っていたのは team / player の ID 割当と保存順序 — 第 1〜4 段で移した発火 orchestration と同型のものだった。Android / Web で確実に再実装が必要になるため、Swift オラクルが生きているうちに移す（#56 / 第 1〜4 段と同じ論法）。
+
+境界の形は既存 2 層をそのまま踏襲する:
+
+- **計画層** `sample_import`（純粋関数・feature 非依存）— `find_team_options` / `default_decisions` / `normalize_name` / `import_commit_plan`（DTO + decisions + 事前生成 ID in → 保存すべき entity と発火順 out）
+- **発火層** `ffi_write::commit_sample_match_import` — 計画 → 新規 Team save → 新規 Player save → Match save → facts を逐次 `record_append_fact`（検証つき）
+
+従属して次を固定する:
+
+- **ID 供給は `Vec<Uuid>` 方式**（決定 4 の同型。新規 fact を組むわけではなく `recorded_at` は DTO 由来のため `NewFactStamp` は不要）。必要数は `sample_import_required_id_count` がコア側で数え、不足は `InsufficientNewIds` で拒否する
+- **`TeamOption.id`（SwiftUI `Identifiable` 用の `UUID()`）はコアに持たせない** — コアは UUID を生成しない（設計不変条件 2）。Swift シムが `existing?.id` ベースの計算プロパティで再提供する
+- **`ExistingSnapshot` は `playersByTeamID` マップではなく平坦な `players: Vec<Player>`** に畳む。`Player.team_id` が所属の一次情報であり、呼び出し側が team ごとに `loadPlayers(teamId:)` した結果を詰めていたので両表現は等価
+- **表示名の解決（existing なら DB の現名称、createNew なら DTO 名）はシェル残置**。検証入力ではない read（`load_team`）を repository 契約へ足さないため（決定 1 の「read は最小セット」）。コアが返すのは ID と件数集計（`ImportCommitOutcome`）まで
+- decode 失敗（未知の teamKey / playerKey 等）は `CoreWriteError::ImportDecodeFailed` で拒否する（移植元 `ImportError.conversionFailed` 相当）。計画が失敗した時点で 1 件も発火しない
 
 **削除の使用中判定はコアへ（grill 確定 2026-07-19）**: `deleteTeam` / `deletePlayer` の参照整合（`teamInUse` / `playerInUse`）は、trait の参照カウント read（`count_matches_referencing_team` / `count_facts_referencing_player`）をコアが読み、使用中なら発火せず構造化エラーで拒否する形に移す。従属して次を固定する:
 
@@ -174,6 +190,7 @@ pub enum CoreWriteError {
 4. **アプリ第 3 段（migrate commit）**: `MigrateToVideoStore.commit` の順序 orchestration を移管 → green → **完了（2026-07-19）**: 計画層 `video_migration_plan`（control の both 化・play の videoClock 変換・control → play の発火順を純粋関数化）+ 入口 `commit_video_migration`（config 先行 save → 逐次 validate → update）。シェル入力は `VideoSyncInput`（fact_id + video 区間）のみ — draft の matchClock は facts の read-only ミラーなのでコアが DB 真実から導く。実装追記: 計画不成立（sync 欠落・videoClock 導出不能）用に `CoreWriteError::MigrationPlanInfeasible { message }` を決定 5 の enum へ追加（wizard の事前 validation が通っていれば到達しない安全網）。store の `buildUpdatedFacts` / `updateControlFact` / `MigrationCommitError` を削除
 5. **アプリ第 4 段（entity CRUD + 完全遮断）**: match ヘッダ / team / player の CRUD をコア入口へ、削除の使用中判定をコアへ移管（Swift 実装のチェックは削除）。importer / migrator / view の呼び先置換 → 可視性遮断を全書き込みに拡張 → green → **完了（2026-07-19）**: `TeamWriteRepository` foreign trait + `record_save_match` / `record_delete_match`（passthrough）・`record_save_team` / `record_delete_team`・`record_save_player` / `record_delete_player`（削除は参照カウント read → 判定 → 発火）。シェルの write 面は `MatchWriter`（旧 MatchFactWriter を改名 — fact に加え match ヘッダ save / delete / migration commit を持つ）+ `TeamWriter` の 2 本に集約し、`MatchRepository` / `TeamRepository` protocol から全書き込みメソッドを削除（完全遮断 — 決定 3）。`SwiftDataTeamRepository` の使用中判定は削除し cascade のみ実装内に残置。view の catch は `CoreWriteError.TeamInUse / .PlayerInUse` へ置換、`RepositoryError` の validationFailed / teamInUse / playerInUse は廃止
 6. **回帰検証**: (a) アプリ側既存テスト全 green（ユニット + パッケージ）、(b) UI テスト実機 green、(c) `PRE_RELEASE_SMOKE_TEST.md` 完走、(d) TestFlight 配布 + 数日 dogfood（#56 から引き継いだ dogfood を兼ねる — #61 完了条件）
+7. **アプリ第 5 段（import の merge 調停 + commit）**: 決定 2 の追記（2026-07-20）に基づく後追い工程 — handball-project#67。計画層 `sample_import` + 入口 `commit_sample_match_import` → Swift の `MatchMergerV2` / `MatchImporterV2` を薄い梱包材へ縮小 → 該当 Swift テストを Rust テスト + 境界テストへ移植 → green
 
 各段は独立して出荷可能な状態を保つ（途中の段で止めても境界は整合する）。
 
@@ -183,6 +200,8 @@ pub enum CoreWriteError {
 - **write-plan のみ（計画をコアが返し、発火はシェル）** → 単独では却下、内部表現として採用（決定 1）。発火ループ・順序設計・エラー処理の所在が Swift に残り、Android で発火側の二重実装が発生する。#61 の目的（シェルを薄く・発火をコアへ）を満たさない
 - **移管を判断の厚い 3 経路に絞る（entity CRUD・importer は残置 — 起草時の当初案）** → 却下（grill 確定 2026-07-19）。薄い転送の移管は Swift を減らさない（ADR 0001 却下理由 2 のとおり）が、書き込み目録の単一化・可視性遮断の全面化・Android との全書き込み共有を優先し、梱包材の対価を払って全経路をコア経由にする（決定 2）
 - **削除の使用中チェックを Swift 実装に残す（整合性の最下層防衛を維持する案）** → 却下（grill 確定 2026-07-19）。判定の単一所在をコアに揃える。原子性は cascade を trait 実装内に残すことで維持し、防衛線の役割は可視性遮断（決定 3）が引き継ぐ
+- **import の merge 調停をシェル残置にする（起草時 / ADR 0004 決定 2 の判断）** → 却下（2026-07-20 撤回 — 決定 2 追記）。「repository / DB に触る」という残置理由が棚卸しで成り立たないと判明した（`MatchMergerV2` は snapshot を受け取る純粋関数で DB に触らない）。Android で確実に再実装が必要になる純粋ドメインロジックであり、残置の対価は二重実装そのものだった
+- **import commit の結果に表示名を含める（`load_team` を repository 契約へ追加する案）** → 却下。表示名は検証入力ではなくプレゼンテーションで、read 面を広げる対価に見合わない。コアは ID + 件数集計まで返し、名前解決はシェルの既存 read 面（`TeamRepository`）で行う
 - **existing_facts をシェルが引数で渡す（読み取り注入なしの最シンプル境界）** → 却下（grill 確定 2026-07-19）。検証入力が「保存瞬間の DB 真実」から「store の読み込み済みコピー」に変わり、コピーが古い場合（Mac マルチウィンドウ等）に現行より検証が緩くなるセマンティクス変更を伴う。write 経路内の最小 read セット（決定 1）は採用し、それを超える汎用 read 面の注入（`load_players` 全般・観測など）は引き続き見送り
 - **同期 callback（async をやめる）** → 却下。SwiftData 実装は async であり、同期ブリッジは executor 詰まり・deadlock リスクを最頻経路に持ち込む
 - **コアが DB を所有（rusqlite 等でコア内永続化）** → 却下。SwiftData 資産（migration・CloudKit 展望・既存 store）を捨てることになり、「fact ログの永続化は各 OS ネイティブ」の分担を壊す
