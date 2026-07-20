@@ -13,10 +13,10 @@ use std::collections::BTreeMap;
 
 use uuid::Uuid;
 
-use crate::clock::{MatchClock, VideoClock};
+use crate::clock::{FactAnchor, MatchClock, VideoClock};
 use crate::configuration::{MatchConfiguration, PhaseKind, VideoSource};
 use crate::entities::{Match, Player, Team};
-use crate::facts::{ControlFact, MatchFact, PlayFact};
+use crate::facts::{ControlFact, MatchFact, PlayEventKind, PlayFact, StoppageKind};
 use crate::ids::{FactId, PlayerId, TeamId};
 use crate::projection::{
     LiveMatchProjection, Phase, ScoreProgressionProjection, SegmentResolver, SummaryProjection,
@@ -30,7 +30,10 @@ use crate::sample_dto::{
 use crate::validation::DomainValidationIssue;
 use crate::validators;
 use crate::validators::RosterContext;
-use crate::write::{self, VideoMigrationDraftIssue, VideoSyncDraftInput};
+use crate::write::{
+    self, CaptureClockKind, NewFactStamp, PlayFactEdit, VideoMigrationDraftIssue,
+    VideoSyncDraftInput,
+};
 
 /// コアのバージョン文字列。FFI 疎通確認の最小関数。
 #[uniffi::export]
@@ -186,6 +189,56 @@ pub fn validate_video_migration_draft(
         &phase_syncs,
         &stoppage_syncs,
     )
+}
+
+// ── 記録入口（記録操作 in → fact / anchor out — handball-project#69）──
+
+/// `write::capture_play_anchor`（記録 offset の減算 + 0 クランプ + anchor 組み立て）。
+#[uniffi::export]
+pub fn capture_play_anchor(
+    base_seconds: f64,
+    recording_offset_seconds: f64,
+    clock_kind: CaptureClockKind,
+) -> FactAnchor {
+    write::capture_play_anchor(base_seconds, recording_offset_seconds, clock_kind)
+}
+
+/// `write::initial_timer_seconds`（記録画面を開いたときのタイマー初期累積秒）。
+#[uniffi::export]
+pub fn initial_timer_seconds(facts: Vec<MatchFact>) -> f64 {
+    write::initial_timer_seconds(&facts)
+}
+
+/// `write::build_play_fact`。
+#[uniffi::export]
+pub fn build_play_fact(
+    stamp: NewFactStamp,
+    kind: PlayEventKind,
+    team_id: Option<TeamId>,
+    player_id: Option<PlayerId>,
+    anchor: FactAnchor,
+    title: Option<String>,
+    note: Option<String>,
+) -> MatchFact {
+    write::build_play_fact(stamp, kind, team_id, player_id, anchor, title, note)
+}
+
+/// `write::build_stoppage_fact`。
+#[uniffi::export]
+pub fn build_stoppage_fact(
+    stamp: NewFactStamp,
+    kind: StoppageKind,
+    start_anchor: FactAnchor,
+    end_anchor: Option<FactAnchor>,
+    note: Option<String>,
+) -> MatchFact {
+    write::build_stoppage_fact(stamp, kind, start_anchor, end_anchor, note)
+}
+
+/// `write::apply_play_fact_edit`（1 操作分の編集適用。trim / クランプ / anchor 場合分け込み）。
+#[uniffi::export]
+pub fn apply_play_fact_edit(play: PlayFact, edit: PlayFactEdit) -> PlayFact {
+    write::apply_play_fact_edit(play, edit)
 }
 
 // ── sample_dto（SAMPLE_DTO_V2 の parse / 変換 / export — ADR 0004 決定 2）──

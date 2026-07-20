@@ -11,7 +11,10 @@ use chrono::{DateTime, Utc};
 use crate::clock::{FactAnchor, MatchClock, VideoClock};
 use crate::configuration::{MatchConfiguration, PhaseKind, VideoSource};
 use crate::entities::Match;
-use crate::facts::{ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload};
+use crate::facts::{
+    ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
+    StoppageKind, StoppagePayload,
+};
 use crate::ids::{FactId, PlayerId, TeamId};
 use crate::projection::SegmentResolver;
 use crate::validators::RosterContext;
@@ -478,5 +481,176 @@ fn validate_stoppage_sync_drafts(
                 });
             }
         }
+    }
+}
+
+// ── 記録入口の純粋ヘルパー（移植元: RecordingScreenStore の残留計算 — handball-project#69）──
+//
+// 「記録操作 in → fact / anchor out」の粗い粒度で置く（設計不変条件 4）。clamp・正規化・
+// anchor の場合分けは各入口の内部に吸収し、シェルには状態保持と橋渡しだけを残す。
+// タイマーの delta 加算（now - last）は Date 演算かつ 2Hz 経路であり、ドメイン規則ではなく
+// シェルの UI 状態遷移なのでコアには持ち込まない。
+
+/// 記録時に anchor をどの時計で組むか（capture method に対応）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+pub enum CaptureClockKind {
+    /// タイマーモード: 試合タイマーの累積秒を基準にする。
+    MatchClock,
+    /// 動画モード / ハイライト: 動画の再生位置を基準にする。
+    VideoClock,
+}
+
+/// play event を捕捉した瞬間の anchor を組む（移植元: `RecordingScreenStore.capturePlayEvent` /
+/// `recordFreeNote` / `capturePlayEventInVideoMode` の `max(0, base - offset)`）。
+///
+/// `recording_offset_seconds` は「事象が起きてからボタンを押すまでの遅れ」の補正で、
+/// 基準秒から引く。結果が負になったら 0 にクランプする（時計は負にならない）。
+pub fn capture_play_anchor(
+    base_seconds: f64,
+    recording_offset_seconds: f64,
+    clock_kind: CaptureClockKind,
+) -> FactAnchor {
+    let elapsed_seconds = (base_seconds - recording_offset_seconds).max(0.0);
+    match clock_kind {
+        CaptureClockKind::MatchClock => FactAnchor::MatchClock(MatchClock { elapsed_seconds }),
+        CaptureClockKind::VideoClock => FactAnchor::VideoClock(VideoClock { elapsed_seconds }),
+    }
+}
+
+/// 記録画面を開いたときのタイマー初期累積秒（移植元: `RecordingScreenStore.lastPlayMatchClock`
+/// + `load()` の `?? 0`）。
+///
+/// fact 列を末尾から走査し、最初に見つかった play fact の matchClock を返す。
+/// play fact が無い / 直近 play が videoClock 単独なら 0（タイマーは頭出し）。
+pub fn initial_timer_seconds(facts: &[MatchFact]) -> f64 {
+    facts
+        .iter()
+        .rev()
+        .find_map(|fact| match &fact.payload {
+            MatchFactPayload::Play(play) => Some(play.anchor.match_clock()),
+            MatchFactPayload::Control(_) => None,
+        })
+        .flatten()
+        .map(|clock| clock.elapsed_seconds)
+        .unwrap_or(0.0)
+}
+
+/// 新規 play fact を組む（移植元: `confirmPlayEvent` / `confirmPendingFreeNote` /
+/// `recordFreeNote` の fact 生成）。
+///
+/// `title` / `note` は `apply_play_fact_edit` と同じ規則で正規化する（前後空白除去 →
+/// 空文字なら None）。移植元は新規記録経路だけ正規化しておらず、「同じ文字列でも
+/// 新規記録か編集かで保存される中身が変わる」非対称があった（handball-project#69）。
+pub fn build_play_fact(
+    stamp: NewFactStamp,
+    kind: PlayEventKind,
+    team_id: Option<TeamId>,
+    player_id: Option<PlayerId>,
+    anchor: FactAnchor,
+    title: Option<String>,
+    note: Option<String>,
+) -> MatchFact {
+    MatchFact {
+        id: stamp.id,
+        recorded_at: stamp.recorded_at,
+        payload: MatchFactPayload::Play(PlayFact {
+            kind,
+            team_id,
+            player_id,
+            related_player_id: None,
+            anchor,
+            title: normalize_optional_text(title),
+            note: normalize_optional_text(note),
+        }),
+    }
+}
+
+/// 新規 stoppage fact を組む（移植元: `recordTimeout` / `recordTimerPause` /
+/// `recordVideoStoppage` の fact 生成）。
+///
+/// `end_anchor` はタイマーモードでは None（開始のみの marker）、動画モードでは区間の終端。
+/// `note` の扱いは `build_play_fact` と同じ（正規化する）。
+pub fn build_stoppage_fact(
+    stamp: NewFactStamp,
+    kind: StoppageKind,
+    start_anchor: FactAnchor,
+    end_anchor: Option<FactAnchor>,
+    note: Option<String>,
+) -> MatchFact {
+    MatchFact {
+        id: stamp.id,
+        recorded_at: stamp.recorded_at,
+        payload: MatchFactPayload::Control(ControlFact::Stoppage(StoppagePayload {
+            kind,
+            start_anchor,
+            end_anchor,
+            note: normalize_optional_text(note),
+        })),
+    }
+}
+
+/// 既存 play fact への 1 操作分の編集（移植元: `RecordingScreenStore` の
+/// `updateFactNote` / `updateFactTitle` / `updateFactPlayer` / `updateFactKind` /
+/// `updateFactMatchClock` / `updateFactVideoClock`）。
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+pub enum PlayFactEdit {
+    /// メモを差し替える（前後空白除去 → 空文字なら None）。
+    Note { text: Option<String> },
+    /// タイトルを差し替える（同上）。
+    Title { text: Option<String> },
+    /// 選手を差し替える（None で選手なしにする）。
+    Player { player_id: Option<PlayerId> },
+    /// イベント種別を差し替える。
+    Kind { kind: PlayEventKind },
+    /// matchClock を差し替える（タイマーモード想定）。anchor は `.matchClock` 単独になる。
+    MatchClock { elapsed_seconds: f64 },
+    /// videoClock を差し替える（動画モード想定）。`.matchClock` 単独の fact は変更しない。
+    VideoClock { elapsed_seconds: f64 },
+}
+
+/// play fact に編集を 1 件適用した結果を返す。
+pub fn apply_play_fact_edit(play: PlayFact, edit: PlayFactEdit) -> PlayFact {
+    let mut play = play;
+    match edit {
+        PlayFactEdit::Note { text } => play.note = normalize_optional_text(text),
+        PlayFactEdit::Title { text } => play.title = normalize_optional_text(text),
+        PlayFactEdit::Player { player_id } => play.player_id = player_id,
+        PlayFactEdit::Kind { kind } => play.kind = kind,
+        PlayFactEdit::MatchClock { elapsed_seconds } => {
+            play.anchor = FactAnchor::MatchClock(MatchClock {
+                elapsed_seconds: elapsed_seconds.max(0.0),
+            });
+        }
+        PlayFactEdit::VideoClock { elapsed_seconds } => {
+            let video_clock = VideoClock {
+                elapsed_seconds: elapsed_seconds.max(0.0),
+            };
+            play.anchor = match play.anchor {
+                FactAnchor::VideoClock(_) => FactAnchor::VideoClock(video_clock),
+                FactAnchor::Both { match_clock, .. } => FactAnchor::Both {
+                    match_clock,
+                    video_clock,
+                },
+                // matchClock 単独の fact に videoClock だけ与えても sync 点は決まらないため触らない。
+                FactAnchor::MatchClock(_) => play.anchor,
+            };
+        }
+    }
+    play
+}
+
+/// 任意テキストの正規化: 前後の空白・改行を除去し、空文字になったら None にする。
+///
+/// 移植元: `RecordingScreenStore` の
+/// `let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines)` +
+/// `(trimmed?.isEmpty == false) ? trimmed : nil`。
+fn normalize_optional_text(text: Option<String>) -> Option<String> {
+    let trimmed = text?.trim().to_string();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed)
     }
 }
