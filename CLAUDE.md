@@ -7,8 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ハンドボール試合データのツールキット（Rust workspace）。[HandballRecorder](https://github.com/kinjo-ryura/HandballRecorder) のドメイン層 `RecorderDomain`（Swift・Foundation のみ依存の純粋計算 約 2,700 行）の移植であり、単一の共有コアを iOS / Android / Web (wasm) / CLI へ届けるための基盤。[handball-project](https://github.com/kinjo-ryura/handball-project) の submodule（`apps/handball-toolkit/`）として管理される。
 
 - 経緯・設計判断の一次資料: [handball-project#49](https://github.com/kinjo-ryura/handball-project/issues/49) と `handball-project/docs/research/handballrecorder-rust-core.md`
-- 設計の正典: `docs/adr/`（0001 境界 API / 0002 エラー体系 / 0003 パリティ検証。accepted 2026-07-12）
-- **移植作業の進め方・現在地・作業規律: [`docs/PORTING.md`](docs/PORTING.md)。移植作業のセッションは必ず冒頭でこれを読み、進捗があればチェックを更新すること**
+- 設計の正典: `docs/adr/`（0001 境界 API / 0002 エラー体系 / 0003 パリティ検証 — accepted 2026-07-12。0004 iOS FFI 本境界 / 0005 write orchestration — accepted 2026-07-18）。**各 ADR の「実装追記」が実装の現況を持つ**
+- 移植の経緯・作業規律: [`docs/PORTING.md`](docs/PORTING.md)。**移植は完走済みで、同ファイルは完了記録**（現在地の管理台帳ではない）。進行中・未着手の作業は GitHub Issues が正
 - ドキュメント・コードコメントは日本語で書く（OSS 公開時の英語化は公開判断とセットで行う）
 
 ## 開発コマンド
