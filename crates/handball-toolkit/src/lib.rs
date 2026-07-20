@@ -25,6 +25,7 @@ pub mod ffi_write;
 pub mod ids;
 pub mod projection;
 pub mod sample_dto;
+pub mod sample_import;
 pub mod validation;
 pub mod validators;
 pub mod write;
