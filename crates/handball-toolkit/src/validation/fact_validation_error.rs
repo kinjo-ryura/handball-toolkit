@@ -31,6 +31,17 @@ pub enum FactValidationError {
     // ── anchor 系 ──
     NegativeMatchClock,
     NegativeVideoClock,
+    /// 秒値が非有限（NaN / ±∞）。移植元 Swift には無い、Rust 側で新設した case。
+    ///
+    /// `NaN < 0.0` は false になるため負値検査を素通りする。素通りした非有限値は
+    /// serde_json が `null` として書き出す（Err にも panic にもならない）ので、
+    /// export は成功として読み戻せない JSON を書く。projection 側でも NaN は比較が
+    /// 常に false になり `SegmentResolver` の区間判定にヒットせず、phase 別集計から
+    /// 黙って除外される。いずれも失敗が書き込み時点に現れないため、ここで弾く。
+    /// 詳細は handball-project#91。
+    NonFiniteMatchClock,
+    /// 秒値が非有限（NaN / ±∞）。詳細は [`FactValidationError::NonFiniteMatchClock`]。
+    NonFiniteVideoClock,
     InvalidAnchorForConfiguration {
         configuration: MatchConfigurationKind,
         actual: FactAnchorKind,

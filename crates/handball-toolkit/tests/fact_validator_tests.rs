@@ -165,6 +165,127 @@ fn negative_match_clock_is_rejected() {
     )));
 }
 
+/// 非有限の 3 値。`NaN < 0.0` も `INF < 0.0` も false になるため、負値検査だけでは
+/// 全て素通りする（handball-project#91）。
+const NON_FINITE: [(f64, &str); 3] = [
+    (f64::NAN, "NaN"),
+    (f64::INFINITY, "+∞"),
+    (f64::NEG_INFINITY, "-∞"),
+];
+
+#[test]
+fn non_finite_match_clock_is_rejected() {
+    let c = ctx();
+    for (secs, label) in NON_FINITE {
+        let fact = PlayFact {
+            team_id: Some(c.home_id),
+            player_id: Some(c.player1),
+            ..play_base(PlayEventKind::Goal, mc(secs))
+        };
+        let issues = validate_play_fact(&fact, &c.timer_config, &c.roster);
+        assert!(
+            issues.contains(&DomainValidationIssue::Fact(
+                FactValidationError::NonFiniteMatchClock
+            )),
+            "matchClock = {label} が弾かれていない: {issues:?}"
+        );
+    }
+}
+
+#[test]
+fn non_finite_video_clock_is_rejected() {
+    let c = ctx();
+    for (secs, label) in NON_FINITE {
+        let fact = PlayFact {
+            team_id: Some(c.home_id),
+            player_id: Some(c.player1),
+            ..play_base(PlayEventKind::Goal, vc(secs))
+        };
+        let issues = validate_play_fact(&fact, &c.video_config, &c.roster);
+        assert!(
+            issues.contains(&DomainValidationIssue::Fact(
+                FactValidationError::NonFiniteVideoClock
+            )),
+            "videoClock = {label} が弾かれていない: {issues:?}"
+        );
+    }
+}
+
+#[test]
+fn non_finite_both_anchor_reports_each_clock() {
+    // Both は 2 つの時計を持つ。片方だけ報告して終わらないことを固定する。
+    let c = ctx();
+    for (secs, label) in NON_FINITE {
+        let fact = PlayFact {
+            team_id: Some(c.home_id),
+            player_id: Some(c.player1),
+            ..play_base(PlayEventKind::Goal, both(secs, secs))
+        };
+        let issues = validate_play_fact(&fact, &c.video_config, &c.roster);
+        assert!(
+            issues.contains(&DomainValidationIssue::Fact(
+                FactValidationError::NonFiniteMatchClock
+            )) && issues.contains(&DomainValidationIssue::Fact(
+                FactValidationError::NonFiniteVideoClock
+            )),
+            "both({label}, {label}) が両時計とも報告されていない: {issues:?}"
+        );
+    }
+}
+
+#[test]
+fn non_finite_stoppage_anchors_are_rejected() {
+    // 実際に到達しうる経路（video mode の中断記録は呼び出し側から anchor を受け取る）。
+    let c = ctx();
+    for (secs, label) in NON_FINITE {
+        let fact = ControlFact::Stoppage(StoppagePayload {
+            kind: StoppageKind::Timeout,
+            start_anchor: vc(secs),
+            end_anchor: Some(vc(secs)),
+            note: None,
+        });
+        let issues = validate_control_fact(&fact, &c.video_config);
+        assert!(
+            issues.contains(&DomainValidationIssue::Fact(
+                FactValidationError::NonFiniteVideoClock
+            )),
+            "stoppage anchor = {label} が弾かれていない: {issues:?}"
+        );
+    }
+}
+
+#[test]
+fn negative_infinity_is_reported_as_non_finite_not_negative() {
+    // -∞ は負値でもあるが、非有限を先に見るので NonFinite に分類される。
+    // 分類が入れ替わるとシェルの文言が「0 秒より前」になり実態とずれる。
+    let c = ctx();
+    let fact = PlayFact {
+        team_id: Some(c.home_id),
+        player_id: Some(c.player1),
+        ..play_base(PlayEventKind::Goal, mc(f64::NEG_INFINITY))
+    };
+    let issues = validate_play_fact(&fact, &c.timer_config, &c.roster);
+    assert!(issues.contains(&DomainValidationIssue::Fact(
+        FactValidationError::NonFiniteMatchClock
+    )));
+    assert!(!issues.contains(&DomainValidationIssue::Fact(
+        FactValidationError::NegativeMatchClock
+    )));
+}
+
+#[test]
+fn finite_anchor_passes_value_check() {
+    // 非有限検査の追加で正常値まで弾いていないことを固定する。
+    let c = ctx();
+    let fact = PlayFact {
+        team_id: Some(c.home_id),
+        player_id: Some(c.player1),
+        ..play_base(PlayEventKind::Goal, both(600.0, 900.0))
+    };
+    let issues = validate_play_fact(&fact, &c.video_config, &c.roster);
+    assert!(issues.is_empty(), "正常な anchor が弾かれた: {issues:?}");
+}
+
 #[test]
 fn goal_without_player_is_rejected() {
     let c = ctx();

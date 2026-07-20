@@ -230,36 +230,51 @@ fn validate_anchor_value(anchor: FactAnchor) -> Vec<DomainValidationIssue> {
     let mut issues: Vec<DomainValidationIssue> = Vec::new();
     match anchor {
         FactAnchor::MatchClock(mc) => {
-            if mc.elapsed_seconds < 0.0 {
-                issues.push(DomainValidationIssue::Fact(
-                    FactValidationError::NegativeMatchClock,
-                ));
-            }
+            issues.extend(match_clock_value_issue(mc.elapsed_seconds));
         }
         FactAnchor::VideoClock(vc) => {
-            if vc.elapsed_seconds < 0.0 {
-                issues.push(DomainValidationIssue::Fact(
-                    FactValidationError::NegativeVideoClock,
-                ));
-            }
+            issues.extend(video_clock_value_issue(vc.elapsed_seconds));
         }
         FactAnchor::Both {
             match_clock: mc,
             video_clock: vc,
         } => {
-            if mc.elapsed_seconds < 0.0 {
-                issues.push(DomainValidationIssue::Fact(
-                    FactValidationError::NegativeMatchClock,
-                ));
-            }
-            if vc.elapsed_seconds < 0.0 {
-                issues.push(DomainValidationIssue::Fact(
-                    FactValidationError::NegativeVideoClock,
-                ));
-            }
+            issues.extend(match_clock_value_issue(mc.elapsed_seconds));
+            issues.extend(video_clock_value_issue(vc.elapsed_seconds));
         }
     }
     issues
+}
+
+/// 非有限（NaN / ±∞）を負値より先に見る。`NaN < 0.0` は false になるため、
+/// 順序を逆にすると非有限が素通りする（handball-project#91）。
+fn match_clock_value_issue(seconds: f64) -> Option<DomainValidationIssue> {
+    if !seconds.is_finite() {
+        Some(DomainValidationIssue::Fact(
+            FactValidationError::NonFiniteMatchClock,
+        ))
+    } else if seconds < 0.0 {
+        Some(DomainValidationIssue::Fact(
+            FactValidationError::NegativeMatchClock,
+        ))
+    } else {
+        None
+    }
+}
+
+/// [`match_clock_value_issue`] の video clock 版。
+fn video_clock_value_issue(seconds: f64) -> Option<DomainValidationIssue> {
+    if !seconds.is_finite() {
+        Some(DomainValidationIssue::Fact(
+            FactValidationError::NonFiniteVideoClock,
+        ))
+    } else if seconds < 0.0 {
+        Some(DomainValidationIssue::Fact(
+            FactValidationError::NegativeVideoClock,
+        ))
+    } else {
+        None
+    }
 }
 
 // ── Anchor kind の configuration 整合 ──

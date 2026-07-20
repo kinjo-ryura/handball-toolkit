@@ -18,12 +18,21 @@ accepted（2026-07-12 起草、同日 grill 済み。handball-project#49）
 |---|---|---|
 | `MatchValidationError` | 同名 | 3（`SameTeamOnBothSides` / `EmptyTitle` / `OverlappingRosterSelections { player_ids }`） |
 | `ConfigurationValidationError` | 同名 | 2（`NonPositivePhaseDuration { seconds }` / `EmptyVideoExternalId`） |
-| `FactValidationError` | 同名 | 20（anchor 系 3 / 文字列・参照 3 / Play kind 必須 2 / PhaseStart 3 / Stoppage 5 / 参照整合 4） |
+| `FactValidationError` | 同名 | 20（anchor 系 3 / 文字列・参照 3 / Play kind 必須 2 / PhaseStart 3 / Stoppage 5 / 参照整合 4）→ 現在 22（下の #91 追記） |
 | `TimelineValidationError` | 同名 | 12（R3 / R5 / R6 / R7 / R8 / R9 / R11 + shootout 順序 2 + phase 連続性 1 + stoppage 重複・範囲 2） |
 | `DomainValidationIssue` | 同名 | 4（`Match` / `Configuration` / `Fact` / `Timeline` の集約） |
 
 - payload（`invalidAnchorForConfiguration(configuration:actual:allowed:)` の 3 引数等）も 1:1 で写す
 - **severity は持たない**（一律 blocking、Swift 設計踏襲）。warning が必要になったら struct ラッパー化する将来判断も踏襲
+
+**実装追記（2026-07-20、handball-project#91）**: 上の「1:1 で写す」は**移植中の忠実性制約**であり、移植完走後の case 追加を禁じるものではない。移植元 `Packages/RecorderDomain` は HandballRecorder 側で削除済み（コミット `8aeffb8`、Rust コアへ差し替え）で、対応を保つべき live な Swift 実装はもう存在しない。したがって「Swift に無い case は足せない」という読み方は取らない。
+
+初回の適用が `NonFiniteMatchClock` / `NonFiniteVideoClock` の新設（`FactValidationError` は 20 → 22 ケース）。移植元の負値検査 `< 0.0` は NaN / ±∞ を素通りさせるが、これは移植すべき仕様ではなく**移植元から引き継いだ穴**である。決定 2 の「code は安定契約」に対しては**追加のみ**で、既存 code の意味も名前も変えない。
+
+case を足すときの条件:
+
+- **移植元の挙動を「改善」する変更ではないこと**。ADR 0003 のパリティ検証は正常系の projection 一致を守る枠組みであり、正常系で観測されない値（非有限秒）の扱いはその対象外。判断に迷う場合はゴールデンコーパスの出力が変わるか否かを基準にする（変わるなら改善であり、足してはいけない）
+- **シェル側の文言を同時に用意すること**。`DomainValidationMessage.swift` の `switch` は網羅型なので、文言を書かない限りコンパイルが通らない（漏れは構造的に検出される）。文言正典 `DOMAIN_VALIDATION_MESSAGES.md` にも行を足す
 - 自動修復はコアで行わない（判定のみ。修復はシェルの責務）
 - ルール ID（R3–R11、R1/R2/R4/R10 は歴史的欠番）は doc コメントに Swift 同様に明記し、`DOMAIN_VALIDATION_RULES.md` と相互参照可能にする
 
@@ -86,7 +95,7 @@ FFI / JSON 境界でのエラー表現（serde 形式）:
 | （wasm）`lib.rs` `build_match_view` の `ids.next().expect` | `ffi_api.rs` の同型（直前の `required_id_count` 検査で `InsufficientNewIds` に落とす）。個数一致は `wasm_binding_tests.rs` の `insufficient_ids_boundary` が required-1 / required の両側で assert |
 | （wasm）`lib.rs` `build_match_view_js` の `to_string().expect` | `MatchView` はコアの derive `Serialize` 型を束ねた plain struct。根拠は `sample_match_encoder.rs` の行と同じ |
 
-**注**: 最後の行の「非有限 f64 は `null` になる」は panic しない代わりに **export を静かに壊す**（読み戻せない JSON を成功として書く）。これは panic 境界ではなく validation の穴であり、handball-project#91 で別途扱う。
+**注**: 「非有限 f64 は `null` になる」は panic しない代わりに **export を静かに壊す**（読み戻せない JSON を成功として書く）。これは panic 境界ではなく validation の穴であり、handball-project#91 で `NonFiniteMatchClock` / `NonFiniteVideoClock` を新設して**書き込み時点で弾く**ことで塞いだ（決定 1 の #91 追記）。encoder 側は引き続き非有限を弾かない — 弾くべき地点は validation であり、encoder に二重の防御を置くと責務が分散するため。
 
 ## Considered options
 
