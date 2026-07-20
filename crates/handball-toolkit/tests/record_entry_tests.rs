@@ -210,10 +210,10 @@ fn play_fact_は_stamp_の_id_と_recorded_at_を載せる() {
     assert_eq!(play.related_player_id, None);
 }
 
-/// パリティ維持（移植元の新規記録経路は title / note を trim しない）。
-/// 非対称の解消は後続コミットで別途扱う。
+/// 移植元は新規記録経路だけ正規化しておらず、同じ文字列でも新規記録か編集かで
+/// 保存される中身が変わる非対称があった（handball-project#69 で解消）。
 #[test]
-fn 新規_play_fact_の_title_と_note_は正規化しない() {
+fn 新規_play_fact_の_title_と_note_も編集と同じ規則で正規化する() {
     let fact = build_play_fact(
         stamp(2),
         PlayEventKind::FreeNote,
@@ -229,8 +229,8 @@ fn 新規_play_fact_の_title_と_note_は正規化しない() {
     let MatchFactPayload::Play(play) = fact.payload else {
         panic!("play fact のはず");
     };
-    assert_eq!(play.title.as_deref(), Some("  タイトル  "));
-    assert_eq!(play.note.as_deref(), Some("   "));
+    assert_eq!(play.title.as_deref(), Some("タイトル"));
+    assert_eq!(play.note, None);
 }
 
 #[test]
@@ -277,6 +277,39 @@ fn 動画モードの_stoppage_は_end_anchor_付きで組む() {
         }))
     );
     assert_eq!(payload.note.as_deref(), Some("負傷"));
+}
+
+/// stoppage の note も play fact と同じ規則で正規化する（移植元は
+/// `recordTimerPause` だけ trim し `recordVideoStoppage` は素通しだった）。
+#[test]
+fn 新規_stoppage_fact_の_note_も正規化する() {
+    let trimmed = build_stoppage_fact(
+        stamp(5),
+        StoppageKind::Pause,
+        FactAnchor::MatchClock(MatchClock {
+            elapsed_seconds: 600.0,
+        }),
+        None,
+        Some("  怪我  ".to_string()),
+    );
+    let MatchFactPayload::Control(ControlFact::Stoppage(payload)) = trimmed.payload else {
+        panic!("stoppage fact のはず");
+    };
+    assert_eq!(payload.note.as_deref(), Some("怪我"));
+
+    let blank = build_stoppage_fact(
+        stamp(6),
+        StoppageKind::Pause,
+        FactAnchor::MatchClock(MatchClock {
+            elapsed_seconds: 600.0,
+        }),
+        None,
+        Some("   ".to_string()),
+    );
+    let MatchFactPayload::Control(ControlFact::Stoppage(payload)) = blank.payload else {
+        panic!("stoppage fact のはず");
+    };
+    assert_eq!(payload.note, None);
 }
 
 // ── apply_play_fact_edit（移植元: RecordingScreenStoreEditTests）──

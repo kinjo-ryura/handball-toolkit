@@ -539,7 +539,9 @@ pub fn initial_timer_seconds(facts: &[MatchFact]) -> f64 {
 /// 新規 play fact を組む（移植元: `confirmPlayEvent` / `confirmPendingFreeNote` /
 /// `recordFreeNote` の fact 生成）。
 ///
-/// `title` / `note` は正規化せずそのまま載せる（移植元の挙動 — ADR 0005 決定 7 のパリティ維持）。
+/// `title` / `note` は `apply_play_fact_edit` と同じ規則で正規化する（前後空白除去 →
+/// 空文字なら None）。移植元は新規記録経路だけ正規化しておらず、「同じ文字列でも
+/// 新規記録か編集かで保存される中身が変わる」非対称があった（handball-project#69）。
 pub fn build_play_fact(
     stamp: NewFactStamp,
     kind: PlayEventKind,
@@ -558,8 +560,8 @@ pub fn build_play_fact(
             player_id,
             related_player_id: None,
             anchor,
-            title,
-            note,
+            title: normalize_optional_text(title),
+            note: normalize_optional_text(note),
         }),
     }
 }
@@ -568,7 +570,7 @@ pub fn build_play_fact(
 /// `recordVideoStoppage` の fact 生成）。
 ///
 /// `end_anchor` はタイマーモードでは None（開始のみの marker）、動画モードでは区間の終端。
-/// `note` の扱いは `build_play_fact` と同じ（正規化しない — パリティ維持）。
+/// `note` の扱いは `build_play_fact` と同じ（正規化する）。
 pub fn build_stoppage_fact(
     stamp: NewFactStamp,
     kind: StoppageKind,
@@ -583,7 +585,7 @@ pub fn build_stoppage_fact(
             kind,
             start_anchor,
             end_anchor,
-            note,
+            note: normalize_optional_text(note),
         })),
     }
 }
