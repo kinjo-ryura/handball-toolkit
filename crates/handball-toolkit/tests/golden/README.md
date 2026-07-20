@@ -10,8 +10,12 @@ Rust 実装の出力が `expected/` と一致することをパリティテス�
 |---|---|
 | オラクル（RecorderDomain） | HandballRecorder **main** `b7cf57e861a9100ee3f721c8c477e2aae062c3f8` |
 | dump ツール | HandballRecorder `parity/oracle-dump` ブランチの `recorder-domain-dump`（Package: `Packages/RecorderDomain`。ブランチ削除後は tag `oracle-dump-final`） |
-| 入力コーパス | handball-sample-matches `6a8e71388f851edb7fa4029a3d35c4c4396ae926`（`v2/matches/` 4 件 = `.video` 2 + `.timer` 2、`v2/highlights/` 6 件） |
+| 入力コーパス | handball-sample-matches `d64d8d5f7b8ec947fae1640a5f6b0fa40900e369`（`v2/matches/` 4 件 = `.video` 2 + `.timer` 2、`v2/highlights/` 6 件） |
 | 生成日 | 2026-07-20（`.timer` 2 件を追加 — handball-project#53。期待値は昇格前に `local/` で生成済みのものを、入力 byte 一致のまま流用したので再 dump していない。highlights は #71 で再生成、`.video` matches は 2026-07-12 生成のまま） |
+
+`2025-12-20-f352ea46` の `match.displayName` に「（前半のみ）」を付記した入力更新
+（handball-project#89）を取り込んでいる。`displayName` は projection に現れず期待値に
+含まれないため、再 dump はしていない。
 
 - 出所ハッシュは **main のコミット**を記録する（`parity/oracle-dump` はパリティ完走後に削除されるため。
   ブランチの不変条件「RecorderDomain ソース不変」により、オラクルの中身 = main の RecorderDomain）
