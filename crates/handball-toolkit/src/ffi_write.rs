@@ -13,10 +13,14 @@
 
 use std::sync::Arc;
 
+use uuid::Uuid;
+
 use crate::configuration::{MatchConfiguration, VideoSource};
 use crate::entities::{Match, Player, Team};
 use crate::facts::MatchFact;
 use crate::ids::{FactId, MatchId, PlayerId, TeamId};
+use crate::sample_dto::SampleMatchDtoV2;
+use crate::sample_import::{self, ImportCommitOutcome, ImportDecisions};
 use crate::validation::DomainValidationIssue;
 use crate::validators::{self, RosterContext};
 use crate::write::{self, NewFactStamp, PlayerTeamRef, VideoMigrationPlanError, VideoSyncInput};
@@ -41,6 +45,9 @@ pub enum CoreWriteError {
     /// video 移行 commit の計画不成立（sync 欠落・videoClock 導出不能）。wizard の
     /// 事前 validation が通っていれば到達しない安全網（実装順序 4 で追加した variant）。
     MigrationPlanInfeasible { message: String },
+    /// import commit の DTO → domain decode 失敗（未知の teamKey / playerKey・不正な
+    /// configuration 等）。移植元 `MatchImporterV2.ImportError.conversionFailed` 相当。
+    ImportDecodeFailed { message: String },
 }
 
 impl From<VideoMigrationPlanError> for CoreWriteError {
@@ -227,6 +234,57 @@ pub async fn commit_video_migration(
         }
     }
     Ok(())
+}
+
+/// サンプル試合 import commit の入口（handball-project#67 — ADR 0005 の import 版）。
+///
+/// 移植元: `MatchImporterV2.commit(parsed:decisions:...)` の ID 解決 + 組立 + 保存順序。
+/// シェルに残るのは取得（HTTP / Bundle）と decisions の UI 選択、表示名の解決だけになる。
+///
+/// 順序設計をコアが所有する（移植元の保存順をそのまま保存 — 挙動パリティ）:
+/// 1. 計画（純粋関数 `import_commit_plan` — 既存に統合した entity は save 対象に積まない）
+/// 2. 新規 Team を save（Match が teamId を参照するため先）
+/// 3. 新規 Player を save
+/// 4. Match ヘッダを save
+/// 5. facts を逐次 append（`record_append_fact` と同じ検証つき — 挙動パリティ）
+///
+/// 挙動パリティ（決定 7）: 連鎖は逐次・非 atomic。途中失敗は再実行復旧前提で、
+/// 発火済みの entity はロールバックしない（移植元の for ループと同じ）。
+#[uniffi::export]
+pub async fn commit_sample_match_import(
+    match_repo: Arc<dyn MatchWriteRepository>,
+    team_repo: Arc<dyn TeamWriteRepository>,
+    dto: SampleMatchDtoV2,
+    decisions: ImportDecisions,
+    new_ids: Vec<Uuid>,
+) -> Result<ImportCommitOutcome, CoreWriteError> {
+    let required = sample_import::required_import_id_count(&dto, &decisions);
+    if new_ids.len() < required {
+        return Err(CoreWriteError::InsufficientNewIds {
+            required: required as u32,
+            provided: new_ids.len() as u32,
+        });
+    }
+    let mut ids = new_ids.into_iter();
+    let plan = sample_import::import_commit_plan(&dto, &decisions, || {
+        ids.next().expect("必要数は事前検査済み")
+    })
+    .map_err(|error| CoreWriteError::ImportDecodeFailed {
+        message: format!("{error:?}"),
+    })?;
+
+    for team in plan.teams_to_save {
+        team_repo.save_team(team).await?;
+    }
+    for player in plan.players_to_save {
+        team_repo.save_player(player).await?;
+    }
+    let match_id = plan.r#match.id;
+    match_repo.save_match(plan.r#match).await?;
+    for fact in plan.facts {
+        record_append_fact(match_repo.clone(), match_id, fact).await?;
+    }
+    Ok(plan.outcome)
 }
 
 /// fact delete の write 入口: 読む → `validate_delete` → 合格時のみ発火。

@@ -5,6 +5,7 @@
 //! roster 0 件 skip ルール（コアへ移した判断）。async 入口は pollster で回す
 //! （fake は即時完了 future のためランタイム不要）。
 
+use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
 
@@ -16,13 +17,20 @@ use handball_toolkit::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
 };
 use handball_toolkit::ids::{FactId, MatchId, PlayerId, TeamId};
+use handball_toolkit::sample_dto::{
+    SCHEMA_VERSION_CURRENT, SampleControlFactDtoV2, SampleFactAnchorDtoV2, SampleFactDtoV2,
+    SampleFactPayloadDtoV2, SampleMatchClockDtoV2, SampleMatchConfigurationDtoV2, SampleMatchDtoV2,
+    SampleMatchHeaderV2, SamplePhaseStartPayloadDtoV2, SamplePlayFactDtoV2, SamplePlayerDtoV2,
+    SampleTeamDtoV2, SampleTeamsDtoV2, SampleTimerConfigurationDtoV2,
+};
+use handball_toolkit::sample_import::{ImportDecisions, TeamTarget};
 use handball_toolkit::validation::{DomainValidationIssue, FactValidationError};
 use handball_toolkit::write::{NewFactStamp, PlayerTeamRef, VideoSyncInput};
 use handball_toolkit_ffi::ffi_write::{
-    CoreWriteError, MatchWriteRepository, TeamWriteRepository, commit_video_migration,
-    count_phase_completion_facts, record_append_fact, record_delete_fact, record_delete_player,
-    record_delete_team, record_fact_with_phase_completion, record_save_player, record_save_team,
-    record_update_fact,
+    CoreWriteError, MatchWriteRepository, TeamWriteRepository, commit_sample_match_import,
+    commit_video_migration, count_phase_completion_facts, record_append_fact, record_delete_fact,
+    record_delete_player, record_delete_team, record_fact_with_phase_completion,
+    record_save_player, record_save_team, record_update_fact,
 };
 use uuid::Uuid;
 
@@ -709,4 +717,256 @@ fn 未使用選手の削除と_save_の_passthrough_は発火する() {
             .len(),
         1
     );
+}
+
+// ── サンプル試合 import commit（handball-project#67）──
+//
+// 計画層（ID 解決・集計・並び）は handball-toolkit の `sample_import_tests` が固定する。
+// ここで見るのは発火層の責務: 保存順序（team → player → match → fact）・
+// facts が検証つき append を通ること・拒否経路で 1 件も発火しないこと。
+
+/// import 由来の match（ID 供給を連番にしたときの結果と一致させる）。
+fn imported_match(id: u128, home: u128, away: u128) -> Match {
+    Match {
+        id: MatchId(Uuid::from_u128(id)),
+        title: Some("テスト試合".to_string()),
+        date: chrono::DateTime::from_timestamp(0, 0).expect("epoch は有効"),
+        home_team_id: TeamId(Uuid::from_u128(home)),
+        away_team_id: TeamId(Uuid::from_u128(away)),
+        configuration: MatchConfiguration::Timer {
+            phase_duration_seconds: 1800.0,
+        },
+        roster_selection: RosterSelection::default(),
+        is_home_on_left: true,
+    }
+}
+
+fn import_anchor(start: f64, end: Option<f64>) -> SampleFactAnchorDtoV2 {
+    SampleFactAnchorDtoV2 {
+        kind: "matchClock".to_string(),
+        match_clock: Some(SampleMatchClockDtoV2 {
+            elapsed_seconds: start,
+        }),
+        video_clock: None,
+        end_match_elapsed_seconds: end,
+        end_video_elapsed_seconds: None,
+    }
+}
+
+fn import_dto(player_key: Option<&str>) -> SampleMatchDtoV2 {
+    SampleMatchDtoV2 {
+        schema_version: SCHEMA_VERSION_CURRENT,
+        r#match: SampleMatchHeaderV2 {
+            display_name: Some("テスト試合".to_string()),
+            date: chrono::DateTime::from_timestamp(0, 0).expect("epoch は有効"),
+            configuration: SampleMatchConfigurationDtoV2 {
+                kind: "timer".to_string(),
+                timer: Some(SampleTimerConfigurationDtoV2 {
+                    phase_duration_seconds: 1800.0,
+                }),
+                video: None,
+                video_highlight: None,
+            },
+        },
+        teams: SampleTeamsDtoV2 {
+            home: SampleTeamDtoV2 {
+                key: "home".to_string(),
+                name: "ホーム".to_string(),
+                players: vec![
+                    SamplePlayerDtoV2 {
+                        key: "h1".to_string(),
+                        name: "ホーム1".to_string(),
+                        jersey_number: Some(1),
+                    },
+                    SamplePlayerDtoV2 {
+                        key: "h2".to_string(),
+                        name: "ホーム2".to_string(),
+                        jersey_number: Some(2),
+                    },
+                ],
+            },
+            away: SampleTeamDtoV2 {
+                key: "away".to_string(),
+                name: "アウェイ".to_string(),
+                players: vec![SamplePlayerDtoV2 {
+                    key: "a1".to_string(),
+                    name: "アウェイ1".to_string(),
+                    jersey_number: Some(1),
+                }],
+            },
+        },
+        facts: vec![
+            SampleFactDtoV2 {
+                fact_id: None,
+                recorded_at: chrono::DateTime::from_timestamp(0, 0).expect("epoch は有効"),
+                payload: SampleFactPayloadDtoV2 {
+                    kind: "control".to_string(),
+                    play: None,
+                    control: Some(SampleControlFactDtoV2 {
+                        kind: "phaseStart".to_string(),
+                        phase_start: Some(SamplePhaseStartPayloadDtoV2 {
+                            kind: "regular".to_string(),
+                        }),
+                        stoppage: None,
+                        anchor: import_anchor(0.0, Some(1800.0)),
+                    }),
+                },
+            },
+            SampleFactDtoV2 {
+                fact_id: None,
+                recorded_at: chrono::DateTime::from_timestamp(1, 0).expect("固定秒は有効"),
+                payload: SampleFactPayloadDtoV2 {
+                    kind: "play".to_string(),
+                    play: Some(SamplePlayFactDtoV2 {
+                        kind: "goal".to_string(),
+                        team_key: Some("home".to_string()),
+                        player_key: player_key.map(str::to_string),
+                        related_player_key: None,
+                        anchor: import_anchor(600.0, None),
+                        title: None,
+                        note: None,
+                    }),
+                    control: None,
+                },
+            },
+        ],
+    }
+}
+
+fn all_new_decisions() -> ImportDecisions {
+    ImportDecisions {
+        home_team: TeamTarget::CreateNew,
+        away_team: TeamTarget::CreateNew,
+        players: HashMap::new(),
+    }
+}
+
+/// 連番 ID（100 起点）。既存 fixture の ID 空間と衝突させない。
+fn import_ids(count: usize) -> Vec<Uuid> {
+    (0..count)
+        .map(|i| Uuid::from_u128(100 + i as u128))
+        .collect()
+}
+
+#[test]
+fn import_commit_は_team_player_match_fact_の順に発火する() {
+    // 連番 ID: home=100 away=101 / players=102,103,104 / match=105 / facts=106,107
+    let match_repo = Arc::new(FakeRepo {
+        match_: imported_match(105, 100, 101),
+        ..FakeRepo::new(Vec::new())
+    });
+    let team_repo = Arc::new(FakeTeamRepo::default());
+
+    let outcome = run(commit_sample_match_import(
+        match_repo.clone(),
+        team_repo.clone(),
+        import_dto(Some("h1")),
+        all_new_decisions(),
+        import_ids(8),
+    ))
+    .expect("全新規の import は成功する");
+
+    assert_eq!(outcome.teams_created, 2);
+    assert_eq!(outcome.teams_reused, 0);
+    assert_eq!(outcome.players_created, 3);
+    assert_eq!(outcome.players_reused, 0);
+    assert_eq!(outcome.fact_count, 2);
+    assert_eq!(outcome.match_id, MatchId(Uuid::from_u128(105)));
+
+    let saved_teams = team_repo
+        .saved_teams
+        .lock()
+        .expect("テスト内で poison しない");
+    assert_eq!(
+        saved_teams
+            .iter()
+            .map(|t| t.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["ホーム", "アウェイ"]
+    );
+    let saved_players = team_repo
+        .saved_players
+        .lock()
+        .expect("テスト内で poison しない");
+    assert_eq!(
+        saved_players
+            .iter()
+            .map(|p| p.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["ホーム1", "ホーム2", "アウェイ1"]
+    );
+    assert_eq!(
+        match_repo
+            .saved_matches
+            .lock()
+            .expect("テスト内で poison しない")
+            .len(),
+        1
+    );
+    // facts は検証つき append を通って発火する。
+    assert_eq!(match_repo.fact_log().len(), 2);
+}
+
+#[test]
+fn 事前生成_id_が不足した_import_は発火せず_insufficient_new_ids() {
+    let match_repo = Arc::new(FakeRepo {
+        match_: imported_match(105, 100, 101),
+        ..FakeRepo::new(Vec::new())
+    });
+    let team_repo = Arc::new(FakeTeamRepo::default());
+
+    let result = run(commit_sample_match_import(
+        match_repo.clone(),
+        team_repo.clone(),
+        import_dto(Some("h1")),
+        all_new_decisions(),
+        import_ids(7),
+    ));
+
+    assert_eq!(
+        result,
+        Err(CoreWriteError::InsufficientNewIds {
+            required: 8,
+            provided: 7
+        })
+    );
+    assert!(
+        team_repo
+            .saved_teams
+            .lock()
+            .expect("テスト内で poison しない")
+            .is_empty()
+    );
+    assert!(match_repo.fact_log().is_empty());
+}
+
+#[test]
+fn 未知の_player_key_を含む_import_は発火せず_import_decode_failed() {
+    let match_repo = Arc::new(FakeRepo {
+        match_: imported_match(105, 100, 101),
+        ..FakeRepo::new(Vec::new())
+    });
+    let team_repo = Arc::new(FakeTeamRepo::default());
+
+    let result = run(commit_sample_match_import(
+        match_repo.clone(),
+        team_repo.clone(),
+        import_dto(Some("ghost")),
+        all_new_decisions(),
+        import_ids(8),
+    ));
+
+    assert!(matches!(
+        result,
+        Err(CoreWriteError::ImportDecodeFailed { .. })
+    ));
+    // 計画が失敗した時点で 1 件も発火しない（decode は保存より前）。
+    assert!(
+        team_repo
+            .saved_teams
+            .lock()
+            .expect("テスト内で poison しない")
+            .is_empty()
+    );
+    assert!(match_repo.fact_log().is_empty());
 }
