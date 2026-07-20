@@ -241,12 +241,16 @@ pub async fn commit_video_migration(
 /// 移植元: `MatchImporterV2.commit(parsed:decisions:...)` の ID 解決 + 組立 + 保存順序。
 /// シェルに残るのは取得（HTTP / Bundle）と decisions の UI 選択、表示名の解決だけになる。
 ///
-/// 順序設計をコアが所有する（移植元の保存順をそのまま保存 — 挙動パリティ）:
+/// 順序設計をコアが所有する:
 /// 1. 計画（純粋関数 `import_commit_plan` — 既存に統合した entity は save 対象に積まない）
 /// 2. 新規 Team を save（Match が teamId を参照するため先）
 /// 3. 新規 Player を save
 /// 4. Match ヘッダを save
 /// 5. facts を逐次 append（`record_append_fact` と同じ検証つき — 挙動パリティ）
+///
+/// entity の順序は移植元のまま。**facts のみ `import_commit_plan` が永続化順へ整列する**
+/// （移植元から意図的に乖離 — handball-project#72）。逐次 append は都度 whole-log 検証を
+/// 通すため、DTO の記録順のままでは `.video` の途中状態が R3 / R5 に抵触して必ず失敗する。
 ///
 /// 挙動パリティ（決定 7）: 連鎖は逐次・非 atomic。途中失敗は再実行復旧前提で、
 /// 発火済みの entity はロールバックしない（移植元の for ループと同じ）。

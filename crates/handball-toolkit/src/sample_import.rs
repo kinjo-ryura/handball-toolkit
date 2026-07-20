@@ -319,7 +319,11 @@ pub fn normalize_name(name: &str) -> String {
 
 // ── commit 計画（移植元: MatchImporterV2.commit の resolveTeam / resolvePlayers / 組立）──
 
-/// import commit で保存すべきものと発火順（移植元の保存順序をそのまま保存する）。
+/// import commit で保存すべきものと発火順。
+///
+/// entity（team / player / match）の順序は移植元をそのまま保存する。
+/// facts のみ **永続化順へ整列する**（`sort_by_persistence_order` を参照 —
+/// 移植元から意図的に乖離。handball-project#72）。
 #[derive(Debug, Clone, PartialEq)]
 pub struct ImportCommitPlan {
     /// 新規作成するチームのみ（既存に統合したチームは save しない）。home → away の順。
@@ -327,6 +331,7 @@ pub struct ImportCommitPlan {
     /// 新規作成する選手のみ。home 所属 → away 所属の順（各チーム内は DTO の並び順）。
     pub players_to_save: Vec<Player>,
     pub r#match: Match,
+    /// 永続化順（累積秒 → recordedAt → id）へ整列済み。DTO の並び順ではない。
     pub facts: Vec<MatchFact>,
     pub outcome: ImportCommitOutcome,
 }
@@ -439,11 +444,12 @@ pub fn import_commit_plan(
         is_home_on_left: true,
     };
 
-    let facts = dto
+    let mut facts = dto
         .facts
         .iter()
         .map(|fact_dto| decode_fact(fact_dto, &teams_by_key, &players_by_key, &mut new_id))
         .collect::<Result<Vec<_>, _>>()?;
+    sort_by_persistence_order(&mut facts);
 
     let outcome = ImportCommitOutcome {
         match_id: match_.id,
@@ -462,6 +468,45 @@ pub fn import_commit_plan(
         facts,
         outcome,
     })
+}
+
+/// fact 列を永続化順（`PERSISTENCE_MODEL_V1` の sort 規約: 累積秒 → recordedAt → id）へ整列する。
+///
+/// DTO の `facts` は **記録順（recordedAt 順）** であって時刻順とは限らない。実際、配信中の
+/// `.video` サンプルは phase 開始（videoClock 1086s）が配列の 38 番目にあり、
+/// それより後ろの時刻（1130s〜）の play が先に並んでいる。
+///
+/// 一方 `commit_sample_match_import` は facts を 1 件ずつ `record_append_fact` で発火し、
+/// その都度 **whole-log 検証**（`validate_fact_log`）を通す。この検証は
+/// 「facts は永続化順で並んでいる前提」で書かれており、かつ R3 / R5 は
+/// 「fact が 1 件以上あって PhaseStart が無い」だけで落ちる。
+/// そのため DTO 順のまま append すると、`.video` は最初の play を積んだ時点で
+/// `VideoWithFactsMissingPhaseStart` により必ず失敗していた（handball-project#72）。
+///
+/// 整列は shell 側ではなくここで行う。保存順序の所有はコア側にある（ADR 0005 決定 2 追記）ため。
+/// 読み出し側（`SwiftDataMatchRepository.factRecordOrder`）と同じ規約に揃えてあるので、
+/// 整列しても永続化後の観測結果は変わらない。
+///
+/// 注: 移植元 Swift（`MatchImporterV2.commit` の for ループ）は整列しない。ここは
+/// **意図的にオラクルから乖離**する — 移植元は同じ経路で `.video` を取り込めないため
+/// （iOS の公開サンプルは read-only の in-memory repository 経由で、書き込み検証を通らない）。
+fn sort_by_persistence_order(facts: &mut [MatchFact]) {
+    facts.sort_by(|lhs, rhs| {
+        cumulative_seconds(lhs)
+            .total_cmp(&cumulative_seconds(rhs))
+            .then_with(|| lhs.recorded_at.cmp(&rhs.recorded_at))
+            .then_with(|| lhs.id.cmp(&rhs.id))
+    });
+}
+
+/// 整列キーの代表時刻。累積秒（matchClock）を優先し、無ければ動画秒を使う。
+/// どちらも無い fact は末尾へ寄せる（読み出し側の `?? .infinity` と同じ扱い）。
+fn cumulative_seconds(fact: &MatchFact) -> f64 {
+    let anchor = fact.anchor();
+    anchor
+        .match_elapsed_seconds()
+        .or_else(|| anchor.video_elapsed_seconds())
+        .unwrap_or(f64::INFINITY)
 }
 
 #[allow(clippy::too_many_arguments)]

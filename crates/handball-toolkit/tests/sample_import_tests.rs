@@ -9,6 +9,7 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, TimeZone, Utc};
 use handball_toolkit::entities::{Player, Team};
+use handball_toolkit::facts::MatchFactPayload;
 use handball_toolkit::ids::{PlayerId, TeamId};
 use handball_toolkit::sample_dto::{
     SCHEMA_VERSION_CURRENT, SampleControlFactDtoV2, SampleFactAnchorDtoV2, SampleFactDtoV2,
@@ -308,6 +309,35 @@ fn import_dto(facts: Vec<SampleFactDtoV2>) -> SampleMatchDtoV2 {
 
 fn default_import_dto() -> SampleMatchDtoV2 {
     import_dto(vec![phase_start_fact_dto(), play_fact_dto(Some("h1"))])
+}
+
+/// DTO の facts が記録順（時刻順とは限らない）で来ても、plan は永続化順
+/// （累積秒 → recordedAt → id）へ整列して返す。
+///
+/// 配信中の `.video` サンプルは phase 開始が配列の後方にあり、DTO 順のまま逐次 append すると
+/// 最初の play を積んだ時点で whole-log 検証の R3 / R5 に抵触して必ず失敗していた
+/// （handball-project#72）。整列はその回帰止め。
+#[test]
+fn commit_plan_sorts_facts_into_persistence_order() {
+    // DTO 順は [play(600s), phaseStart(0s)] = 時刻の逆順。
+    let dto = import_dto(vec![play_fact_dto(Some("h1")), phase_start_fact_dto()]);
+    let decisions = ImportDecisions {
+        home_team: TeamTarget::CreateNew,
+        away_team: TeamTarget::CreateNew,
+        players: HashMap::new(),
+    };
+
+    let plan = import_commit_plan(&dto, &decisions, sequential_ids()).unwrap();
+
+    assert_eq!(plan.facts.len(), 2);
+    assert!(
+        matches!(plan.facts[0].payload, MatchFactPayload::Control(_)),
+        "累積秒 0s の phaseStart が先頭に来るべき（DTO では 2 番目）"
+    );
+    assert!(
+        matches!(plan.facts[1].payload, MatchFactPayload::Play(_)),
+        "累積秒 600s の play が後ろに来るべき（DTO では 1 番目）"
+    );
 }
 
 /// home=existing / away=createNew、選手 h1=existing / 残り default createNew の混在解決で
