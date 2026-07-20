@@ -25,8 +25,9 @@ use crate::projection::{
 use crate::sample_dto::{
     self, SampleFactDtoV2, SampleHighlightIndexDtoV2, SampleIndexDtoV2,
     SampleMatchConfigurationDtoV2, SampleMatchConversionResult, SampleMatchDecodeErrorV2,
-    SampleMatchDtoV2,
+    SampleMatchDtoV2, SampleTeamDtoV2,
 };
+use crate::sample_import::{self, ExistingSnapshot, ImportDecisions, TeamOption};
 use crate::validation::DomainValidationIssue;
 use crate::validators;
 use crate::validators::RosterContext;
@@ -376,6 +377,46 @@ pub fn encode_sample_match(dto: SampleMatchDtoV2) -> String {
 #[uniffi::export]
 pub fn sample_match_default_slug(match_: Match, home_team: Team, away_team: Team) -> String {
     sample_dto::default_slug(&match_, &home_team, &away_team)
+}
+
+// ── import の merge 調停（handball-project#67。発火は ffi_write）──
+
+/// `sample_import::find_team_options`（既存チーム候補のソート + 末尾に「新規作成」）。
+#[uniffi::export]
+pub fn find_import_team_options(
+    parsed_team: SampleTeamDtoV2,
+    snapshot: ExistingSnapshot,
+) -> Vec<TeamOption> {
+    sample_import::find_team_options(&parsed_team, &snapshot)
+}
+
+/// `sample_import::default_decisions`（exact → 既存 / partial → 候補先頭 / parsedOnly → 新規）。
+#[uniffi::export]
+pub fn default_import_decisions(
+    home_option: TeamOption,
+    away_option: TeamOption,
+) -> ImportDecisions {
+    sample_import::default_decisions(&home_option, &away_option)
+}
+
+/// `sample_import::TeamOption::new_team`（「新規作成」候補。コアは UUID を生成しないため
+/// Swift 側の `Identifiable` はシムが補う）。
+#[uniffi::export]
+pub fn new_import_team_option(parsed_keys: Vec<String>) -> TeamOption {
+    TeamOption::new_team(parsed_keys)
+}
+
+/// `sample_import::normalize_name`（全角空白 → 半角・空白畳み込み・前後除去）。
+#[uniffi::export]
+pub fn normalize_import_name(name: String) -> String {
+    sample_import::normalize_name(&name)
+}
+
+/// `sample_import::required_import_id_count` — `commit_sample_match_import` へ渡す
+/// 事前生成 ID の必要数（消費順の知識をシェルへ漏らさない — ADR 0005 決定 4）。
+#[uniffi::export]
+pub fn sample_import_required_id_count(dto: SampleMatchDtoV2, decisions: ImportDecisions) -> usize {
+    sample_import::required_import_id_count(&dto, &decisions)
 }
 
 // ── SegmentResolver（object ハンドル — ADR 0004 決定 5）──
