@@ -98,6 +98,35 @@ pub async fn record_append_fact(
 ) -> Result<(), CoreWriteError>;   // load → validate_append → 合格時のみ repo.append_fact
 ```
 
+**import の atomic commit 用に第 3 の trait を追加（2026-07-22 追記 — handball-project#83）**: 上記 2 本（`MatchWriteRepository` / `TeamWriteRepository`）は 1 操作 = 1 `context.save()` の素朴 CRUD で、逐次・非 atomic（決定 7）。import の commit を atomic 化する（決定 7 の 2026-07-22 追記）ため、**全書き込みを 1 トランザクションで束ねる粗い入口**を 1 本足す。素朴 CRUD の 2 本はそのまま温存し、import 経路だけがこの入口を使う。
+
+```rust
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait ImportWriteRepository: Send + Sync + std::fmt::Debug {
+    /// batch を 1 `context.save()` で保存する（全成功 or 1 件も保存しない）。
+    /// 検証はコアが呼ぶ前に済ませる — この実装は検証なしの素朴バッチ。
+    async fn commit_import(&self, batch: ImportWriteBatch) -> Result<(), CoreWriteError>;
+}
+
+/// 保存順序込みでコアが組み立てる書き込み集合。facts は `sort_by_persistence_order` 済み。
+pub struct ImportWriteBatch {
+    pub teams: Vec<Team>,      // 新規のみ（既存再利用は含めない）
+    pub players: Vec<Player>,  // 新規のみ
+    pub r#match: Match,
+    pub facts: Vec<MatchFact>,
+}
+```
+
+設計不変条件との整合（コールバック注入は崩さない）:
+
+- **コールバック注入を維持**: Swift が実装する foreign trait を Rust が `Arc<dyn>` で受ける形は不変。発火の判断・順序・検証は Rust のまま、Swift は 1 context への insert + save だけを担う
+- **stateless 境界（決定 6）**: batch を値で 1 回渡すだけで、トランザクションオブジェクトを FFI 越しに持ち回らない。「`begin_tx` → `save(tx)` → `commit_tx`」型は FFI を跨ぐ long-lived object になり決定 6 に反するため採らない（Considered options 参照）
+- **DB 非所有（設計不変条件 1）**: `context` / `save()` は Swift のみ。トランザクション境界は DB ハンドルを握る Swift 側にしか張れず、この分担が atomic の前提
+- **粗い境界（設計不変条件 4）**: N 回の append より粗い 1 バッチはむしろ理想形。V2 は単一 `ModelContainer` なので team / player / match / fact を 1 context に混ぜて save できる
+
+これに伴い `commit_sample_match_import` は「計画（純粋）→ `validate_fact_log` で 1 回検証 → `ImportWriteRepository::commit_import(batch)` を 1 回」へ変わる（現行の `save_team` / `save_player` / `save_match` ループ + facts 逐次 `record_append_fact` を置換）。
+
 ### 2. 移管範囲 — 全書き込み経路をコア経由に（grill 確定 2026-07-19 で拡大）
 
 当初案は「判断の厚い 3 経路のみ移管、薄い転送は残置」だったが、grill で**「書き込みは全部コア経由」の一貫性を優先**する判断に拡大した。薄い経路の移管自体は Swift を減らさないが、(1) 書き込みの目録がコア 1 箇所に揃い、(2) 可視性遮断（決定 3）を全書き込みに張れて「コアを通らない書き込み経路」が型システム上消滅し、(3) Android が全書き込みで同じ入口・同じ構造化エラーを得る。
@@ -174,6 +203,15 @@ pub enum CoreWriteError {
 - 1 操作 1 `context.save()`、連鎖（補完 append・migrate commit）は逐次・非 atomic、途中失敗は再実行復旧前提 — 現行挙動を移管後も維持する（トランザクション化は将来の別判断）
 - fact CRUD が `observeMatches` を re-emit しない現挙動も維持（`MatchListStore.reloadItems` 補完の構図を変えない）
 
+**import 連鎖だけ atomic へ（2026-07-22 追記 — handball-project#83）**: 上記のうち **サンプル試合 import の commit（第 5 段 / `ffi_write::commit_sample_match_import`）だけ**を「逐次・非 atomic」から「1 トランザクション（成功なら全保存 / 失敗なら 1 件も保存しない）」へ改める。適用範囲と理由:
+
+- **対象は開発者専用経路に限る**: import to DB の唯一の導線は HandballRecorder の `DevDataViewV2`（アプリエントリで丸ごと `#if DEBUG`。App Store リリースビルドには存在しない）。エンドユーザーは踏まないため「ユーザー向けの失敗表示・復旧導線」は不要で、論点は純粋に「開発者が再 import で復旧するか / そもそも中途半端を残さないか」に絞れる
+- **失敗時に「facts 0 件の試合行 + 孤児チーム」が残る問題**（#72 で実測、#83）を構造的に消す。現状の「途中失敗は再実行復旧前提」は孤児の後始末を開発者の手作業にし、再 import は重複 Match も生む（`doubleImportCreatesDuplicateMatch` で固定）
+- **import はバッチだから自然に atomic 化できる**: record / phase 補完 / migrate と違い、import は commit 時点で全 fact を保有し、かつ `import_commit_plan` → `sort_by_persistence_order` で永続化順に整列済み。全 entity/fact を 1 `context.save()` に束ねられる。副産物として N-1 回の冗長な whole-log 検証と save が消える
+- **record / phase 補完 / migrate commit の逐次・非 atomic は不変**（対話的・逐次で、全書き込みを事前に持たないため）。トランザクション化は import に限る
+
+**検証の意味論差（プレフィックス → 最終形）を許容する**: 逐次 append は「各プレフィックスが `validate_fact_log` を通る」ことを要求する（だから `sort_by_persistence_order` が要る）。バッチ検証は「最終形の log が 1 回通る」だけを見るため厳密には**わずかに緩い**。import は**新規 Match への投入で fact log が空スタート**のため「保存瞬間の DB 真実 = バッチそのもの」となり、決定 1「検証入力は保存瞬間の DB 真実」は成立する。整列は引き続きコアが行う（読み出し規約 `SwiftDataMatchRepository.factRecordOrder` と一致させるため）。
+
 ### 8. wasm / CLI / Kotlin への影響
 
 - foreign trait・async 入口・`async-trait` 依存はすべて feature `uniffi` 配下 — wasm / CLI ビルドは不変
@@ -190,7 +228,8 @@ pub enum CoreWriteError {
 4. **アプリ第 3 段（migrate commit）**: `MigrateToVideoStore.commit` の順序 orchestration を移管 → green → **完了（2026-07-19）**: 計画層 `video_migration_plan`（control の both 化・play の videoClock 変換・control → play の発火順を純粋関数化）+ 入口 `commit_video_migration`（config 先行 save → 逐次 validate → update）。シェル入力は `VideoSyncInput`（fact_id + video 区間）のみ — draft の matchClock は facts の read-only ミラーなのでコアが DB 真実から導く。実装追記: 計画不成立（sync 欠落・videoClock 導出不能）用に `CoreWriteError::MigrationPlanInfeasible { message }` を決定 5 の enum へ追加（wizard の事前 validation が通っていれば到達しない安全網）。store の `buildUpdatedFacts` / `updateControlFact` / `MigrationCommitError` を削除
 5. **アプリ第 4 段（entity CRUD + 完全遮断）**: match ヘッダ / team / player の CRUD をコア入口へ、削除の使用中判定をコアへ移管（Swift 実装のチェックは削除）。importer / migrator / view の呼び先置換 → 可視性遮断を全書き込みに拡張 → green → **完了（2026-07-19）**: `TeamWriteRepository` foreign trait + `record_save_match` / `record_delete_match`（passthrough）・`record_save_team` / `record_delete_team`・`record_save_player` / `record_delete_player`（削除は参照カウント read → 判定 → 発火）。シェルの write 面は `MatchWriter`（旧 MatchFactWriter を改名 — fact に加え match ヘッダ save / delete / migration commit を持つ）+ `TeamWriter` の 2 本に集約し、`MatchRepository` / `TeamRepository` protocol から全書き込みメソッドを削除（完全遮断 — 決定 3）。`SwiftDataTeamRepository` の使用中判定は削除し cascade のみ実装内に残置。view の catch は `CoreWriteError.TeamInUse / .PlayerInUse` へ置換、`RepositoryError` の validationFailed / teamInUse / playerInUse は廃止
 6. **回帰検証**: (a) アプリ側既存テスト全 green（ユニット + パッケージ）、(b) UI テスト実機 green、(c) `PRE_RELEASE_SMOKE_TEST.md` 完走、(d) TestFlight 配布 + 数日 dogfood（#56 から引き継いだ dogfood を兼ねる — #61 完了条件）
-7. **アプリ第 5 段（import の merge 調停 + commit）**: 決定 2 の追記（2026-07-20）に基づく後追い工程 — handball-project#67。計画層 `sample_import` + 入口 `commit_sample_match_import` → Swift の `MatchMergerV2` / `MatchImporterV2` を薄い梱包材へ縮小 → 該当 Swift テストを Rust テスト + 境界テストへ移植 → green
+7. **アプリ第 5 段（import の merge 調停 + commit）**: 決定 2 の追記（2026-07-20）に基づく後追い工程 — handball-project#67。計画層 `sample_import` + 入口 `commit_sample_match_import` → Swift の `MatchMergerV2` / `MatchImporterV2` を薄い梱包材へ縮小 → 該当 Swift テストを Rust テスト + 境界テストへ移植 → green → **完了（2026-07-20 — #67）**
+8. **import commit の atomic 化（第 5 段の後続）**: 決定 7 / 決定 1 の 2026-07-22 追記に基づく — handball-project#83。`ImportWriteRepository` foreign trait + `ImportWriteBatch` を追加し、Swift 実装は 1 `ModelContext` に全 insert → `save()` 1 回。`commit_sample_match_import` を「計画 → `validate_fact_log` で 1 回検証 → `commit_import(batch)` を 1 回」へ置換（`save_team` / `save_player` / `save_match` ループ + facts 逐次 `record_append_fact` を撤去）。fake repo テストで「途中 throw なら 1 件も保存されない（atomic）／正常時は全保存」を固定し、既存の import 境界テストを green に保つ。**dev 専用経路（`DevDataViewV2` / `#if DEBUG`）に限定し、record / phase 補完 / migrate の逐次・非 atomic は変えない**
 
 各段は独立して出荷可能な状態を保つ（途中の段で止めても境界は整合する）。
 
@@ -201,6 +240,9 @@ pub enum CoreWriteError {
 - **移管を判断の厚い 3 経路に絞る（entity CRUD・importer は残置 — 起草時の当初案）** → 却下（grill 確定 2026-07-19）。薄い転送の移管は Swift を減らさない（ADR 0001 却下理由 2 のとおり）が、書き込み目録の単一化・可視性遮断の全面化・Android との全書き込み共有を優先し、梱包材の対価を払って全経路をコア経由にする（決定 2）
 - **削除の使用中チェックを Swift 実装に残す（整合性の最下層防衛を維持する案）** → 却下（grill 確定 2026-07-19）。判定の単一所在をコアに揃える。原子性は cascade を trait 実装内に残すことで維持し、防衛線の役割は可視性遮断（決定 3）が引き継ぐ
 - **import の merge 調停をシェル残置にする（起草時 / ADR 0004 決定 2 の判断）** → 却下（2026-07-20 撤回 — 決定 2 追記）。「repository / DB に触る」という残置理由が棚卸しで成り立たないと判明した（`MatchMergerV2` は snapshot を受け取る純粋関数で DB に触らない）。Android で確実に再実装が必要になる純粋ドメインロジックであり、残置の対価は二重実装そのものだった
+- **import も逐次・非 atomic のまま維持する（決定 7 起草時の方針）** → 却下（2026-07-22 — #83）。dev 専用経路とはいえ「facts 0 件の試合 + 孤児チーム」の後始末が開発者の手作業になり、再 import は重複 Match を生む。import はバッチで全 fact を事前保有するため atomic 化のコストが低い（粗い入口 1 本 + 1 context save）。record / phase 補完 / migrate（対話的・逐次）は対象外
+- **import の atomic 化にトランザクション handle を FFI 越しに持ち回る（`begin_tx` / `commit_tx`）** → 却下（2026-07-22 — #83）。fine-grained な per-entity 呼び出しと atomic を両立できるが、トランザクショントークンが FFI を跨ぐ long-lived object になり決定 6（stateless 境界）に反する。async foreign trait の寿命・再入問題も最頻経路の外で新たに踏む
+- **import の失敗時に補償ロールバック（発火済みを `delete_*` で巻き戻す）** → 却下（2026-07-22 — #83）。コールバック注入は保てるが、巻き戻し自体が失敗しうるため**真の atomic ではない**（best-effort）。バッチ 1 save の方が単純かつ確実
 - **import commit の結果に表示名を含める（`load_team` を repository 契約へ追加する案）** → 却下。表示名は検証入力ではなくプレゼンテーションで、read 面を広げる対価に見合わない。コアは ID + 件数集計まで返し、名前解決はシェルの既存 read 面（`TeamRepository`）で行う
 - **existing_facts をシェルが引数で渡す（読み取り注入なしの最シンプル境界）** → 却下（grill 確定 2026-07-19）。検証入力が「保存瞬間の DB 真実」から「store の読み込み済みコピー」に変わり、コピーが古い場合（Mac マルチウィンドウ等）に現行より検証が緩くなるセマンティクス変更を伴う。write 経路内の最小 read セット（決定 1）は採用し、それを超える汎用 read 面の注入（`load_players` 全般・観測など）は引き続き見送り
 - **同期 callback（async をやめる）** → 却下。SwiftData 実装は async であり、同期ブリッジは executor 詰まり・deadlock リスクを最頻経路に持ち込む
@@ -222,6 +264,7 @@ pub enum CoreWriteError {
 - fact 書き込みの全経路が FFI async を 1 往復する（現行 +1 ホップ）。書き込みは人操作起点の低頻度イベントで、2Hz ホットパス（ADR 0004 決定 5）とは別系統 — 性能懸念なし
 - Android（#59）は repository 実装を書くだけで、発火判断・補完・順序設計を Rust から得る
 - 本 ADR で ADR 0001 の「保存コールバック注入 却下」は正式に置き換えられる（write-plan 比較の宿題も決定 1 で決着）
+- サンプル試合 import（第 5 段 / dev 専用の `DevDataViewV2`）は atomic になり、途中失敗で孤児レコード（facts 0 件の試合 + 孤児チーム）が残らない。`commit_sample_match_import` は N 回の逐次発火から `ImportWriteRepository::commit_import` の 1 バッチ呼び出しへ縮み、N-1 回の冗長検証・save も消える。record / phase 補完 / migrate commit の逐次・非 atomic は不変（決定 7 の 2026-07-22 追記）
 
 ## 参照
 
@@ -230,3 +273,5 @@ pub enum CoreWriteError {
 - [ADR 0004](0004-ios-full-boundary.md) — FFI 本境界（本 ADR はその上に発火層を足す）
 - handball-project#61 — 本 ADR の起点 Issue（棚卸し詳細はコメント）
 - handball-project#59 — Kotlin バインディング（発火 orchestration の共有先）
+- handball-project#67 — 第 5 段（import の merge 調停 + commit のコア移管。完了）
+- handball-project#83 — import commit の atomic 化（決定 7 / 決定 1 の 2026-07-22 追記・第 8 段）
