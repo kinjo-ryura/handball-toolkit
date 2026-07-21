@@ -46,3 +46,50 @@ from_custom = "{}.uuidString"
 type_name = "Int"
 into_custom = "Int({})"
 from_custom = "UInt32({})"
+
+# Kotlin バインディング（Android シェル向け — handball-project#59）。
+# custom_types は Swift 側（上）と同じ写像を Kotlin の等価型で行い、両シェルの API 面を揃える。
+# 設定なしだと Uuid / *Id は kotlin.String、CoreInt は kotlin.UInt の builtin ブリッジに落ちる。
+# package_name は既定（uniffi.handball_toolkit）のまま。Android シェルのパッケージ構成が決まった
+# 時点で設定する（Swift の module_name = ADR 0004 決定 8 に相当する Kotlin 側の決定は本境界では未確定）。
+[bindings.kotlin]
+
+# Uuid（String ブリッジ — src/ffi_support.rs）を Kotlin の java.util.UUID へ写す。
+[bindings.kotlin.custom_types.Uuid]
+type_name = "UUID"
+imports = ["java.util.UUID"]
+into_custom = "UUID.fromString({})"
+from_custom = "{}.toString()"
+
+# ID newtype（handball-project#52）も同様に UUID へ写す。Kotlin 側の API 面も全部 UUID に揃う。
+[bindings.kotlin.custom_types.MatchId]
+type_name = "UUID"
+imports = ["java.util.UUID"]
+into_custom = "UUID.fromString({})"
+from_custom = "{}.toString()"
+
+[bindings.kotlin.custom_types.TeamId]
+type_name = "UUID"
+imports = ["java.util.UUID"]
+into_custom = "UUID.fromString({})"
+from_custom = "{}.toString()"
+
+[bindings.kotlin.custom_types.PlayerId]
+type_name = "UUID"
+imports = ["java.util.UUID"]
+into_custom = "UUID.fromString({})"
+from_custom = "{}.toString()"
+
+[bindings.kotlin.custom_types.FactId]
+type_name = "UUID"
+imports = ["java.util.UUID"]
+into_custom = "UUID.fromString({})"
+from_custom = "{}.toString()"
+
+# CoreInt（usize → u32 ブリッジ）を Kotlin の Int へ写す（Swift の Int 写像 = ADR 0004 決定 6 に対応）。
+# builtin は u32 = kotlin.UInt。移植元 API の index / 個数は Int なので Int へ寄せる。
+# from_custom の toUInt() がトラップし得るのは Kotlin 側が負値を lower する経路に限られる。
+[bindings.kotlin.custom_types.CoreInt]
+type_name = "Int"
+into_custom = "{}.toInt()"
+from_custom = "{}.toUInt()"
