@@ -64,10 +64,15 @@ cargo run -p handball-toolkit-cli -- validate ../handball-sample-matches/v2
 cargo run -p handball-toolkit-cli -- validate --json path/to/match.json
 ```
 
-exit code は 0 = 指摘なし / 1 = 指摘あり / 2 = 使い方・パス誤り。指摘は境界ワイヤ形式
-`{scope, code, params}`（ADR 0002）で表示する。handball-sample-matches の CI への組み込みは
-本リポの OSS 公開後に行う（private リポのままだと public リポの Actions から PAT なしで
-参照できないため。それまでは配信前に手元で本 CLI を実行する運用）。
+exit code は 0 = error なし（warning のみは 0） / 1 = error あり / 2 = 使い方・パス誤り。
+指摘は境界ワイヤ形式 `{scope, code, params}`（ADR 0002）に severity（`error` / `warning`）を
+添えて表示する。severity は CLI 所有のレイヤ概念で、コアの構造化エラー（ADR 0002 は
+severity を持たず一律 blocking）とは別。warning は「途中で記録をやめた試合を配信サンプルと
+して残す判断を尊重しつつ気づけるようにしたい検査」に使う（例: `corpus/matchCoverageIncomplete`
+= regular phase が 2 未満で試合全体を覆っていない疑い。handball-project#90 / #89）。
+handball-sample-matches の CI への組み込みは本リポの OSS 公開後に行う（private リポのままだと
+public リポの Actions から PAT なしで参照できないため。それまでは配信前に手元で本 CLI を
+実行する運用）。
 
 ## 開発
 

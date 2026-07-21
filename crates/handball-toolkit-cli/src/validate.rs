@@ -6,7 +6,8 @@ use std::path::Path;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use handball_toolkit::configuration::MatchConfiguration;
+use handball_toolkit::configuration::{MatchConfiguration, PhaseKind};
+use handball_toolkit::facts::{ControlFact, MatchFact, MatchFactPayload};
 use handball_toolkit::persistence_order::persistence_ordered;
 use handball_toolkit::projection::SummaryProjection;
 use handball_toolkit::sample_dto::{
@@ -186,6 +187,8 @@ pub fn validate_match_dto(
             .push(Finding::new(label, Stage::Domain, domain_issue(&issue)));
     }
 
+    check_match_coverage(label, &conversion.facts, &match_.configuration, report);
+
     let summary = SummaryProjection::build(match_, &conversion.facts);
     Some(DerivedMatchInfo {
         home_score: summary.home_score,
@@ -251,6 +254,53 @@ fn check_duplicate_slugs<'a>(
                 corpus_issue("duplicateSlug", json!({"slug": slug})),
             ));
         }
+    }
+}
+
+/// 「記録が試合全体を覆っているか」の検査（handball-project#90）。
+///
+/// ハンドボールの試合は最低 2 つの regular phase（前半・後半）を持つ。regular な
+/// PhaseStart が 2 未満なら前半のみ等の部分記録の疑い（#89 の `2025-12-20-f352ea46`
+/// が実例）。本体は単独で内部整合し、index スコアも「前半終了時点の正しい集計」
+/// として通るため、ドメイン validation・index 突合のどちらからも漏れる隙間を埋める。
+///
+/// 単一 phase が正常な `.videoHighlight` は対象外（highlights は PhaseStart を
+/// 持たないのが通常。フル試合と区別する内部経路フラグ — SCHEMA.md）。
+///
+/// 途中で記録をやめた試合を配信サンプルとして残す判断（#89 は displayName /
+/// description で明示して残した）を尊重するため、blocking な error ではなく
+/// warning で報告する（severity は report.rs の CLI 所有概念）。
+fn check_match_coverage(
+    label: &str,
+    facts: &[MatchFact],
+    configuration: &MatchConfiguration,
+    report: &mut RunReport,
+) {
+    if matches!(configuration, MatchConfiguration::VideoHighlight(_)) {
+        return;
+    }
+    let regular_phase_count = facts
+        .iter()
+        .filter(|fact| {
+            matches!(
+                &fact.payload,
+                MatchFactPayload::Control(ControlFact::PhaseStart(payload))
+                    if payload.kind == PhaseKind::Regular
+            )
+        })
+        .count();
+    if regular_phase_count < 2 {
+        report.findings.push(
+            Finding::new(
+                label,
+                Stage::Corpus,
+                corpus_issue(
+                    "matchCoverageIncomplete",
+                    json!({ "regularPhaseCount": regular_phase_count }),
+                ),
+            )
+            .warning(),
+        );
     }
 }
 

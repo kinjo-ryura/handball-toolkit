@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use handball_toolkit_cli::corpus::validate_corpus;
-use handball_toolkit_cli::report::RunReport;
+use handball_toolkit_cli::report::{RunReport, Severity};
 use handball_toolkit_cli::validate::validate_file;
 
 fn fixture(name: &str) -> PathBuf {
@@ -102,6 +102,77 @@ fn single_match_file_mode_detects_shape() {
     let mut report = RunReport::default();
     validate_file(&fixture("corpus-ok/index.json"), &mut report);
     assert_eq!(report.findings.len(), 0, "{:#?}", report.findings);
+}
+
+#[test]
+fn half_only_match_reports_coverage_warning() {
+    // regular PhaseStart が 1 件だけ（前半のみ相当）の試合本体。ドメイン整合は
+    // 通るが「試合全体を覆っていない」warning が 1 件出る（handball-project#90）。
+    let mut report = RunReport::default();
+    validate_file(&fixture("half-only-match.json"), &mut report);
+
+    assert_eq!(
+        report.error_count(),
+        0,
+        "error は無いはず: {:#?}",
+        report.findings
+    );
+    assert_eq!(
+        report.warning_count(),
+        1,
+        "warning は 1 件: {:#?}",
+        report.findings
+    );
+
+    let finding = report
+        .findings
+        .iter()
+        .find(|finding| {
+            finding.issue.get("code").and_then(|v| v.as_str()) == Some("matchCoverageIncomplete")
+        })
+        .expect("matchCoverageIncomplete が出るはず");
+    assert_eq!(finding.severity, Severity::Warning);
+    assert_eq!(
+        finding.issue["params"]["regularPhaseCount"].as_i64(),
+        Some(1)
+    );
+}
+
+#[test]
+fn full_match_has_no_coverage_warning() {
+    // 前後半 2 phase の完全試合には warning が出ない（偽陽性ゼロの確認）。
+    let mut report = RunReport::default();
+    validate_file(
+        &fixture("corpus-ok/matches/2026-01-01-tigers-vs-falcons.json"),
+        &mut report,
+    );
+    assert_eq!(report.findings.len(), 0, "{:#?}", report.findings);
+}
+
+#[test]
+fn warning_only_input_exits_zero() {
+    // warning のみ（error なし）の入力は exit 0。severity が exit code を分ける。
+    let bin = env!("CARGO_BIN_EXE_handball-toolkit-cli");
+    let out = Command::new(bin)
+        .args([
+            "validate",
+            "--json",
+            fixture("half-only-match.json").to_str().unwrap(),
+        ])
+        .output()
+        .expect("バイナリ実行に失敗");
+    assert_eq!(out.status.code(), Some(0), "warning のみは exit 0: {out:?}");
+
+    let parsed: serde_json::Value =
+        serde_json::from_slice(&out.stdout).expect("--json 出力は JSON のはず");
+    let findings = parsed["findings"].as_array().expect("findings は配列");
+    assert!(
+        findings.iter().any(|finding| {
+            finding["issue"]["code"].as_str() == Some("matchCoverageIncomplete")
+                && finding["severity"].as_str() == Some("warning")
+        }),
+        "warning severity の matchCoverageIncomplete が出るはず: {parsed:#?}"
+    );
 }
 
 #[test]

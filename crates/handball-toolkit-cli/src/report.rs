@@ -25,6 +25,19 @@ pub enum Stage {
     Corpus,
 }
 
+/// 指摘の重大度。CLI 所有のレイヤ概念で、コアの構造化エラー（ADR 0002 は
+/// severity を持たず一律 blocking）とは別。`error` は blocking（プロセスは
+/// exit 1）、`warning` は非 blocking（warning のみなら exit 0）。
+///
+/// 用途: 「途中で記録をやめた試合」のように、配信サンプルとして残す判断を
+/// 尊重しつつ気づけるようにしたい検査（handball-project#90）を warning で出す。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Severity {
+    Error,
+    Warning,
+}
+
 /// 1 件の検証指摘。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,6 +45,8 @@ pub struct Finding {
     /// 検証対象ファイル（呼び出し時のパス表記のまま）。
     pub path: String,
     pub stage: Stage,
+    /// 重大度。既定は `error`（blocking）。`Finding::warning` で warning にする。
+    pub severity: Severity,
     /// fact 単位の指摘のときの `facts[]` index（JSON 配列順）。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fact_index: Option<usize>,
@@ -43,17 +58,27 @@ pub struct Finding {
 }
 
 impl Finding {
+    /// 既定の重大度 `error`（blocking）で 1 件を組む。既存の検査はすべて
+    /// blocking のためここを既定にし、warning は `warning()` で明示的に落とす。
     pub fn new(path: &str, stage: Stage, issue: Value) -> Finding {
         Finding {
             path: path.to_owned(),
             stage,
+            severity: Severity::Error,
             fact_index: None,
             fact_id: None,
             issue,
         }
     }
 
+    /// この指摘を warning（非 blocking）に落とす。
+    pub fn warning(mut self) -> Finding {
+        self.severity = Severity::Warning;
+        self
+    }
+
     /// 人間可読の 1 行表示。文言レイヤは持たず code + params を機械的に並べる。
+    /// warning は行頭に `[warning]` を付けて error（既定）と区別する。
     pub fn human_line(&self) -> String {
         let scope = self
             .issue
@@ -65,7 +90,11 @@ impl Finding {
             .get("code")
             .and_then(Value::as_str)
             .unwrap_or("?");
-        let mut line = format!("{}: [{scope}/{code}]", self.path);
+        let prefix = match self.severity {
+            Severity::Error => "",
+            Severity::Warning => "[warning] ",
+        };
+        let mut line = format!("{prefix}{}: [{scope}/{code}]", self.path);
         if let Some(params) = self.issue.get("params")
             && params.as_object().is_none_or(|map| !map.is_empty())
         {
@@ -94,6 +123,22 @@ pub struct RunReport {
 impl RunReport {
     pub fn finding_count(&self) -> usize {
         self.findings.len()
+    }
+
+    /// blocking な指摘（`error`）の件数。プロセスの exit code はこれで決める。
+    pub fn error_count(&self) -> usize {
+        self.findings
+            .iter()
+            .filter(|finding| finding.severity == Severity::Error)
+            .count()
+    }
+
+    /// 非 blocking な指摘（`warning`）の件数。
+    pub fn warning_count(&self) -> usize {
+        self.findings
+            .iter()
+            .filter(|finding| finding.severity == Severity::Warning)
+            .count()
     }
 }
 

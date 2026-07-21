@@ -15,7 +15,7 @@ usage: handball-toolkit-cli validate [--json] <path>...
 
   --json  結果を JSON（{checkedFiles, findings[]}）で stdout に出力する
 
-exit code: 0 = 指摘なし / 1 = 指摘あり / 2 = 使い方・パス誤り";
+exit code: 0 = error なし（warning のみは 0） / 1 = error あり / 2 = 使い方・パス誤り";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -67,13 +67,16 @@ fn run(args: &[String]) -> ExitCode {
             println!("{}", finding.human_line());
         }
         println!(
-            "検証 {} ファイル / 指摘 {} 件",
+            "検証 {} ファイル / 指摘 {} 件（error {} / warning {}）",
             report.checked_files,
-            report.finding_count()
+            report.finding_count(),
+            report.error_count(),
+            report.warning_count(),
         );
     }
 
-    if report.findings.is_empty() {
+    // exit code は blocking な error のみで決める（warning は非 blocking）。
+    if report.error_count() == 0 {
         ExitCode::SUCCESS
     } else {
         ExitCode::from(1)

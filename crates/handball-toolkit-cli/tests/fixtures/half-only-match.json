@@ -81,30 +81,6 @@
           "note": null
         }
       }
-    },
-    {
-      "factID": "33333333-3333-3333-3333-333333333333",
-      "recordedAt": "2026-01-01T10:55:00Z",
-      "payload": {
-        "kind": "control",
-        "play": null,
-        "control": {
-          "kind": "phaseStart",
-          "anchor": {
-            "kind": "videoClock",
-            "matchClock": null,
-            "videoClock": {
-              "elapsedSeconds": 1800.0
-            },
-            "endMatchElapsedSeconds": null,
-            "endVideoElapsedSeconds": 3600.0
-          },
-          "phaseStart": {
-            "kind": "regular"
-          },
-          "stoppage": null
-        }
-      }
     }
   ]
 }
