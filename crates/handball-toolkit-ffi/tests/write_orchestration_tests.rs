@@ -23,14 +23,14 @@ use handball_toolkit::sample_dto::{
     SampleMatchHeaderV2, SamplePhaseStartPayloadDtoV2, SamplePlayFactDtoV2, SamplePlayerDtoV2,
     SampleTeamDtoV2, SampleTeamsDtoV2, SampleTimerConfigurationDtoV2,
 };
-use handball_toolkit::sample_import::{ImportDecisions, TeamTarget};
+use handball_toolkit::sample_import::{ImportDecisions, ImportWriteBatch, TeamTarget};
 use handball_toolkit::validation::{DomainValidationIssue, FactValidationError};
 use handball_toolkit::write::{NewFactStamp, PlayerTeamRef, VideoSyncInput};
 use handball_toolkit_ffi::ffi_write::{
-    CoreWriteError, MatchWriteRepository, TeamWriteRepository, commit_sample_match_import,
-    commit_video_migration, count_phase_completion_facts, record_append_fact, record_delete_fact,
-    record_delete_player, record_delete_team, record_fact_with_phase_completion,
-    record_save_player, record_save_team, record_update_fact,
+    CoreWriteError, ImportWriteRepository, MatchWriteRepository, TeamWriteRepository,
+    commit_sample_match_import, commit_video_migration, count_phase_completion_facts,
+    record_append_fact, record_delete_fact, record_delete_player, record_delete_team,
+    record_fact_with_phase_completion, record_save_player, record_save_team, record_update_fact,
 };
 use uuid::Uuid;
 
@@ -719,11 +719,30 @@ fn 未使用選手の削除と_save_の_passthrough_は発火する() {
     );
 }
 
-// ── サンプル試合 import commit（handball-project#67）──
+// ── サンプル試合 import commit（handball-project#67 / atomic 化 #83）──
 //
-// 計画層（ID 解決・集計・並び）は handball-toolkit の `sample_import_tests` が固定する。
-// ここで見るのは発火層の責務: 保存順序（team → player → match → fact）・
-// facts が検証つき append を通ること・拒否経路で 1 件も発火しないこと。
+// 計画層（ID 解決・集計・並び）は handball-toolkit の `sample_import_tests` が固定し、
+// 検証 + バッチ組立（`import_commit_batch`）も同 crate のテストが固定する。
+// ここで見るのは発火層の責務: 検証を通ったら **1 バッチ**を `commit_import` へ渡すこと
+// （= 1 context.save() で atomic）と、拒否経路（ID 不足 / decode 失敗 / 検証失敗）で
+// commit_import を 1 度も発火しないこと。
+
+/// import commit の atomic 発火を記録する fake。`commit_import` は受け取ったバッチを溜める。
+#[derive(Debug, Default)]
+struct FakeImportRepo {
+    committed: Mutex<Vec<ImportWriteBatch>>,
+}
+
+#[async_trait::async_trait]
+impl ImportWriteRepository for FakeImportRepo {
+    async fn commit_import(&self, batch: ImportWriteBatch) -> Result<(), CoreWriteError> {
+        self.committed
+            .lock()
+            .expect("テスト内で poison しない")
+            .push(batch);
+        Ok(())
+    }
+}
 
 /// import 由来の match（ID 供給を連番にしたときの結果と一致させる）。
 fn imported_match(id: u128, home: u128, away: u128) -> Match {
@@ -849,17 +868,17 @@ fn import_ids(count: usize) -> Vec<Uuid> {
 }
 
 #[test]
-fn import_commit_は_team_player_match_fact_の順に発火する() {
+fn import_commit_は_1_バッチで_team_player_match_fact_を発火する() {
     // 連番 ID: home=100 away=101 / players=102,103,104 / match=105 / facts=106,107
     let match_repo = Arc::new(FakeRepo {
         match_: imported_match(105, 100, 101),
         ..FakeRepo::new(Vec::new())
     });
-    let team_repo = Arc::new(FakeTeamRepo::default());
+    let import_repo = Arc::new(FakeImportRepo::default());
 
     let outcome = run(commit_sample_match_import(
         match_repo.clone(),
-        team_repo.clone(),
+        import_repo.clone(),
         import_dto(Some("h1")),
         all_new_decisions(),
         import_ids(8),
@@ -873,38 +892,47 @@ fn import_commit_は_team_player_match_fact_の順に発火する() {
     assert_eq!(outcome.fact_count, 2);
     assert_eq!(outcome.match_id, MatchId(Uuid::from_u128(105)));
 
-    let saved_teams = team_repo
-        .saved_teams
+    // 発火は 1 バッチだけ（= 1 context.save() で atomic）。
+    let committed = import_repo
+        .committed
         .lock()
         .expect("テスト内で poison しない");
+    assert_eq!(committed.len(), 1, "commit_import は 1 回だけ発火する");
+    let batch = &committed[0];
     assert_eq!(
-        saved_teams
+        batch
+            .teams
             .iter()
             .map(|t| t.name.as_str())
             .collect::<Vec<_>>(),
         vec!["ホーム", "アウェイ"]
     );
-    let saved_players = team_repo
-        .saved_players
-        .lock()
-        .expect("テスト内で poison しない");
     assert_eq!(
-        saved_players
+        batch
+            .players
             .iter()
             .map(|p| p.name.as_str())
             .collect::<Vec<_>>(),
         vec!["ホーム1", "ホーム2", "アウェイ1"]
     );
-    assert_eq!(
+    assert_eq!(batch.match_.id, MatchId(Uuid::from_u128(105)));
+    // facts は永続化順（累積秒 0s の phaseStart → 600s の goal）。
+    assert_eq!(batch.facts.len(), 2);
+    assert!(matches!(
+        batch.facts[0].payload,
+        MatchFactPayload::Control(_)
+    ));
+    assert!(matches!(batch.facts[1].payload, MatchFactPayload::Play(_)));
+
+    // match_repo へは検証入力の read のみ。逐次 save_match / append_fact は通らない。
+    assert!(
         match_repo
             .saved_matches
             .lock()
             .expect("テスト内で poison しない")
-            .len(),
-        1
+            .is_empty()
     );
-    // facts は検証つき append を通って発火する。
-    assert_eq!(match_repo.fact_log().len(), 2);
+    assert!(match_repo.fact_log().is_empty());
 }
 
 #[test]
@@ -913,11 +941,11 @@ fn 事前生成_id_が不足した_import_は発火せず_insufficient_new_ids()
         match_: imported_match(105, 100, 101),
         ..FakeRepo::new(Vec::new())
     });
-    let team_repo = Arc::new(FakeTeamRepo::default());
+    let import_repo = Arc::new(FakeImportRepo::default());
 
     let result = run(commit_sample_match_import(
         match_repo.clone(),
-        team_repo.clone(),
+        import_repo.clone(),
         import_dto(Some("h1")),
         all_new_decisions(),
         import_ids(7),
@@ -931,13 +959,12 @@ fn 事前生成_id_が不足した_import_は発火せず_insufficient_new_ids()
         })
     );
     assert!(
-        team_repo
-            .saved_teams
+        import_repo
+            .committed
             .lock()
             .expect("テスト内で poison しない")
             .is_empty()
     );
-    assert!(match_repo.fact_log().is_empty());
 }
 
 #[test]
@@ -946,11 +973,11 @@ fn 未知の_player_key_を含む_import_は発火せず_import_decode_failed() 
         match_: imported_match(105, 100, 101),
         ..FakeRepo::new(Vec::new())
     });
-    let team_repo = Arc::new(FakeTeamRepo::default());
+    let import_repo = Arc::new(FakeImportRepo::default());
 
     let result = run(commit_sample_match_import(
         match_repo.clone(),
-        team_repo.clone(),
+        import_repo.clone(),
         import_dto(Some("ghost")),
         all_new_decisions(),
         import_ids(8),
@@ -960,13 +987,43 @@ fn 未知の_player_key_を含む_import_は発火せず_import_decode_failed() 
         result,
         Err(CoreWriteError::ImportDecodeFailed { .. })
     ));
-    // 計画が失敗した時点で 1 件も発火しない（decode は保存より前）。
+    // 計画が失敗した時点で 1 件も発火しない（decode は組立より前）。
     assert!(
-        team_repo
-            .saved_teams
+        import_repo
+            .committed
             .lock()
             .expect("テスト内で poison しない")
             .is_empty()
     );
-    assert!(match_repo.fact_log().is_empty());
+}
+
+#[test]
+fn 検証に落ちる_import_は_commit_import_を発火しない() {
+    let match_repo = Arc::new(FakeRepo {
+        match_: imported_match(105, 100, 101),
+        ..FakeRepo::new(Vec::new())
+    });
+    let import_repo = Arc::new(FakeImportRepo::default());
+
+    // goal に player が無い → MissingPlayerForPlayKind で検証に落ちる（計画は成立する）。
+    let result = run(commit_sample_match_import(
+        match_repo.clone(),
+        import_repo.clone(),
+        import_dto(None),
+        all_new_decisions(),
+        import_ids(8),
+    ));
+
+    assert!(matches!(
+        result,
+        Err(CoreWriteError::ValidationFailed { .. })
+    ));
+    assert!(
+        import_repo
+            .committed
+            .lock()
+            .expect("テスト内で poison しない")
+            .is_empty(),
+        "検証に落ちたら 1 件も保存しない（atomic の片側の保証）"
+    );
 }

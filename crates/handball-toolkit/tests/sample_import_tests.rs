@@ -19,7 +19,8 @@ use handball_toolkit::sample_dto::{
 };
 use handball_toolkit::sample_import::{
     ExistingSnapshot, ImportDecisions, PlayerTarget, TeamOption, TeamTarget, default_decisions,
-    find_team_options, import_commit_plan, normalize_name, required_import_id_count,
+    find_team_options, import_commit_batch, import_commit_plan, normalize_name,
+    required_import_id_count,
 };
 use uuid::Uuid;
 
@@ -454,4 +455,54 @@ fn commit_plan_rejects_unknown_fact_key() {
     let result = import_commit_plan(&dto, &decisions, sequential_ids());
 
     assert!(result.is_err());
+}
+
+// ── import_commit_batch（atomic 発火バッチの検証 + 組立 — handball-project#83）──
+
+/// 検証を通る計画は、entity（新規のみ）と永続化順の facts をそのままバッチへ引き継ぐ。
+/// バッチ発火（`commit_import`）は 1 回で、そこが 1 `context.save()` = atomic になる。
+#[test]
+fn import_commit_batch_assembles_batch_from_valid_plan() {
+    let dto = default_import_dto();
+    let decisions = ImportDecisions {
+        home_team: TeamTarget::CreateNew,
+        away_team: TeamTarget::CreateNew,
+        players: HashMap::new(),
+    };
+    let plan = import_commit_plan(&dto, &decisions, sequential_ids()).unwrap();
+    let expected_teams = plan.teams_to_save.clone();
+    let expected_players = plan.players_to_save.clone();
+    let expected_match = plan.r#match.clone();
+    let expected_facts = plan.facts.clone();
+
+    // 両チーム新規なので import 先の既存 roster は空。
+    let batch = import_commit_batch(plan, &[]).expect("検証を通るはず");
+
+    assert_eq!(batch.teams, expected_teams);
+    assert_eq!(batch.players, expected_players);
+    assert_eq!(batch.match_, expected_match);
+    // facts は plan の永続化順のまま（並べ替えない）。
+    assert_eq!(batch.facts, expected_facts);
+}
+
+/// いずれかの fact がプレフィックス検証に落ちたら `Err` を返し、バッチは 1 件も組まない。
+/// = 呼び出し側は `commit_import` を発火しない = 何も保存されない（atomic の片側の保証）。
+#[test]
+fn import_commit_batch_rejects_invalid_sequence_without_assembling() {
+    // phaseStart 無しで play だけ → timer の whole-log 検証（R3 / R5）で落ちる。
+    let dto = import_dto(vec![play_fact_dto(Some("h1"))]);
+    let decisions = ImportDecisions {
+        home_team: TeamTarget::CreateNew,
+        away_team: TeamTarget::CreateNew,
+        players: HashMap::new(),
+    };
+    let plan = import_commit_plan(&dto, &decisions, sequential_ids()).unwrap();
+
+    let result = import_commit_batch(plan, &[]);
+
+    assert!(
+        result.is_err(),
+        "検証に落ちたらバッチを組まない（commit_import を発火しない）"
+    );
+    assert!(!result.unwrap_err().is_empty(), "issues は非空で返す");
 }

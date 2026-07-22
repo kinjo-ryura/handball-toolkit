@@ -210,7 +210,7 @@ pub enum CoreWriteError {
 - **import はバッチだから自然に atomic 化できる**: record / phase 補完 / migrate と違い、import は commit 時点で全 fact を保有し、かつ `import_commit_plan` → `sort_by_persistence_order` で永続化順に整列済み。全 entity/fact を 1 `context.save()` に束ねられる。副産物として N-1 回の冗長な whole-log 検証と save が消える
 - **record / phase 補完 / migrate commit の逐次・非 atomic は不変**（対話的・逐次で、全書き込みを事前に持たないため）。トランザクション化は import に限る
 
-**検証の意味論差（プレフィックス → 最終形）を許容する**: 逐次 append は「各プレフィックスが `validate_fact_log` を通る」ことを要求する（だから `sort_by_persistence_order` が要る）。バッチ検証は「最終形の log が 1 回通る」だけを見るため厳密には**わずかに緩い**。import は**新規 Match への投入で fact log が空スタート**のため「保存瞬間の DB 真実 = バッチそのもの」となり、決定 1「検証入力は保存瞬間の DB 真実」は成立する。整列は引き続きコアが行う（読み出し規約 `SwiftDataMatchRepository.factRecordOrder` と一致させるため）。
+**検証はプレフィックスごとに in-memory で回し、パリティを完全に保つ（実装で確定 — 起草時案から改善）**: 起草時は「バッチは最終形の log を 1 回検証するので逐次 append よりわずかに緩い」と想定したが、実装（`sample_import::import_commit_batch`）では**シェルの読み込み済みコピーではなく in-memory の working ログに対して `validate_append` を fact ごとに回す**（fact 単体 validation + roster 参照整合 + `working + fact` の whole-log 検証）。これは現行の「逐次 append で各プレフィックスを検証」と**同一の意味論**で、atomic 化しても検証は 1 mm も緩めない。「最終形だけ検証」は不要と判明したので採らなかった。import は新規 Match への投入で fact log が空スタートのため、roster 以外の検証入力は「保存瞬間の DB 真実 = バッチそのもの」で決定 1 を満たす。roster は**既存所属選手（新規保存前の DB read = 最小 read）+ 新規選手**で構築し、現行の「entity を save してから `load_roster_players` で読む」のと同じ集合を save 前に組み直す（参照整合の結果は不変）。facts の整列は引き続きコアが行う（`sort_by_persistence_order`。読み出し規約 `SwiftDataMatchRepository.factRecordOrder` と一致させ、プレフィックス検証が通るため）。
 
 ### 8. wasm / CLI / Kotlin への影響
 
@@ -229,7 +229,10 @@ pub enum CoreWriteError {
 5. **アプリ第 4 段（entity CRUD + 完全遮断）**: match ヘッダ / team / player の CRUD をコア入口へ、削除の使用中判定をコアへ移管（Swift 実装のチェックは削除）。importer / migrator / view の呼び先置換 → 可視性遮断を全書き込みに拡張 → green → **完了（2026-07-19）**: `TeamWriteRepository` foreign trait + `record_save_match` / `record_delete_match`（passthrough）・`record_save_team` / `record_delete_team`・`record_save_player` / `record_delete_player`（削除は参照カウント read → 判定 → 発火）。シェルの write 面は `MatchWriter`（旧 MatchFactWriter を改名 — fact に加え match ヘッダ save / delete / migration commit を持つ）+ `TeamWriter` の 2 本に集約し、`MatchRepository` / `TeamRepository` protocol から全書き込みメソッドを削除（完全遮断 — 決定 3）。`SwiftDataTeamRepository` の使用中判定は削除し cascade のみ実装内に残置。view の catch は `CoreWriteError.TeamInUse / .PlayerInUse` へ置換、`RepositoryError` の validationFailed / teamInUse / playerInUse は廃止
 6. **回帰検証**: (a) アプリ側既存テスト全 green（ユニット + パッケージ）、(b) UI テスト実機 green、(c) `PRE_RELEASE_SMOKE_TEST.md` 完走、(d) TestFlight 配布 + 数日 dogfood（#56 から引き継いだ dogfood を兼ねる — #61 完了条件）
 7. **アプリ第 5 段（import の merge 調停 + commit）**: 決定 2 の追記（2026-07-20）に基づく後追い工程 — handball-project#67。計画層 `sample_import` + 入口 `commit_sample_match_import` → Swift の `MatchMergerV2` / `MatchImporterV2` を薄い梱包材へ縮小 → 該当 Swift テストを Rust テスト + 境界テストへ移植 → green → **完了（2026-07-20 — #67）**
-8. **import commit の atomic 化（第 5 段の後続）**: 決定 7 / 決定 1 の 2026-07-22 追記に基づく — handball-project#83。`ImportWriteRepository` foreign trait + `ImportWriteBatch` を追加し、Swift 実装は 1 `ModelContext` に全 insert → `save()` 1 回。`commit_sample_match_import` を「計画 → `validate_fact_log` で 1 回検証 → `commit_import(batch)` を 1 回」へ置換（`save_team` / `save_player` / `save_match` ループ + facts 逐次 `record_append_fact` を撤去）。fake repo テストで「途中 throw なら 1 件も保存されない（atomic）／正常時は全保存」を固定し、既存の import 境界テストを green に保つ。**dev 専用経路（`DevDataViewV2` / `#if DEBUG`）に限定し、record / phase 補完 / migrate の逐次・非 atomic は変えない**
+8. **import commit の atomic 化（第 5 段の後続）**: 決定 7 / 決定 1 の 2026-07-22 追記に基づく — handball-project#83。
+   - **コア（Rust）→ 完了（2026-07-22）**: 純粋関数 `sample_import::import_commit_batch`（既存 roster + 新規選手で roster 構築 → in-memory の working ログにプレフィックスごと `validate_append` → `ImportWriteBatch` 組立）+ `ImportWriteBatch`（uniffi Record）+ `ffi_write::ImportWriteRepository` foreign trait を追加。`commit_sample_match_import` を「計画 → 既存 roster read → `import_commit_batch` で検証 + 組立 → `commit_import(batch)` を 1 回」へ置換し、`save_team` / `save_player` / `save_match` ループ + facts 逐次 `record_append_fact` を撤去（第 2 引数を `team_repo` → `import_repo` へ変更）。テスト: `sample_import_tests` に純粋関数（合格 → バッチ組立 / 違反 → 未組立）、`write_orchestration_tests`（fake repo）に「1 バッチ発火・ID 不足 / decode 失敗 / 検証失敗で `commit_import` 不発火」を追加。
+   - **シェル（Swift）→ 未**: `ImportWriteRepository` を 1 `ModelContext` に全 insert → `save()` 1 回で実装、`RecorderV2Services` で DI、`ImportWriter.commitSampleImport` の呼び先を新シグネチャへ。生成 Swift を `bootstrap.sh --refresh-generated` で追随。ios_poc smoke に import の atomic 往復を足す。
+   - **dev 専用経路（`DevDataViewV2` / `#if DEBUG`）に限定し、record / phase 補完 / migrate の逐次・非 atomic は変えない**
 
 各段は独立して出荷可能な状態を保つ（途中の段で止めても境界は整合する）。
 
@@ -264,7 +267,7 @@ pub enum CoreWriteError {
 - fact 書き込みの全経路が FFI async を 1 往復する（現行 +1 ホップ）。書き込みは人操作起点の低頻度イベントで、2Hz ホットパス（ADR 0004 決定 5）とは別系統 — 性能懸念なし
 - Android（#59）は repository 実装を書くだけで、発火判断・補完・順序設計を Rust から得る
 - 本 ADR で ADR 0001 の「保存コールバック注入 却下」は正式に置き換えられる（write-plan 比較の宿題も決定 1 で決着）
-- サンプル試合 import（第 5 段 / dev 専用の `DevDataViewV2`）は atomic になり、途中失敗で孤児レコード（facts 0 件の試合 + 孤児チーム）が残らない。`commit_sample_match_import` は N 回の逐次発火から `ImportWriteRepository::commit_import` の 1 バッチ呼び出しへ縮み、N-1 回の冗長検証・save も消える。record / phase 補完 / migrate commit の逐次・非 atomic は不変（決定 7 の 2026-07-22 追記）
+- サンプル試合 import（第 5 段 / dev 専用の `DevDataViewV2`）は atomic になり、途中失敗で孤児レコード（facts 0 件の試合 + 孤児チーム）が残らない。`commit_sample_match_import` の FFI 往復が激減する: 従来は「entity 逐次 save（team / player / match）+ fact ごとに 3 read（match / fact_log / roster）+ append」で計 O(3N) 往復だったのが、**roster read 1 回 + `commit_import` バッチ発火 1 回の計 2 往復**へ。検証回数（N 回の `validate_append`）は現行と同じでパリティを保つ。record / phase 補完 / migrate commit の逐次・非 atomic は不変（決定 7 の 2026-07-22 追記）
 
 ## 参照
 

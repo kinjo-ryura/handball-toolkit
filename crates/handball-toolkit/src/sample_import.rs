@@ -26,6 +26,9 @@ use crate::persistence_order::sort_by_persistence_order;
 use crate::sample_dto::{
     SampleMatchDecodeErrorV2, SampleMatchDtoV2, SampleTeamDtoV2, decode_configuration, decode_fact,
 };
+use crate::validation::DomainValidationIssue;
+use crate::validators;
+use crate::write::{PlayerTeamRef, roster_context_from_players};
 
 // ── Targets / Decisions（移植元: MatchMergerV2 の同名型）──
 
@@ -485,6 +488,73 @@ pub fn import_commit_plan(
         r#match: match_,
         facts,
         outcome,
+    })
+}
+
+/// import commit の atomic 発火バッチ（1 `context.save()` で保存する書き込み集合 —
+/// ADR 0005 決定 1 / 決定 7 の 2026-07-22 追記・handball-project#83）。
+///
+/// `import_commit_batch` が組み、`ffi_write::ImportWriteRepository::commit_import` が
+/// 1 トランザクションで発火する（全成功 or 1 件も保存しない）。teams / players は**新規のみ**、
+/// facts は永続化順へ整列済み（`ImportCommitPlan` から引き継ぐ）。
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct ImportWriteBatch {
+    /// 新規作成するチームのみ（home → away）。
+    pub teams: Vec<Team>,
+    /// 新規作成する選手のみ。
+    pub players: Vec<Player>,
+    /// import する試合ヘッダ（新規）。
+    pub match_: Match,
+    /// 永続化順へ整列済みの fact 列。
+    pub facts: Vec<MatchFact>,
+}
+
+/// commit 計画を検証し、atomic 発火バッチへ組む純粋関数（ADR 0005 決定 7 の 2026-07-22 追記）。
+///
+/// **検証の意味論は現行の逐次 append と同一**にする: シェルの読み込み済みコピーではなく
+/// in-memory の working ログに対して**プレフィックスごとに** `validate_append` を回す
+/// （fact 単体 validation + roster 参照整合 + `working + fact` の whole-log 検証）。
+/// atomic 化するのは write（`commit_import` の 1 バッチ発火）だけで、検証は緩めない。
+///
+/// `existing_roster` は import 先 2 チームの**既存**所属選手（新規保存前の DB 真実）。
+/// これに新規選手（`plan.players_to_save`）を足して roster を構築する — 現行の「entity を
+/// save してから `load_roster_players` で読む」のと同じ集合を save 前に組み直すため、
+/// 参照整合の検証結果は変わらない。
+///
+/// いずれかの fact が検証に落ちたら `Err(issues)` を返し、**バッチは 1 件も組まない**
+/// （呼び出し側は `commit_import` を発火しない = 何も保存されない）。
+pub fn import_commit_batch(
+    plan: ImportCommitPlan,
+    existing_roster: &[PlayerTeamRef],
+) -> Result<ImportWriteBatch, Vec<DomainValidationIssue>> {
+    let mut roster_refs: Vec<PlayerTeamRef> = existing_roster.to_vec();
+    for player in &plan.players_to_save {
+        roster_refs.push(PlayerTeamRef {
+            player_id: player.id,
+            team_id: player.team_id,
+        });
+    }
+    let roster = roster_context_from_players(
+        plan.r#match.home_team_id,
+        plan.r#match.away_team_id,
+        &roster_refs,
+    );
+
+    let mut working: Vec<MatchFact> = Vec::new();
+    for fact in &plan.facts {
+        let issues = validators::validate_append(fact, &working, &plan.r#match, roster.as_ref());
+        if !issues.is_empty() {
+            return Err(issues);
+        }
+        working.push(fact.clone());
+    }
+
+    Ok(ImportWriteBatch {
+        teams: plan.teams_to_save,
+        players: plan.players_to_save,
+        match_: plan.r#match,
+        facts: plan.facts,
     })
 }
 
