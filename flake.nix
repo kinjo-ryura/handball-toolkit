@@ -42,6 +42,36 @@
           # Cargo.toml の `=` ピンも同時に合わせること。
           pkgs.wasm-bindgen-cli
         ];
+
+        # Android クロスリンク（handball-project#106）。
+        #
+        # SDK / NDK はこの flake では持たず、ホスト（dotfiles の nix-darwin）が提供する。
+        # Android 環境は他プロジェクトでも使うためグローバル導入とし、ここは「あれば使う」に
+        # 留める — ANDROID_NDK_ROOT が無い環境でも Android 以外のビルドは一切影響を受けない。
+        #
+        # linker を .cargo/config.toml に直書きしないのは、NDK の実体が nix store の
+        # ユーザー固有絶対パスで、git 管理下に置くと OSS 公開（handball-project#134）で
+        # 持ち出せず、かつ `nix flake update` のたびに壊れるため。
+        #
+        # ここで NDK clang を PATH に出さないことも重要: ホストリンクは Xcode CLT の
+        # /usr/bin/cc に任せる方針（上の overrideAttrs のコメント参照）なので、
+        # クロスリンカはフルパスで名指しし、PATH は汚さない。
+        shellHook = ''
+          if [ -n "''${ANDROID_NDK_ROOT:-}" ]; then
+            # ホストディレクトリ名は Apple Silicon でも darwin-x86_64
+            # （中身は universal binary で Rosetta は不要）。
+            # API 24 は Android シェルの minSdk 暫定値 — 確定は handball-project#133。
+            _hbt_android_cc="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android24-clang"
+            if [ -x "$_hbt_android_cc" ]; then
+              export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$_hbt_android_cc"
+              # cc crate を引く依存が現れた場合に同じ clang を使わせる。
+              export CC_aarch64_linux_android="$_hbt_android_cc"
+            else
+              echo "warn: ANDROID_NDK_ROOT は設定されているが NDK clang が見つかりません: $_hbt_android_cc" >&2
+            fi
+            unset _hbt_android_cc
+          fi
+        '';
       };
     };
 }
