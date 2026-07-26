@@ -1,68 +1,48 @@
 # handball-toolkit
 
-A toolkit for handball match data: a fact schema, score and timeline projections, and
-validation, as a set of Rust crates.
+ハンドボール試合データのツールキット。fact スキーマ + スコア / タイムライン導出（projections）+ validation を提供する Rust crate 群。
 
-A match is stored as an append-only log of **facts** — a goal was scored, a phase
-started, the clock was stopped. Everything else (the score, the timeline, per-player
-statistics, what the UI may currently offer) is *derived* from that log by pure
-functions. The core owns those derivations and the rules that decide whether a fact
-may be appended at all; it owns nothing else.
+試合は **fact の追記専用ログ**として保存される — ゴールが決まった、phase が始まった、時計が止まった。それ以外のすべて（スコア、タイムライン、選手別スタッツ、UI が今どの操作を出してよいか）は、そのログから純粋関数で**導出**される。コアが所有するのはその導出と、「その fact を追記してよいか」を判定するルールだけで、それ以外は何も持たない。
 
-One core serves iOS, Android, the web, and the command line. It is the typed
-implementation of the schema published by
-[handball-sample-matches](https://github.com/kinjo-ryura/handball-sample-matches),
-and it is what powers [HandballRecorder](https://github.com/kinjo-ryura/HandballRecorder).
+単一のコアが iOS / Android / Web / CLI に供給される。[handball-sample-matches](https://github.com/kinjo-ryura/handball-sample-matches) が配信するスキーマの型付き実装であり、[HandballRecorder](https://github.com/kinjo-ryura/HandballRecorder) を動かしているコアでもある。
 
-## Design invariants
+## 設計不変条件
 
-These four constraints shape every API in the crate. If you are writing a shell — an
-app on top of this core — they are the contract you are agreeing to.
+この 4 つが crate のあらゆる API を規定している。シェル（このコアの上に載るアプリ）を書くなら、これが同意する契約になる。
 
-**The core is stateless.** It owns no database handle, no session, no UI state. Every
-entry point takes a slice of facts and returns a derived value. Persistence belongs to
-the platform, which is far better at it than a portable core would be.
+**コアは状態を持たない。** DB ハンドルもセッションも UI 状態も所有しない。すべての入口は fact のスライスを受け取り、導出値を返す。永続化はプラットフォームの担当で、可搬なコアより遥かに上手くやる。
 
-**The core is deterministic.** It never calls `now()` and never generates a UUID. When
-an operation needs a timestamp or an id, *you* generate it and pass it in. This is what
-makes golden-file testing stable and what lets the same code run under WebAssembly.
+**コアは決定的。** `now()` を呼ばず、UUID も生成しない。時刻や ID が要る操作では、**呼び出し側が発行して渡す**。これがゴールデンテストの安定を担保し、wasm でも同じコードが動く理由になっている。
 
-**Errors are structured, never prose.** The core returns codes and parameters. It has
-no user-facing text in any language, so localization stays entirely in your shell. See
-[docs/ERROR_CODES.md](docs/ERROR_CODES.md).
+**エラーは構造化され、文章を持たない。** コアが返すのはコードとパラメータのみ。ユーザー向け文言をどの言語でも持たないので、多言語化はシェル側で閉じる。→ [docs/ERROR_CODES.md](docs/ERROR_CODES.md)
 
-**The boundary is coarse.** Facts in, projection out, in one synchronous call. There
-are no chatty getters, because every call crosses an FFI, JNI, or WebAssembly boundary
-where round trips are expensive.
+**境界は粗い粒度。** fact 列 in → projection out を同期 1 往復で行う。細かい getter の応酬をしないのは、呼び出しのたびに FFI / JNI / wasm の境界を越えるため。
 
-## Getting started
+## 使い方
 
 ```toml
 [dependencies]
 handball-toolkit = { git = "https://github.com/kinjo-ryura/handball-toolkit" }
 ```
 
-### Validate before you write
+### 書き込む前に検証する
 
-Validation returns a *list* — the core reports every problem it finds rather than
-stopping at the first. A non-empty list means the write must be refused.
+validation は**リスト**を返す — 最初の 1 件で止まらず、見つかった問題をすべて報告する。非空なら書き込みを拒否する契約。
 
 ```rust
 use handball_toolkit::validators;
 
 let issues = validators::validate_fact_log(&facts, &match_);
 if !issues.is_empty() {
-    // Every issue is a (scope, code, params) triple. Look up your own wording;
-    // the core deliberately has none. See docs/ERROR_CODES.md.
+    // 各 issue は (scope, code, params) の三つ組。文言は自前の表から引く
+    // （コアは意図的に文言を持たない）。→ docs/ERROR_CODES.md
     return Err(issues);
 }
 ```
 
-Individual entry points exist for narrower checks: `validate_match`,
-`validate_configuration`, `validate_play_fact`, `validate_control_fact`, and the write
-guards `validate_append`, `validate_update`, `validate_delete`.
+より狭い検査には個別の入口がある: `validate_match` / `validate_configuration` / `validate_play_fact` / `validate_control_fact`、および write ガードの `validate_append` / `validate_update` / `validate_delete`。
 
-### Derive what you display
+### 表示するものを導出する
 
 ```rust
 use handball_toolkit::projection::{SummaryProjection, TimelineProjection};
@@ -71,15 +51,11 @@ let timeline = TimelineProjection::build(&match_, &facts);
 let summary = SummaryProjection::build_with_timeline(&match_, &timeline);
 ```
 
-Building the timeline once and passing it on avoids resolving segments twice.
-`ScoreProgressionProjection` and `LiveMatchProjection` follow the same shape, the
-latter answering "what may the user do right now" for a live recording session.
+timeline を一度組んで渡し回すことで、segment の解決を二度やらずに済む。`ScoreProgressionProjection` も同じ形。`LiveMatchProjection` は「いま何ができるか」を答える記録中セッション向けの projection。
 
-### The input contract
+### 入力契約
 
-**Facts must be sorted in persistence order** — accumulated seconds, then recorded-at,
-then id — before you hand them to a validator or a projection. Passing an unsorted
-slice does not raise an error; it silently produces wrong answers.
+**fact 列は永続化順（累積秒 → recordedAt → id）にソートしてから**渡すこと。未ソートのまま渡してもエラーにはならず、**黙って誤った結果を返す**。
 
 ```rust
 use handball_toolkit::persistence_order;
@@ -87,152 +63,125 @@ use handball_toolkit::persistence_order;
 persistence_order::sort_by_persistence_order(&mut facts);
 ```
 
-### What your shell must supply
+### シェルが供給するもの
 
-Because the core is deterministic, the shell owns four things:
+コアが決定的であることの裏返しとして、シェルが次の 4 つを所有する。
 
-| The shell provides | Why |
+| シェルが供給する | 理由 |
 |---|---|
-| Timestamps | The core never reads the clock |
-| UUIDs | The core never generates one. Ask `required_*_id_count`, generate that many, pass them in |
-| Persistence | The core plans writes; your repository performs them |
-| Every user-visible string | The core emits codes, not sentences |
+| 時刻 | コアは時計を読まない |
+| UUID | コアは生成しない。`required_*_id_count` に必要数を尋ね、その数だけ作って渡す |
+| 永続化 | コアは書き込みを計画するだけで、実行はシェルの repository |
+| ユーザーに見える文言すべて | コアが返すのはコードであって文章ではない |
 
-## Targets
+## ターゲット
 
-### WebAssembly
+### Web (wasm)
 
-Build match projections in the browser, straight from published JSON. No server
-involved.
+配信 JSON からブラウザ内で projection を組み立てる。サーバーは要らない。
 
 ```bash
-./scripts/build_wasm.sh   # → target/wasm/: .wasm, an ES module, and .d.ts
+./scripts/build_wasm.sh   # → target/wasm/: .wasm + ES module の JS グルー + .d.ts
 ```
 
-The public surface is three functions, keeping to the one-round-trip rule:
+公開面は 3 関数だけで、「1 往復」の原則を保っている。
 
 ```js
 import init, { requiredIdCount, buildMatchView } from './handball_toolkit_wasm.js';
 await init();
 
 const json = await (await fetch('.../v2/matches/foo.json')).text();
-// The core does not generate UUIDs, so the shell pre-generates them.
+// コアは UUID を生成しないので、シェルが事前生成して渡す
 const ids = Array.from({ length: requiredIdCount(json) }, () => crypto.randomUUID());
 const view = JSON.parse(buildMatchView('foo', json, ids));
 // view = { match, homeTeam, awayTeam, players, summary, timeline }
 ```
 
-Failures arrive as exceptions whose `message` is the structured error as JSON.
+失敗は例外で返り、`message` に構造化エラーの JSON が載る。
 
-`wasm-bindgen` the crate and `wasm-bindgen-cli` the tool must be at **exactly** the
-same version, so the Cargo dependency is pinned with `=` to match the version the Nix
-flake provides. Bump both together.
+`wasm-bindgen` crate と `wasm-bindgen-cli` は**バージョン完全一致**が必要なため、Cargo.toml 側を `=` でピン留めして flake が入れる版と揃えている。上げるときは両方同時に。
 
-### iOS and macOS
+### iOS / macOS
 
 ```bash
-./scripts/build_xcframework.sh   # → target/xcframework/: XCFramework + generated Swift
-./scripts/ios_poc/run.sh         # smoke test inside the simulator
+./scripts/build_xcframework.sh   # → target/xcframework/: XCFramework + 生成 Swift API 層
+./scripts/ios_poc/run.sh         # 本境界 smoke をシミュレータ内で実行
 ```
 
-Three slices: device, simulator, and macOS. UniFFI's standard distribution shape
-applies — the binary and its C module ship as the XCFramework, while the generated
-Swift API layer is compiled as source alongside your app.
+実機 / シミュレータ / macOS の 3 スライス構成。UniFFI の標準配布形に従い、「バイナリ + C モジュール」が XCFramework、生成された Swift API 層は利用側がソースとして一緒にコンパイルする 2 段構え。
 
 ### Android
 
-Kotlin bindings are generated by UniFFI from the same core. Compiling the staticlib
-needs no NDK; producing a `.so` does.
+同じコアから UniFFI が Kotlin バインディングを生成する。staticlib のコンパイルに NDK は不要だが、`.so` 生成にはリンカが要る。
 
-### Command line
+### CLI
 
-Validates published match JSON against the core's own validators.
+配信されている試合 JSON を、コア自身の validators で検証する。
 
 ```bash
-# A whole v2 root: index-to-file agreement plus score, factCount, hasVideo, date
+# v2 ルートを一括検証（index ↔ ファイル突合 + スコア / factCount / hasVideo / date の転記整合）
 cargo run -p handball-toolkit-cli -- validate ../handball-sample-matches/v2
 
-# A single file; --json for machine-readable output
+# 単体ファイル。--json で機械可読出力
 cargo run -p handball-toolkit-cli -- validate --json path/to/match.json
 ```
 
-Exit codes: `0` clean (warnings alone still exit 0), `1` errors found, `2` bad usage.
-Severity is a CLI-level concept layered on top of the core's structured errors, which
-carry no severity and are uniformly blocking.
+exit code は `0` = error なし（warning のみは 0）/ `1` = error あり / `2` = 使い方・パス誤り。severity は CLI 所有のレイヤ概念で、コアの構造化エラー（severity を持たず一律 blocking）とは別物。
 
-## Layout
+## 構成
 
 ```
 crates/
-  handball-toolkit/       core: facts, clocks, configuration, entities, validators, projections
-                          feature `uniffi` (off by default) adds the FFI surface
-  handball-toolkit-cli/   validator for published match JSON
-  handball-toolkit-ffi/   UniFFI packaging: staticlib plus binding generation
-  handball-toolkit-wasm/  WebAssembly packaging: marshalling only, no logic
+  handball-toolkit/       コア（facts / clocks / configuration / entities / validators / projections）
+                          feature `uniffi`（default off）で FFI 公開面が有効になる
+  handball-toolkit-cli/   配信 JSON の検証 CLI
+  handball-toolkit-ffi/   UniFFI パッケージング（staticlib 化 + バインディング生成）
+  handball-toolkit-wasm/  wasm パッケージング（マーシャリングのみ・ロジックを持たない）
 ```
 
-The FFI and WebAssembly crates are packaging only. Types and behaviour live in the
-core, and the two wrappers hold no logic of their own.
+FFI と wasm の 2 crate はパッケージングに徹する。型と振る舞いはコアにあり、ラッパー側は独自のロジックを持たない。
 
-## Development
+## 開発
 
-The environment is declared with a Nix flake and direnv; rustup is not used. The
-toolchain is pinned in [`rust-toolchain.toml`](./rust-toolchain.toml) and provided by
-[rust-overlay](https://github.com/oxalica/rust-overlay).
+開発環境は Nix flake + direnv で宣言的に管理する（rustup は不使用）。ツールチェーンは [`rust-toolchain.toml`](./rust-toolchain.toml) で固定し、[rust-overlay](https://github.com/oxalica/rust-overlay) が提供する。
 
-Requirements: Nix, direnv, and the Xcode Command Line Tools. Linking is deliberately
-left to the CLT's `/usr/bin/cc` rather than Nix's clang, so that iOS and XCFramework
-builds do not collide with `xcrun`. See the comments in `flake.nix`.
+前提: Nix / direnv / Xcode Command Line Tools。リンクは Nix の clang ではなく CLT の `/usr/bin/cc` に意図的に任せている（iOS / XCFramework ビルドで `xcrun` 系と衝突させないため。詳細は `flake.nix` のコメント）。
 
 ```bash
-direnv allow        # once; afterwards the environment loads on cd
-cargo test          # all tests
+direnv allow        # 初回のみ。以降はディレクトリに入ると自動で整う
+cargo test          # 全テスト
 cargo clippy
 cargo fmt
 ```
 
-`nix develop` gives the same shell without direnv. Note that the flake pins
-`aarch64-darwin`, so an Apple Silicon machine is currently required for the Nix path;
-CI runs the same commands on a macOS runner.
+direnv を使わない場合は `nix develop` で同じシェルに入れる。flake は `aarch64-darwin` に固定しているため、Nix 経路には現状 Apple Silicon が要る。CI も同じコマンドを macOS ランナーで回している。
 
-## Correctness
+## 正しさの担保
 
-This core is a port of a Swift implementation, and that implementation is the
-specification. Correctness is anchored in three places:
+このコアは Swift 実装の移植であり、**移植元が仕様の正典**。正しさは 3 か所で固定している。
 
-- **Ported tests.** 140 tests carried over one-to-one from the original suite.
-- **Golden parity.** Real match JSON from `handball-sample-matches` is run through
-  both implementations, and the projection output must match bit for bit. The exact
-  corpus size is asserted in `tests/golden_parity_tests.rs`, which doubles as a check
-  that nothing was quietly dropped.
-- **Wire-format tests.** The `(scope, code)` pairs that shells key their wording
-  tables on are pinned by their own tests, because renaming one is a breaking change.
+- **移植テスト** — 移植元のテストから 1:1 で写した 140 件
+- **ゴールデンパリティ** — `handball-sample-matches` の実試合 JSON を両実装に通し、projection 出力が bit 単位で一致することを検証する。コーパス件数は `tests/golden_parity_tests.rs` の assert が正で、これが列挙漏れの検知も兼ねる
+- **ワイヤ形式テスト** — シェルが文言表を引くキー `(scope, code)` を専用テストで固定する。改名は breaking change だから
 
-The fixtures under `crates/handball-toolkit/tests/golden/inputs/` are copies of
-published match data from
-[handball-sample-matches](https://github.com/kinjo-ryura/handball-sample-matches);
-`tests/golden/README.md` records which commit each was generated from. They are match
-facts — scores, times, and events — included here solely as test fixtures.
+`crates/handball-toolkit/tests/golden/inputs/` のフィクスチャは [handball-sample-matches](https://github.com/kinjo-ryura/handball-sample-matches) の配信データのコピーで、どのコミットから生成したかは `tests/golden/README.md` に記録がある。中身は試合の事実（スコア・時刻・イベント）で、テスト fixture としてのみ同梱している。
 
-## Documentation
+## ドキュメント
 
-| Document | Contents |
+| ドキュメント | 内容 |
 |---|---|
-| [docs/ERROR_CODES.md](docs/ERROR_CODES.md) | Every error code, its parameters, and its meaning |
-| [docs/adr/](docs/adr/) | Design decisions: boundary API, error model, parity verification, the iOS boundary, write orchestration |
-| [docs/PORTING.md](docs/PORTING.md) | Record of the port from Swift |
+| [docs/ERROR_CODES.md](docs/ERROR_CODES.md) | 全エラーコードとパラメータ・意味（**英語**。外部シェル実装者向けの参照表） |
+| [docs/adr/](docs/adr/) | 設計判断: 境界 API / エラー体系 / パリティ検証 / iOS FFI 本境界 / write orchestration |
+| [docs/PORTING.md](docs/PORTING.md) | Swift からの移植記録 |
 
-The ADRs and the source comments are written in Japanese; this README and the error
-code reference are in English. Issues and pull requests are welcome in either language.
+ドキュメントとコードコメントは日本語で書く。例外は `docs/ERROR_CODES.md` のみで、これは外部実装者が文言表を書くための参照表なので英語に置いている。Issue / PR はどちらの言語でも歓迎。
 
-## Status
+## ステータス
 
-The port is complete and parity-verified, and the core is what HandballRecorder runs
-on in production. The Android shell is in progress; the WebAssembly and CLI targets
-build and are tested.
+移植は完走しパリティ検証済み。HandballRecorder は本番でこのコア上で動いている。Android シェルは進行中で、wasm / CLI はビルド・テストが通っている。
 
-Not yet published to crates.io — depend on the Git repository for now.
+crates.io へは未公開（当面は Git リポジトリを直接参照する）。
 
-## License
+## ライセンス
 
-MIT. See [LICENSE](LICENSE).
+MIT。[LICENSE](LICENSE) を参照。

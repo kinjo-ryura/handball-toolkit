@@ -57,7 +57,7 @@
   - ローカル `.timer` は pdf-matches（当時は旧 V2 形式）を一時スクリプトで移行して使用（ADR 0003 §1 追記）。その後 importer の現行スキーマ化（handball-project#54、2026-07-15）で移行は不要になり、スクリプトは削除済み（handball-project#55、2026-07-19）
   - オラクル側の後始末実施済み: `parity/oracle-dump` 先端に tag `oracle-dump-final` を打ちブランチ削除（push は手動: `git push origin oracle-dump-final`）
 - [x] P9 完走後の判断（2026-07-12 実施 — **全項目見送り**。トリガー到来時に再判断）
-  - OSS 公開判断: 見送り → **2026-07-26 に公開へ転換**（handball-project#134）。トリガーだった「公開意思が固まったとき」は、Android 実装者を迎える方針の確定をもって到来した。ライセンスは **MIT 単独**（フォーク・競合実装を許容し、還元の強制力は求めない方針。permissive の中でデュアルを採らなかった経緯も #134 のコメントに残す）。README とエラーコード表（`docs/ERROR_CODES.md`）を英語化し、CI（`cargo test` / `clippy` / `fmt --check`）を追加した
+  - OSS 公開判断: 見送り → **2026-07-26 に公開へ転換**（handball-project#134）。トリガーだった「公開意思が固まったとき」は、Android 実装者を迎える方針の確定をもって到来した。ライセンスは **MIT 単独**（フォーク・競合実装を許容し、還元の強制力は求めない方針。permissive の中でデュアルを採らなかった経緯も #134 のコメントに残す）。README に Getting Started を追加し、エラーコード表（`docs/ERROR_CODES.md`）を英語で新設、CI（`cargo test` / `clippy` / `fmt --check`）を整備した。**英語で持つのはエラーコード表 1 本のみ**（README を含む他は日本語 — 翻訳の二重管理を作らないため）
   - ID の newtype 化: 見送り（handball-project#52 で管理）→ **2026-07-19 に実施済み**（ADR 0001 の追記を参照）
   - `.timer` 公開サンプル追加: 見送り（handball-project#53）。importer 現行スキーマ化（handball-project#54）の後に正規生成で進める
   - 境界拡張候補: 見送り（ADR 0001「将来の境界拡張候補」どおり）。トリガー: Android シェル実装時
