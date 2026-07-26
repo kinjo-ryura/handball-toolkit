@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# 同一ブランチで走行中のジョブは新しい push で打ち切る。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # flake.nix は system = "aarch64-darwin" 固定なので Apple Silicon ランナーが必須
+    # （macos-14 以降の macos-latest が arm64）。ローカル開発と同一の経路を検証する。
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      # ツールチェーンは rust-toolchain.toml 経由で rust-overlay が供給する（rustup 不使用）。
+      # cargo のレジストリと target/ だけをキャッシュする。
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - name: cargo fmt
+        run: nix develop --command cargo fmt --all --check
+
+      - name: cargo clippy
+        run: nix develop --command cargo clippy --workspace --all-targets -- -D warnings
+
+      # tests/golden/local/ は gitignore 済み（ローカル専用の拡張コーパス — ADR 0003 §1）。
+      # 不在時は該当テストが自動でスキップされるので CI でも green になる。
+      - name: cargo test
+        run: nix develop --command cargo test --workspace
