@@ -25,3 +25,7 @@ categories = ["data-structures"]
 lto = true
 codegen-units = 1
 panic = "abort"
+# Android スライスも同じ release で配布する（handball-project#106 で実測して確定）。
+# unwind に戻せば uniffi の catch_unwind が復活しコアの panic が Kotlin 例外になるが、
+# 設計不変条件 3 の下で panic は「起きてはいけないバグ」の領域であり、例外化は
+# 握りつぶす道を作る方向に働く。切替コストと実測値は ADR 0006 の「決定 4」を参照。

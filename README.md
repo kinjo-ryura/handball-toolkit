@@ -112,7 +112,15 @@ const view = JSON.parse(buildMatchView('foo', json, ids));
 
 ### Android
 
-同じコアから UniFFI が Kotlin バインディングを生成する。staticlib のコンパイルに NDK は不要だが、`.so` 生成にはリンカが要る。
+同じコアから UniFFI が Kotlin バインディングを生成する。JNA が実行時に `dlopen` する `.so`（cdylib）として届ける。
+
+```bash
+cargo build --release -p handball-toolkit-ffi --target aarch64-linux-android
+```
+
+ABI は `arm64-v8a`。生成 `.so` の実行時依存は `libdl.so` / `libc.so` のみで、`libc++_shared.so` の同梱は要らない。
+
+**NDK はこのリポジトリの flake では提供しない**（他プロジェクトでも使うため、closure 約 11 GiB をリポジトリごとに抱えない判断 — [ADR 0006](docs/adr/0006-android-distribution.md)）。Android 向けにビルドするには、ホスト環境で Android NDK を用意し `ANDROID_NDK_ROOT` を設定する。設定されていれば devShell がクロスリンカを自動で構成する。未設定の場合に影響を受けるのは Android ターゲットのみで、Web / iOS / CLI のビルドは通常どおり動く。
 
 ### CLI
 
