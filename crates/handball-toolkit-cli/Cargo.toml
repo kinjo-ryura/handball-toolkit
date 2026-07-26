@@ -2,6 +2,11 @@
 name = "handball-toolkit-cli"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Command-line validator for handball match data JSON, built on handball-toolkit."
 
 [dependencies]
 # feature 指定なし = uniffi off。依存グラフに uniffi が入らない（コア Cargo.toml 参照）。

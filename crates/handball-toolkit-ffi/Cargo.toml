@@ -2,6 +2,11 @@
 name = "handball-toolkit-ffi"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "UniFFI packaging crate for handball-toolkit: staticlib for iOS/Android plus binding generation."
 
 # FFI パッケージング crate。uniffi の型・関数公開はコア crate（feature `uniffi`）の
 # namespace に集約し（ADR 0004）、ここは staticlib 化と bindgen CLI の同居だけを担う。

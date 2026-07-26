@@ -2,6 +2,11 @@
 name = "handball-toolkit-wasm"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "WebAssembly bindings for handball-toolkit: build match projections in the browser."
 
 # wasm パッケージング crate。JS から呼べる粗粒度エントリの公開と境界のマーシャリングだけを
 # 担い、型・ロジックはコア crate に置いたまま触らない（FFI crate と同じ位置づけ — ADR 0004）。
