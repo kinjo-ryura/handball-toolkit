@@ -13,7 +13,11 @@ description = "UniFFI packaging crate for handball-toolkit: staticlib for iOS/An
 
 [lib]
 # staticlib: iOS へは静的リンクで届ける（XCFramework の中身）。lib は host テスト用。
-crate-type = ["lib", "staticlib"]
+# cdylib: Android へは動的リンク（.so）で届ける — JNA が実行時に dlopen する形が
+# UniFFI Kotlin バインディングの標準配布形（handball-project#106）。
+# crate-type はターゲット別に切り替えられないため、iOS / host ビルドでも .dylib が
+# 併せて生成される（リンク時間の微増のみで、XCFramework には staticlib しか入らない）。
+crate-type = ["lib", "staticlib", "cdylib"]
 
 [[bin]]
 # バインディング生成 CLI（uniffi 標準の同居パターン）。

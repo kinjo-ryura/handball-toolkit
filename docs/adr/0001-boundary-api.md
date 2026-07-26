@@ -214,6 +214,8 @@ pub fn validate_delete(removed_fact_id: FactId, existing_facts: &[MatchFact], ma
 
 - **タイマーモード phase 自動生成（D-snap auto-create）** — 現在 `RecorderApplication` の `RecordingScreenStore.ensureTimerPhasesCovering`（約 35 行）にある「どの D-snap phase が欠けていて、それぞれ何秒〜何秒で作るべきか」の計算。入力（fact 列 + phase duration + 記録秒）→ 出力（作るべき PhaseStart のリスト）の純粋関数で、Android シェル実装時に二重実装になる筆頭候補。`missing_timer_phases(facts, config, seconds) -> Vec<PhaseStartPayload>` のような形で境界に追加する。挙動の正典は HandballRecorder の ADR 0001「タイマーモードの記録は phase を確認なしで auto-create する」（区間 index の丸め方向の混在に注意）
 
+  判断状況（2026-07-26、handball-project#106）: Android の実機 `.so` ビルド経路を通した時点で取り込みを検討したが、**取り込まないと決めた**。Android シェルのコードがまだ 1 行も無く、二重実装の痛みが仮説でしかないため。上の「保存コールバック注入」「write-plan パターン」と同じ再検討トリガー（= Android シェルで実際に痛みを体感したとき、handball-project#133）を適用する。純粋関数を 1 本足すだけで既存境界を壊さないため、書いてから判断しても手戻りは無い → [ADR 0006](0006-android-distribution.md) 決定 7
+
 ## Considered options
 
 - **モジュール構成を Rust 流に再編**（例: validation と validators の統合、projection のフラット化）→ 却下。移植期間中は 1:1 ミラーが差分レビューとパリティ検証の追跡性で勝る。再編は移植完了後の改善候補
