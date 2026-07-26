@@ -1,6 +1,6 @@
 # 移植作業ガイド — RecorderDomain → Rust
 
-> **状態: 移植完走（2026-07-19）。本ファイルは完了した移植作業の記録であり、現在地の管理台帳ではない。** P0〜P8 完了（移植テスト 140/140 green・パリティ bit-exact 一致）、P9 は全項目見送りを判断済み（下記トリガー参照）。
+> **状態: 移植完走（2026-07-19）。本ファイルは完了した移植作業の記録であり、現在地の管理台帳ではない。** P0〜P8 完了（移植テスト 140/140 green・パリティ bit-exact 一致）、P9 は起草時点で全項目見送りを判断（その後トリガー到来により一部を実施 — 下記参照）。
 >
 > **完走後の設計変更はここで追跡していない。** iOS シェル向けの FFI 本境界は [ADR 0004](adr/0004-ios-full-boundary.md)、保存・更新発火のコア移管は [ADR 0005](adr/0005-core-write-orchestration.md)（各 ADR の「実装追記」が進捗を持つ）。2026-07-15 の UniFFI PoC 境界（JSON in → JSON out）は ADR 0004 で廃止済み。**進行中・未着手の作業は GitHub Issues が正**（完走時点の残りのうち #52 / #54 / #55 / #58 は完了、#53 / #57 / #59 は open）。
 
@@ -57,7 +57,7 @@
   - ローカル `.timer` は pdf-matches（当時は旧 V2 形式）を一時スクリプトで移行して使用（ADR 0003 §1 追記）。その後 importer の現行スキーマ化（handball-project#54、2026-07-15）で移行は不要になり、スクリプトは削除済み（handball-project#55、2026-07-19）
   - オラクル側の後始末実施済み: `parity/oracle-dump` 先端に tag `oracle-dump-final` を打ちブランチ削除（push は手動: `git push origin oracle-dump-final`）
 - [x] P9 完走後の判断（2026-07-12 実施 — **全項目見送り**。トリガー到来時に再判断）
-  - OSS 公開判断: 見送り。リポは private のまま。トリガー: 公開意思が固まったとき（README 英語化・ライセンス選定とセットで実施）
+  - OSS 公開判断: 見送り → **2026-07-26 に公開へ転換**（handball-project#134）。トリガーだった「公開意思が固まったとき」は、Android 実装者を迎える方針の確定をもって到来した。ライセンスは **MIT 単独**（フォーク・競合実装を許容し、還元の強制力は求めない方針。permissive の中でデュアルを採らなかった経緯も #134 のコメントに残す）。README とエラーコード表（`docs/ERROR_CODES.md`）を英語化し、CI（`cargo test` / `clippy` / `fmt --check`）を追加した
   - ID の newtype 化: 見送り（handball-project#52 で管理）→ **2026-07-19 に実施済み**（ADR 0001 の追記を参照）
   - `.timer` 公開サンプル追加: 見送り（handball-project#53）。importer 現行スキーマ化（handball-project#54）の後に正規生成で進める
   - 境界拡張候補: 見送り（ADR 0001「将来の境界拡張候補」どおり）。トリガー: Android シェル実装時
