@@ -17,6 +17,11 @@ Rust 実装の出力が `expected/` と一致することをパリティテス�
 （handball-project#89）を取り込んでいる。`displayName` は projection に現れず期待値に
 含まれないため、再 dump はしていない。
 
+`2026-04-19-bera-bera-vs-aula` / `2026-05-05-ohrid-vs-alkaloid` の `match.date` を試合日へ
+修正した入力更新（handball-project#115。V1 → V2 backfill で記録日時が転記されていた退行）も
+取り込んでいる。`match.date` も projection に現れず期待値に含まれないため、同様に再 dump は
+していない。
+
 - 出所ハッシュは **main のコミット**を記録する（`parity/oracle-dump` はパリティ完走後に削除されるため。
   ブランチの不変条件「RecorderDomain ソース不変」により、オラクルの中身 = main の RecorderDomain）
 - 再生成手順（main の RecorderDomain が変わったら）: PORTING.md「オラクル側の運用 — 再同期の手順」
