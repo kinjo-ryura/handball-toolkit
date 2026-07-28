@@ -136,6 +136,8 @@ cargo run -p handball-toolkit-cli -- validate --json path/to/match.json
 
 exit code は `0` = error なし（warning のみは 0）/ `1` = error あり / `2` = 使い方・パス誤り。severity は CLI 所有のレイヤ概念で、コアの構造化エラー（severity を持たず一律 blocking）とは別物。
 
+この CLI は [handball-sample-matches](https://github.com/kinjo-ryura/handball-sample-matches) の CI（`.github/workflows/validate.yml`）から push / PR ごとに走り、配信 JSON の破損をそこで止める。CI は**この repo の main** を checkout してビルドするので、コア側で validators を強化すれば配信データの検証もそのまま追随する（逆に、既存の配信データが引っかかる規則を足すと向こうの CI が赤くなる）。手元実行は昇格前の事前確認や `--json` での調査に使う。
+
 ## 構成
 
 ```
