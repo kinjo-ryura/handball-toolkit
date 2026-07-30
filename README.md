@@ -122,6 +122,8 @@ ABI は `arm64-v8a`。生成 `.so` の実行時依存は `libdl.so` / `libc.so` 
 
 **NDK はこのリポジトリの flake では提供しない**（他プロジェクトでも使うため、closure 約 11 GiB をリポジトリごとに抱えない判断 — [ADR 0006](docs/adr/0006-android-distribution.md)）。Android 向けにビルドするには、ホスト環境で Android NDK を用意し `ANDROID_NDK_ROOT` を設定する。設定されていれば devShell がクロスリンカを自動で構成する。未設定の場合に影響を受けるのは Android ターゲットのみで、Web / iOS / CLI のビルドは通常どおり動く。
 
+シェルの書き方は [`examples/android/`](examples/android/) が参照実装になっている（Room による永続化 + 3 trait の実装 + 最小 UI）。このコアの上にシェルを載せるなら、公開されている実装例はこれ。
+
 ### CLI
 
 配信されている試合 JSON を、コア自身の validators で検証する。
@@ -188,7 +190,7 @@ direnv を使わない場合は `nix develop` で同じシェルに入れる。f
 
 ## ステータス
 
-移植は完走しパリティ検証済み。HandballRecorder は本番でこのコア上で動いている。Android シェルは進行中で、wasm / CLI はビルド・テストが通っている。
+移植は完走しパリティ検証済み。HandballRecorder は本番でこのコア上で動いている。Android は `.so` + Kotlin バインディングの生成と `examples/android/` の参照シェルまで通っており、wasm / CLI はビルド・テストが通っている。
 
 crates.io へは未公開（当面は Git リポジトリを直接参照する）。
 

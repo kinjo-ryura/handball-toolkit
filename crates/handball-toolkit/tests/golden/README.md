@@ -9,7 +9,7 @@ Rust 実装の出力が `expected/` と一致することをパリティテス�
 | 項目 | 値 |
 |---|---|
 | オラクル（RecorderDomain） | HandballRecorder **main** `b7cf57e861a9100ee3f721c8c477e2aae062c3f8` |
-| dump ツール | HandballRecorder `parity/oracle-dump` ブランチの `recorder-domain-dump`（Package: `Packages/RecorderDomain`。ブランチ削除後は tag `oracle-dump-final`） |
+| dump ツール | HandballRecorder `parity/oracle-dump` ブランチの `recorder-domain-dump`（Package: `Packages/RecorderDomain`。ブランチは削除済みなので tag `oracle-dump-final` から取り出す） |
 | 入力コーパス | handball-sample-matches `d64d8d5f7b8ec947fae1640a5f6b0fa40900e369`（`v2/matches/` 4 件 = `.video` 2 + `.timer` 2、`v2/highlights/` 6 件） |
 | 生成日 | 2026-07-20（`.timer` 2 件を追加 — handball-project#53。期待値は昇格前に `local/` で生成済みのものを、入力 byte 一致のまま流用したので再 dump していない。highlights は #71 で再生成、`.video` matches は 2026-07-12 生成のまま） |
 
@@ -22,15 +22,21 @@ Rust 実装の出力が `expected/` と一致することをパリティテス�
 取り込んでいる。`match.date` も projection に現れず期待値に含まれないため、同様に再 dump は
 していない。
 
-- 出所ハッシュは **main のコミット**を記録する（`parity/oracle-dump` はパリティ完走後に削除されるため。
-  ブランチの不変条件「RecorderDomain ソース不変」により、オラクルの中身 = main の RecorderDomain）
-- 再生成手順（main の RecorderDomain が変わったら）: PORTING.md「オラクル側の運用 — 再同期の手順」
+- 出所ハッシュは **当時の main のコミット**を記録している（`parity/oracle-dump` はパリティ完走後に削除されるため。
+  ブランチの不変条件「RecorderDomain ソース不変」により、オラクルの中身 = 当時の main の RecorderDomain）
+- **オラクルは凍結済み**: RecorderDomain は HandballRecorder main から削除された（`8aeffb8`、2026-07-18）。
+  したがって「main の RecorderDomain が変わったから再生成する」事象はもう起こらない。
+  PORTING.md「オラクル側の運用 — 再同期の手順」は完走前の運用記録として読むこと
+- 期待値を作り直す必要が出た場合（入力コーパスの projection 面が変わった等）は、tag
+  `oracle-dump-final` から取り出して dump を再実行する:
 
 ```bash
-# HandballRecorder の parity/oracle-dump ブランチで
-cd Packages/RecorderDomain
+# ../HandballRecorder/ で。main を汚さずに取り出す
+git worktree add /tmp/oracle oracle-dump-final
+cd /tmp/oracle/Packages/RecorderDomain
 swift run recorder-domain-dump --out <出力先>/matches    <handball-sample-matches>/v2/matches/*.json
 swift run recorder-domain-dump --out <出力先>/highlights <handball-sample-matches>/v2/highlights/2026-*.json
+cd - && git worktree remove /tmp/oracle
 ```
 
 ## 期待値の形式（正規化の規約）
@@ -93,8 +99,8 @@ standalone clone でも 3 モードすべてのパリティ検証が再現でき
 cp <sample-matches>/pdf-matches/jha/<試合>.json \
   crates/handball-toolkit/tests/golden/local/inputs/timer/<試合>.json
 
-# 2. Swift オラクルで期待値を dump（HandballRecorder の parity/oracle-dump。
-#    ブランチ削除後は tag oracle-dump-final から checkout で復元）
+# 2. Swift オラクルで期待値を dump（凍結済み。上の「出所」節と同じく
+#    tag oracle-dump-final から git worktree で取り出して実行する）
 swift run recorder-domain-dump --out .../tests/golden/local/expected/timer \
   .../tests/golden/local/inputs/timer/*.json
 ```

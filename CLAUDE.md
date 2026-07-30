@@ -38,7 +38,7 @@ Cargo workspace。4 crate 構成:
 - `crates/handball-toolkit-ffi/` — FFI パッケージング crate。staticlib 化（XCFramework の中身）と uniffi-bindgen CLI（feature `bindgen`）のみを担い、型・関数の公開面はコア crate の namespace に集約する（ADR 0004 決定 3 実装追記）
 - `crates/handball-toolkit-wasm/` — wasm パッケージング crate（handball-project#57）。JS 向けの粗粒度エントリ（`toolkitVersion` / `requiredIdCount` / `buildMatchView`）とマーシャリングだけを担い、コアには触れない。**ID 生成はシェル（JS の `crypto.randomUUID()`）が行う** — コアは UUID を生成しない（設計不変条件 2）ので、この crate も乱数を引かず `getrandom` の wasm バックエンド設定が不要
 
-Kotlin バインディングは将来の拡張候補で、必要になった時点で workspace member として追加する（先回りで作らない。handball-project#59）。iOS シェル向けのドメイン全型 UniFFI 公開（本境界）は ADR 0004 で確定・実装済み。
+Kotlin バインディングは専用の workspace member を持たない。生成設定は `crates/handball-toolkit/uniffi.toml` の `[bindings.kotlin]`（Uuid / 各 ID newtype / CoreInt の custom_types 込み）にあり、`.so` と Kotlin バインディングは `crates/handball-toolkit-ffi/` から `scripts/build_android.sh` が生成・配置する（handball-project#59 / #106 / #133 いずれも完了。配布境界は ADR 0006）。iOS シェル向けのドメイン全型 UniFFI 公開（本境界）は ADR 0004 で確定・実装済み。
 
 ### iOS 向け XCFramework（UniFFI）
 
@@ -86,8 +86,22 @@ Gradle は flake が提供する。SDK / NDK はホスト（`ANDROID_HOME` / `AN
 
 ### 移植のオラクル（Swift 実装）とパリティ検証
 
-移植元の Swift 実装が真実の仕様。セマンティクスに迷ったら移植元とそのテスト（約 2,500 行）を読む:
+**オラクルは凍結済み。「Swift が真実の仕様」は移植面にのみ適用される** — この 2 点を取り違えると、Rust 独自に進化した挙動を「オラクルと不一致だから」と誤って巻き戻す。
 
-- Swift 実装: `HandballRecorder/Packages/RecorderDomain/Sources/RecorderDomain/`（Clock / Configuration / Entities / Facts / Projection / Validation / Validators）。handball-project の checkout 内では sibling submodule `../HandballRecorder/`
-- 型仕様・validation ルール: 同リポの `docs/redesign/DOMAIN_TYPES_V1.md` / `DOMAIN_VALIDATION_RULES.md`、ドメイン語彙は `CONTEXT.md`
-- パリティ検証: [handball-sample-matches](https://github.com/kinjo-ryura/handball-sample-matches) の実試合 JSON をゴールデンコーパスに、Swift 実装をオラクルとして projection 出力の一致を検証する。特に `SegmentResolver` と validation R3–R9 は移植で最も繊細な部分 — 挙動を「改善」せず一致させる
+- **オラクルの現在地**: RecorderDomain は HandballRecorder main から削除済み（`8aeffb8`「アプリのコアを HandballToolkit へ差し替え」2026-07-18）。sibling submodule `../HandballRecorder/` を見ても無い。到達手段は tag `oracle-dump-final` からの取り出しのみ:
+
+  ```bash
+  # ../HandballRecorder/ で。main を汚さずに読むため worktree を使う
+  git worktree add /tmp/oracle oracle-dump-final
+  ls /tmp/oracle/Packages/RecorderDomain/Sources/RecorderDomain/   # Clock / Configuration / Entities / Facts / Projection / Validation / Validators
+  git worktree remove /tmp/oracle                                  # 読み終わったら
+  ```
+
+- **適用範囲**: 移植完走時点（ゴールデンの出所 = HandballRecorder main `b7cf57e`）の移植面に限る。完走後に Rust コアへ独自追加された挙動は凍結オラクルに存在せず、不一致は退行ではない。これらは **Rust 実装 + 該当 ADR の「実装追記」が正**:
+  - 記録オフセットが phase 境界 / stoppage 区間を越えないクランプ（`72c1024` / handball-project#92）
+  - 非有限 anchor（NaN / ±∞）の validation（`8208d35` / handball-project#91）
+  - 試合全体を覆っているかの coverage 検査（`1b2ac7d` / handball-project#90）
+  - サンプル試合 import の atomic 化（`0f2b90d` / handball-project#83）
+
+- **移植面のセマンティクスに迷ったら**、凍結オラクルとそのテスト（約 2,500 行）を読む。型仕様・validation ルールは HandballRecorder main に残っている `docs/redesign/DOMAIN_TYPES_V1.md` / `DOMAIN_VALIDATION_RULES.md`（削除されていないので tag 不要）、ドメイン語彙は同リポの `CONTEXT.md`
+- **パリティ検証**: [handball-sample-matches](https://github.com/kinjo-ryura/handball-sample-matches) の実試合 JSON をゴールデンコーパスに、Swift 実装をオラクルとして projection 出力の一致を検証する（`crates/handball-toolkit/tests/golden/`。期待値は dump 済みで、オラクルを再実行しなくても回る）。特に `SegmentResolver` と validation R3–R9 は移植で最も繊細な部分 — 移植面については挙動を「改善」せず一致させる
