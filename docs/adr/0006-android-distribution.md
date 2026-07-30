@@ -100,6 +100,25 @@ Swift 側の `module_name = "HandballToolkit"`（ADR 0004 決定 8）に対応�
 
 エミュレータは dotfiles 側で `pixel-api36`（pixel_7 / API 36 / google_apis / arm64-v8a）の作成・起動・`adb devices` 到達を確認済み。`.so` を載せた実行確認は Gradle プロジェクトを要するため #133 の範囲。
 
+## 実装追記（2026-07-28 — #133 のサンプルシェルで実証）
+
+`examples/android`（Room + 3 trait の 15 メソッド + 最小 UI）をエミュレータ上で通し、保留していた 3 点と minSdk が決着した。サンプルの詳細は [`examples/android/README.md`](../../examples/android/README.md)。
+
+**決定 4（`panic = "abort"` 維持）→ 維持で確定**。再検討トリガーは「Kotlin から呼んで panic 診断が実際に苦しいと分かったとき」だったが、実装を通して panic に到達しなかったため発火しない。`unwind` へ倒す積極的理由が現れなかったので、iOS と同一プロファイルのまま据え置く。あわせて、サンプルでは `.so` を strip しない（`packaging.jniLibs.keepDebugSymbols`）— abort 構成ではシンボルの有無がそのまま診断可否になるため。
+
+**決定 6（`package_name` 既定据え置き）→ 変更なし**。サンプルは自前の import で足り、進行を妨げなかった。確定トリガーは引き続き #135。
+
+**決定 7（`missing_timer_phases` の境界追加）→ 追加不要と判明**。ADR 0001 が「Android で二重実装になる筆頭候補」と名指ししたものだが、ADR 0005 実装順序 3 で phase 自動補完が `count_phase_completion_facts` / `record_fact_with_phase_completion` としてコアへ移っており、**Kotlin シェルは補完ロジックを 1 行も書かなかった**（サンプルの ① がその経路）。二重実装の痛みは発生しないため、この項目は解消として閉じる。
+
+**minSdk は 24 で確定**（決定 2 の暫定値をそのまま採用）。ただし生成 Kotlin の API 面に `java.time.Instant`（`UtcDateTime`）が出るため、API 26 未満では **core library desugaring が必須**。NDK リンカの API レベル 24 と揃うことを優先し、desugaring を入れる側を採った。
+
+新たに判明した制約と設計への影響:
+
+- **エラー型のフィールド名に `message` を使えない**（コア側を修正済み）。uniffi の Kotlin backend は error 型を `sealed class … : kotlin.Exception()` として生成し `override val message` を必ず持たせるため、`message` という名前のフィールドは `Throwable.message` と衝突して**生成コードがコンパイルできない**。Swift は error を enum に落とすので露見せず、iOS だけでは気づけない。`CoreWriteError` の 3 variant と `SampleDtoError::InvalidJson` を `detail` へ改名し、`docs/ERROR_CODES.md` を追随させた（Swift シェル側の参照は 0 件 — ADR 0002 が「`message` をユーザーに見せない」と定めているため、シェルは case しか見ていなかった）
+- **async foreign trait は代替形を検討するまでもなく通った**。Kotlin では `suspend fun` を持つ `interface` になり、Room の suspend DAO をそのまま実装にできる。coroutine scope はシェルが供給せず、生成コードが `GlobalScope.launch` で呼ぶ。Rust future の drop で Kotlin の `Job` が cancel される点は Swift 側（キャンセル非対応）と異なる。ただし生成コードが catch するのは `kotlin.Exception` までで `Error` は素通りするため、シェル側でも構造化エラーへ写像しておくのが安全
+- **決定 5（2Hz ホットパス）の前提が Android では成り立たない**。ADR 0004 決定 5 は「object ハンドル + スカラー引数なら FFI 越えは µs オーダー」を根拠に per-call の参照系を許容したが、Android では JNA の `Structure` by-value マーシャリングが支配的で **1 呼び出しあたり 20〜50 µs**（fact 数にほぼ非依存）、fact 列を渡す呼び出しは **約 10 µs/fact** かかる。iOS の「描画のたびに fact 件数ぶん resolver を参照する」形は 305 件で 1 描画 約 11 ms になり成立しない。Android シェルは tick ごとの粗い呼び出し 1 本に畳むか、ADR 0004 が温存した**材料化テーブル方式**（`all_segments()` を 1 回引いて以後 Kotlin 側で解決）を採ること。実測値の表は README。**この実測が ADR 0004 の「性能問題が実測されたときに再検討」の発火にあたる**（エミュレータでの値であり、実機では改善する可能性がある）
+- **Gradle は flake が提供する**（`pkgs.gradle`。closure 約 200 MB）。SDK / NDK をホストに委ねる決定 1 は変えないが、ビルドツールである gradle は wasm-bindgen-cli と同格として repo 側で宣言した。Gradle が読む `ANDROID_HOME` もホスト提供に加わる（決定 1 の「ホストへ要求するインターフェースは `ANDROID_NDK_ROOT` のみ」は `ANDROID_HOME` を含む形へ広がった）
+
 ## Considered options
 
 - **`flake.nix` に NDK / SDK を入れて repo 完結にする** → 却下（決定 1）。closure 10.9 GiB を repo ごとに抱えることになり、他プロジェクトでも使う実態と合わない。再現性は「`ANDROID_NDK_ROOT` だけを要求する」形で最小限確保する

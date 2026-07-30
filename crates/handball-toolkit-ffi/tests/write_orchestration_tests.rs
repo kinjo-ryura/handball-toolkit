@@ -131,7 +131,7 @@ impl MatchWriteRepository for FakeRepo {
     async fn load_match(&self, _match_id: MatchId) -> Result<Match, CoreWriteError> {
         if self.fail_load_match {
             return Err(CoreWriteError::Repository {
-                message: "load_match 失敗".to_string(),
+                detail: "load_match 失敗".to_string(),
             });
         }
         Ok(self.match_.clone())
@@ -557,7 +557,7 @@ fn repository_の失敗はそのまま伝播する() {
     assert_eq!(
         result,
         Err(CoreWriteError::Repository {
-            message: "load_match 失敗".to_string()
+            detail: "load_match 失敗".to_string()
         })
     );
     assert_eq!(repo.fact_log().len(), 1, "読み取り失敗時は発火しない");
