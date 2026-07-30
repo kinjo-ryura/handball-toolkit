@@ -30,6 +30,12 @@ use crate::write::{self, NewFactStamp, PlayerTeamRef, VideoMigrationPlanError, V
 /// エラー体系は ADR の全形で最初から固定する: `TeamInUse` / `PlayerInUse` は第 4 段
 /// （entity CRUD の使用中判定）、`InsufficientNewIds` は第 2 段（phase 自動補完の
 /// ID 供給契約）の入口が返す。
+///
+/// **診断文字列のフィールド名を `message` にしないこと**（handball-project#133）:
+/// uniffi の Kotlin backend は error 型を `sealed class ... : kotlin.Exception()` として
+/// 生成し、`override val message` を必ず持たせる。`message` という名前のフィールドが
+/// あると `Throwable.message` と衝突して**生成コードがコンパイルできない**
+/// （Swift は error を enum に落とすため露見しない）。詳細は ADR 0006 実装追記。
 #[derive(Debug, Clone, PartialEq, uniffi::Error)]
 pub enum CoreWriteError {
     /// validation 違反。発火せず拒否（非空 issues を搬送 — blocking）。
@@ -39,21 +45,21 @@ pub enum CoreWriteError {
     /// 使用中選手削除の拒否（参照整合）。
     PlayerInUse { fact_count: u32 },
     /// シェル repository 実装の失敗（診断文字列のみ — ユーザー向け文言はシェル所有）。
-    Repository { message: String },
+    Repository { detail: String },
     /// 事前生成 ID / 時刻スタンプの不足（ID 供給契約違反。シェルは再試行できる）。
     InsufficientNewIds { required: usize, provided: usize },
     /// video 移行 commit の計画不成立（sync 欠落・videoClock 導出不能）。wizard の
     /// 事前 validation が通っていれば到達しない安全網（実装順序 4 で追加した variant）。
-    MigrationPlanInfeasible { message: String },
+    MigrationPlanInfeasible { detail: String },
     /// import commit の DTO → domain decode 失敗（未知の teamKey / playerKey・不正な
     /// configuration 等）。移植元 `MatchImporterV2.ImportError.conversionFailed` 相当。
-    ImportDecodeFailed { message: String },
+    ImportDecodeFailed { detail: String },
 }
 
 impl From<VideoMigrationPlanError> for CoreWriteError {
     fn from(error: VideoMigrationPlanError) -> Self {
         CoreWriteError::MigrationPlanInfeasible {
-            message: format!("{error:?}"),
+            detail: format!("{error:?}"),
         }
     }
 }
@@ -72,7 +78,7 @@ impl std::fmt::Display for CoreWriteError {
 impl From<uniffi::UnexpectedUniFFICallbackError> for CoreWriteError {
     fn from(error: uniffi::UnexpectedUniFFICallbackError) -> Self {
         CoreWriteError::Repository {
-            message: error.reason,
+            detail: error.reason,
         }
     }
 }
@@ -289,7 +295,7 @@ pub async fn commit_sample_match_import(
         ids.next().expect("必要数は事前検査済み")
     })
     .map_err(|error| CoreWriteError::ImportDecodeFailed {
-        message: format!("{error:?}"),
+        detail: format!("{error:?}"),
     })?;
 
     let outcome = plan.outcome;

@@ -250,10 +250,16 @@ pub fn apply_play_fact_edit(play: PlayFact, edit: PlayFactEdit) -> PlayFact {
 ///
 /// Swift では throws で受ける。`Decode` は移植エラー型 `SampleMatchDecodeErrorV2` を
 /// そのまま搬送する。
+///
+/// **診断文字列のフィールド名を `message` にしないこと**（handball-project#133）:
+/// uniffi の Kotlin backend は error 型を `sealed class ... : kotlin.Exception()` として
+/// 生成し、`override val message` を必ず持たせる。`message` という名前のフィールドが
+/// あると `Throwable.message` と衝突して**生成コードがコンパイルできない**
+/// （Swift は error を enum に落とすため露見しない）。詳細は ADR 0006 実装追記。
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Error)]
 pub enum SampleDtoError {
     /// JSON が SAMPLE_DTO_V2 schema として parse できない（serde の診断文字列を添付）。
-    InvalidJson { message: String },
+    InvalidJson { detail: String },
     /// DTO → domain の decode 失敗。
     Decode { error: SampleMatchDecodeErrorV2 },
     /// 事前生成 ID の不足。`sample_match_required_id_count` の値だけ生成して渡す。
@@ -270,7 +276,7 @@ impl std::fmt::Display for SampleDtoError {
 
 fn invalid_json(error: serde_json::Error) -> SampleDtoError {
     SampleDtoError::InvalidJson {
-        message: error.to_string(),
+        detail: error.to_string(),
     }
 }
 
