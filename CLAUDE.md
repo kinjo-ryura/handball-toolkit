@@ -61,6 +61,7 @@ XCFramework は ios / ios-sim / macos の 3 スライス構成（HandballRecorde
 
 ```bash
 cargo build --release -p handball-toolkit-ffi --target aarch64-linux-android
+./scripts/build_android.sh   # .so + Kotlin バインディングを examples/android へ配置
 ```
 
 NDK / SDK は**この repo の flake ではなくホスト環境**が提供する（ADR 0006 決定 1）。`ANDROID_NDK_ROOT` があれば devShell の shellHook がクロスリンカを `CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER` に export する。未設定の環境では Android ターゲットだけがビルドできず、host / iOS / wasm は影響を受けない。
@@ -68,6 +69,13 @@ NDK / SDK は**この repo の flake ではなくホスト環境**が提供す�
 - ABI は `arm64-v8a` 単独（開発機が Apple Silicon で AVD も同 ABI。ADR 0006 決定 5）
 - 生成 `.so` の実行時依存は `libdl.so` / `libc.so` のみ（`libc++_shared.so` の同梱は不要）
 - **NDK clang を PATH に出さないこと**: ホストリンクを Xcode CLT の `/usr/bin/cc` に任せる方針は Android でも変えない。クロスリンカはフルパスで名指しする
+- **エラー型のフィールドに `message` という名前を使わないこと**: Kotlin backend は error 型を `sealed class … : kotlin.Exception()` として生成するため `Throwable.message` と衝突し、生成コードがコンパイルできない（Swift では露見しない。診断文字列は `detail` に統一 — ADR 0006 実装追記）
+
+### Android サンプルシェル（`examples/android/`）
+
+Room + 3 trait の 15 メソッド + 最小 UI の参照実装（handball-project#133）。**公開できるシェル実装はこれだけ**（iOS 側は private かつ Swift）。ビルド手順・Android 固有の落とし穴（async foreign trait の取り回し / minSdk と desugaring / 2Hz ホットパスの実測値）は [`examples/android/README.md`](examples/android/README.md)。
+
+Gradle は flake が提供する。SDK / NDK はホスト（`ANDROID_HOME` / `ANDROID_NDK_ROOT`）。
 
 ### 設計不変条件（コアに入れてよいもの / いけないもの）
 
