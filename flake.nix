@@ -41,6 +41,14 @@
           # （不一致だと生成時に schema version mismatch で落ちる）。nixpkgs 側が上がったら
           # Cargo.toml の `=` ピンも同時に合わせること。
           pkgs.wasm-bindgen-cli
+
+          # Android サンプルシェル（examples/android）のビルド（handball-project#133）。
+          # SDK / NDK をホストに任せる判断（ADR 0006 決定 1）は変えないが、gradle は
+          # ビルドツールなので wasm-bindgen-cli と同格でこの flake が宣言する
+          # （closure は約 200 MB で、SDK の 10.9 GiB とは桁が違う）。
+          # JDK は gradle が自前で wrap したものを使うため別途入れない。
+          # Gradle 自身のバージョンは AGP の要求と対応する — examples/android/README.md 参照。
+          pkgs.gradle
         ];
 
         # Android クロスリンク（handball-project#106）。

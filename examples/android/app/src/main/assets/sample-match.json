@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 2,
+  "match": {
+    "displayName": "取り込みサンプル",
+    "date": "2026-04-05T10:00:00Z",
+    "configuration": {
+      "kind": "timer",
+      "timer": { "phaseDurationSeconds": 1800 }
+    }
+  },
+  "teams": {
+    "home": {
+      "key": "home",
+      "name": "取り込み側ホーム",
+      "players": [
+        { "key": "h1", "name": "山本", "jerseyNumber": 7 },
+        { "key": "h2", "name": "中村", "jerseyNumber": 9 }
+      ]
+    },
+    "away": {
+      "key": "away",
+      "name": "取り込み側アウェイ",
+      "players": [
+        { "key": "a1", "name": "小林", "jerseyNumber": 4 },
+        { "key": "a2", "name": "加藤", "jerseyNumber": 11 }
+      ]
+    }
+  },
+  "facts": [
+    {
+      "recordedAt": "2026-04-05T10:00:00Z",
+      "payload": {
+        "kind": "control",
+        "control": {
+          "kind": "phaseStart",
+          "phaseStart": { "kind": "regular" },
+          "anchor": {
+            "kind": "matchClock",
+            "matchClock": { "elapsedSeconds": 0 },
+            "endMatchElapsedSeconds": 1800
+          }
+        }
+      }
+    },
+    {
+      "recordedAt": "2026-04-05T10:05:00Z",
+      "payload": {
+        "kind": "play",
+        "play": {
+          "kind": "goal",
+          "teamKey": "home",
+          "playerKey": "h1",
+          "anchor": {
+            "kind": "matchClock",
+            "matchClock": { "elapsedSeconds": 300 }
+          }
+        }
+      }
+    },
+    {
+      "recordedAt": "2026-04-05T10:12:00Z",
+      "payload": {
+        "kind": "play",
+        "play": {
+          "kind": "shotMissed",
+          "teamKey": "away",
+          "playerKey": "a2",
+          "anchor": {
+            "kind": "matchClock",
+            "matchClock": { "elapsedSeconds": 720 }
+          }
+        }
+      }
+    },
+    {
+      "recordedAt": "2026-04-05T10:20:00Z",
+      "payload": {
+        "kind": "play",
+        "play": {
+          "kind": "goal",
+          "teamKey": "away",
+          "playerKey": "a1",
+          "anchor": {
+            "kind": "matchClock",
+            "matchClock": { "elapsedSeconds": 1200 }
+          }
+        }
+      }
+    }
+  ]
+}
