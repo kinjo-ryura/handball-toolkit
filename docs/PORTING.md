@@ -2,7 +2,9 @@
 
 > **状態: 移植完走（2026-07-19）。本ファイルは完了した移植作業の記録であり、現在地の管理台帳ではない。** P0〜P8 完了（移植テスト 140/140 green・パリティ bit-exact 一致）、P9 は起草時点で全項目見送りを判断（その後トリガー到来により一部を実施 — 下記参照）。
 >
-> **完走後の設計変更はここで追跡していない。** iOS シェル向けの FFI 本境界は [ADR 0004](adr/0004-ios-full-boundary.md)、保存・更新発火のコア移管は [ADR 0005](adr/0005-core-write-orchestration.md)（各 ADR の「実装追記」が進捗を持つ）。2026-07-15 の UniFFI PoC 境界（JSON in → JSON out）は ADR 0004 で廃止済み。**進行中・未着手の作業は GitHub Issues が正**（完走時点の残りのうち #52 / #54 / #55 / #58 は完了、#53 / #57 / #59 は open）。
+> **完走後の設計変更はここで追跡していない。** iOS シェル向けの FFI 本境界は [ADR 0004](adr/0004-ios-full-boundary.md)、保存・更新発火のコア移管は [ADR 0005](adr/0005-core-write-orchestration.md)（各 ADR の「実装追記」が進捗を持つ）。2026-07-15 の UniFFI PoC 境界（JSON in → JSON out）は ADR 0004 で廃止済み。**進行中・未着手の作業は GitHub Issues が正**（完走時点に挙げた残り #52 / #53 / #54 / #55 / #57 / #58 / #59 はすべて完了）。
+>
+> **オラクル（RecorderDomain）は凍結済み**。以下で参照している `../HandballRecorder/Packages/RecorderDomain/` は HandballRecorder main から削除された（`8aeffb8`、2026-07-18）。読む必要が出たら tag `oracle-dump-final` から取り出す（手順は CLAUDE.md「移植のオラクル」節）。**「Swift が真実の仕様」は移植面に限る** — 完走後に Rust 独自追加された挙動は Rust 実装 + ADR の実装追記が正。
 
 セッションをまたいで移植を進めるための「現在地と次の一手」のファイル。**各セッションの冒頭でこれを読み、進捗があったらチェックを更新する**。設計判断の正典は `docs/adr/`（このファイルには理由を書かない）。
 
