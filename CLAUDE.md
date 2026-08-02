@@ -38,7 +38,7 @@ Cargo workspace。4 crate 構成:
 - `crates/handball-toolkit-ffi/` — FFI パッケージング crate。staticlib 化（XCFramework の中身）と uniffi-bindgen CLI（feature `bindgen`）のみを担い、型・関数の公開面はコア crate の namespace に集約する（ADR 0004 決定 3 実装追記）
 - `crates/handball-toolkit-wasm/` — wasm パッケージング crate（handball-project#57）。JS 向けの粗粒度エントリ（`toolkitVersion` / `requiredIdCount` / `buildMatchView`）とマーシャリングだけを担い、コアには触れない。**ID 生成はシェル（JS の `crypto.randomUUID()`）が行う** — コアは UUID を生成しない（設計不変条件 2）ので、この crate も乱数を引かず `getrandom` の wasm バックエンド設定が不要
 
-Kotlin バインディングは専用の workspace member を持たない。生成設定は `crates/handball-toolkit/uniffi.toml` の `[bindings.kotlin]`（Uuid / 各 ID newtype / CoreInt の custom_types 込み）にあり、`.so` と Kotlin バインディングは `crates/handball-toolkit-ffi/` から `scripts/build_android.sh` が生成・配置する（handball-project#59 / #106 / #133 いずれも完了。配布境界は ADR 0006）。iOS シェル向けのドメイン全型 UniFFI 公開（本境界）は ADR 0004 で確定・実装済み。
+Kotlin バインディングは専用の workspace member を持たない。生成設定は `crates/handball-toolkit/uniffi.toml` の `[bindings.kotlin]`（Uuid / 各 ID newtype / CoreInt の custom_types 込み）にあり、`.so` と Kotlin バインディングは `crates/handball-toolkit-ffi/` から `scripts/build_aar.sh` が生成し、`android/toolkit/` の Gradle モジュールが `.aar` に束ねる（handball-project#59 / #106 / #133 / #135 いずれも完了。配布境界は ADR 0006）。iOS シェル向けのドメイン全型 UniFFI 公開（本境界）は ADR 0004 で確定・実装済み。
 
 ### iOS 向け XCFramework（UniFFI）
 
@@ -57,25 +57,31 @@ Kotlin バインディングは専用の workspace member を持たない。生�
 
 XCFramework は ios / ios-sim / macos の 3 スライス構成（HandballRecorderMac も同じ枠組み）。サイズ最適化はワークスペース Cargo.toml の `[profile.release]`（LTO / codegen-units=1 / panic=abort。実測と代償は ADR 0004 実装追記）。生成 Swift（`HandballToolkit.swift`）は XCFramework に入らない。「バイナリ + C モジュール」が XCFramework、Swift API 層はソースとして利用側が一緒にコンパイルする 2 段構え（UniFFI の標準配布形）。
 
-### Android 向け `.so`（UniFFI + JNA）
+### Android 向け `.aar`（UniFFI + JNA）
 
 ```bash
-cargo build --release -p handball-toolkit-ffi --target aarch64-linux-android
-./scripts/build_android.sh   # .so + Kotlin バインディングを examples/android へ配置
+./scripts/build_aar.sh   # → target/aar/handball-toolkit-<version>.aar
 ```
+
+配布物は **GitHub Release に添付する prebuilt `.aar`**（handball-project#135）。中身は「生成 Kotlin + `arm64-v8a` の `.so` + consumer ProGuard ルール」で、**利用者は Rust / Nix / NDK を一切要しない**。Gradle モジュールは `android/toolkit/`、リリース手順は README「リリース」。
+
+**Maven Central は採らなかった** — namespace 所有確認と GPG 署名（鍵の失効管理・パスフレーズ保管という継続的負担）が要り、外部シェル実装者がまだ現れていない段階では見合わないため。障壁除去の本体は Release 配布でも達成される。**使う人が現れたら格上げする**（ADR 0006 実装追記 2026-08-02）。
 
 NDK / SDK は**この repo の flake ではなくホスト環境**が提供する（ADR 0006 決定 1）。`ANDROID_NDK_ROOT` があれば devShell の shellHook がクロスリンカを `CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER` に export する。未設定の環境では Android ターゲットだけがビルドできず、host / iOS / wasm は影響を受けない。
 
 - ABI は `arm64-v8a` 単独（開発機が Apple Silicon で AVD も同 ABI。ADR 0006 決定 5）
-- 生成 `.so` の実行時依存は `libdl.so` / `libc.so` のみ（`libc++_shared.so` の同梱は不要）
+- 生成 `.so` の実行時依存は `libdl.so` / `libc.so` のみ（`libc++_shared.so` の同梱は不要）。`.so` は strip しない（診断性優先 — ADR 0006 決定 4）
+- 生成 Kotlin の package は `io.github.kinjoryura.handballtoolkit`（Maven 座標に対応。ADR 0006 決定 6 が #135 で確定）
 - **NDK clang を PATH に出さないこと**: ホストリンクを Xcode CLT の `/usr/bin/cc` に任せる方針は Android でも変えない。クロスリンカはフルパスで名指しする
 - **エラー型のフィールドに `message` という名前を使わないこと**: Kotlin backend は error 型を `sealed class … : kotlin.Exception()` として生成するため `Throwable.message` と衝突し、生成コードがコンパイルできない（Swift では露見しない。診断文字列は `detail` に統一 — ADR 0006 実装追記）
+- **consumer ProGuard ルールを消さないこと**（`android/toolkit/consumer-rules.pro`）: JNA は reflection で引くため、消費側が R8 で minify すると壊れる。サンプルは `isMinifyEnabled = false` なので**サンプルでは絶対に露見しない**
+- **`.aar` ファイル単体は依存情報を運ばない**: 運ぶのは Maven の POM で、Release 配布（`implementation(files(...))`）では POM が介在しない。JNA と kotlinx-coroutines は**利用側が自分で宣言する必要がある** — README とサンプルの両方に明記してあるので、依存を増減したら 3 箇所（`android/toolkit/build.gradle.kts` / README / `examples/android/app/build.gradle.kts`）を揃えること
 
 ### Android サンプルシェル（`examples/android/`）
 
 Room + 3 trait の 15 メソッド + 最小 UI の参照実装（handball-project#133）。**公開できるシェル実装はこれだけ**（iOS 側は private かつ Swift）。ビルド手順・Android 固有の落とし穴（async foreign trait の取り回し / minSdk と desugaring / 2Hz ホットパスの実測値）は [`examples/android/README.md`](examples/android/README.md)。
 
-Gradle は flake が提供する。SDK / NDK はホスト（`ANDROID_HOME` / `ANDROID_NDK_ROOT`）。
+**このサンプルは配布された `.aar` を `app/libs/` から参照する**（#135）。外部利用者と同じ経路を通すためで、NDK 無しでビルドできる。コアを直したら `./scripts/build_aar.sh` の出力を `examples/android/app/libs/` へコピーする。Gradle は flake が提供、SDK はホスト（`ANDROID_HOME`）。
 
 ### 設計不変条件（コアに入れてよいもの / いけないもの）
 

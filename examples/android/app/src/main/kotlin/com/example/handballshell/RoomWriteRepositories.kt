@@ -5,16 +5,16 @@ import com.example.handballshell.db.ShellDatabase
 import com.example.handballshell.db.toDomain
 import com.example.handballshell.db.toRow
 import java.util.UUID
-import uniffi.handball_toolkit.CoreWriteException
-import uniffi.handball_toolkit.ImportWriteBatch
-import uniffi.handball_toolkit.ImportWriteRepository
-import uniffi.handball_toolkit.Match
-import uniffi.handball_toolkit.MatchFact
-import uniffi.handball_toolkit.MatchWriteRepository
-import uniffi.handball_toolkit.Player
-import uniffi.handball_toolkit.PlayerTeamRef
-import uniffi.handball_toolkit.Team
-import uniffi.handball_toolkit.TeamWriteRepository
+import io.github.kinjoryura.handballtoolkit.CoreWriteException
+import io.github.kinjoryura.handballtoolkit.ImportWriteBatch
+import io.github.kinjoryura.handballtoolkit.ImportWriteRepository
+import io.github.kinjoryura.handballtoolkit.Match
+import io.github.kinjoryura.handballtoolkit.MatchFact
+import io.github.kinjoryura.handballtoolkit.MatchWriteRepository
+import io.github.kinjoryura.handballtoolkit.Player
+import io.github.kinjoryura.handballtoolkit.PlayerTeamRef
+import io.github.kinjoryura.handballtoolkit.Team
+import io.github.kinjoryura.handballtoolkit.TeamWriteRepository
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  シェル契約のすべて: 3 trait / 15 メソッド

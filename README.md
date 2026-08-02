@@ -112,17 +112,70 @@ const view = JSON.parse(buildMatchView('foo', json, ids));
 
 ### Android
 
-同じコアから UniFFI が Kotlin バインディングを生成する。JNA が実行時に `dlopen` する `.so`（cdylib）として届ける。
+**使う側に Rust / Nix / NDK は要らない。** [Releases](https://github.com/kinjo-ryura/handball-toolkit/releases) から prebuilt `.aar` をダウンロードし、アプリの `app/libs/` に置くだけで始められる。
 
-```bash
-cargo build --release -p handball-toolkit-ffi --target aarch64-linux-android
+```kotlin
+dependencies {
+    implementation(files("libs/handball-toolkit-0.1.0.aar"))
+
+    // .aar ファイル単体は依存情報を運ばない（運ぶのは Maven の POM）ので、
+    // この 2 つは利用側で宣言する。生成コードが Native.register で .so を dlopen する
+    // のに JNA、suspend 関数に coroutines を使う。
+    implementation("net.java.dev.jna:jna:5.17.0@aar")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+}
 ```
 
-ABI は `arm64-v8a`。生成 `.so` の実行時依存は `libdl.so` / `libc.so` のみで、`libc++_shared.so` の同梱は要らない。
+`.aar` の中身は「生成 Kotlin + `arm64-v8a` の `.so` + consumer ProGuard ルール」。
 
-**NDK はこのリポジトリの flake では提供しない**（他プロジェクトでも使うため、closure 約 11 GiB をリポジトリごとに抱えない判断 — [ADR 0006](docs/adr/0006-android-distribution.md)）。Android 向けにビルドするには、ホスト環境で Android NDK を用意し `ANDROID_NDK_ROOT` を設定する。設定されていれば devShell がクロスリンカを自動で構成する。未設定の場合に影響を受けるのは Android ターゲットのみで、Web / iOS / CLI のビルドは通常どおり動く。
+利用側の前提は 1 つだけ。**minSdk が 26 未満なら core library desugaring を有効にすること** — 生成 Kotlin の API 面に `java.time.Instant`（`UtcDateTime`）が出るため:
 
-シェルの書き方は [`examples/android/`](examples/android/) が参照実装になっている（Room による永続化 + 3 trait の実装 + 最小 UI）。このコアの上にシェルを載せるなら、公開されている実装例はこれ。
+```kotlin
+android {
+    compileOptions { isCoreLibraryDesugaringEnabled = true }
+}
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+}
+```
+
+R8 の keep ルール（JNA と生成コードは reflection / direct mapping で引かれるため minify で壊れる）は `.aar` が consumer ProGuard ルールとして同梱しているので、利用側で書く必要はない。
+
+シェルの書き方は [`examples/android/`](examples/android/) が参照実装になっている（Room による永続化 + 3 trait の実装 + 最小 UI）。**このサンプル自身が publish 済みの `.aar` を引く形**になっており、外部利用者とまったく同じ経路を通っている。
+
+#### 配布物をビルドする
+
+```bash
+./scripts/build_aar.sh   # → target/aar/handball-toolkit-<version>.aar
+```
+
+ABI は `arm64-v8a` 単独。生成 `.so` の実行時依存は `libdl.so` / `libc.so` のみで、`libc++_shared.so` の同梱は要らない。`.so` は **strip しない** — `panic = "abort"` 構成（[ADR 0006](docs/adr/0006-android-distribution.md) 決定 4）ではコアの panic がネイティブ abort になるため、シンボルの有無がそのまま診断可否になる。
+
+**NDK / SDK はこのリポジトリの flake では提供しない**（他プロジェクトでも使うため、closure 約 11 GiB をリポジトリごとに抱えない判断 — ADR 0006 決定 1）。`.aar` をビルドするには、ホスト環境で Android NDK / SDK を用意し `ANDROID_NDK_ROOT` と `ANDROID_HOME` を設定する。設定されていれば devShell がクロスリンカを自動で構成する。未設定の場合に影響を受けるのは Android ターゲットのみで、Web / iOS / CLI のビルドは通常どおり動く。
+
+#### バージョンの対応関係
+
+配布物のバージョンは**コア crate の `version`（ワークスペース `Cargo.toml` の `[workspace.package]`）に従う**。
+
+| | 値 |
+|---|---|
+| コア crate | `0.1.0` |
+| `.aar` ファイル名 | `handball-toolkit-0.1.0.aar` |
+| git タグ / Release | `v0.1.0` |
+
+`build_aar.sh` はビルド前に `Cargo.toml` と `android/toolkit/build.gradle.kts` の値を照合し、不一致なら止める。上げるときは両方を同時に直して `v<version>` のタグを打つ。
+
+#### リリース
+
+GitHub Release に `.aar` を添付して配る。署名も外部アカウントも要らない。
+
+```bash
+./scripts/build_aar.sh                     # → target/aar/handball-toolkit-<version>.aar
+gh release create v0.1.0 target/aar/handball-toolkit-0.1.0.aar \
+  --title "v0.1.0" --notes "..."
+```
+
+**Maven Central（`implementation("io.github.kinjo-ryura:handball-toolkit:0.1.0")` の一行で済む形）は採らなかった** — namespace 所有確認と GPG 署名が要り、鍵の失効管理・パスフレーズ保管という継続的な負担が発生する。外部シェル実装者がまだ現れていない段階では、その負担に見合わないと判断した。障壁除去の本体（Rust / Nix / NDK を不要にする）は GitHub Release でも達成され、利用側に残る差は「`.aar` を `libs/` に置き、依存 2 行を書く」だけ。**実際に使う人が現れたら Maven Central へ格上げする**（判断の経緯は [ADR 0006](docs/adr/0006-android-distribution.md) 実装追記 2026-08-02）。
 
 ### CLI
 

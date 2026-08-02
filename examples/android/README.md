@@ -30,26 +30,39 @@ UI は plain View、エラー表示は素の文字列、依存は最小に絞っ
 
 ## ビルドと実行
 
+このサンプルは **配布された `.aar` を `app/libs/` から参照する**（handball-project#135）。外部利用者と
+まったく同じ経路を通すためで、`.so` や生成 Kotlin を自前で抱えることはしない。
+
 前提:
 
 - `nix develop`（または direnv）環境内にいること。Gradle は flake が提供する
-- ホストが **`ANDROID_NDK_ROOT` と `ANDROID_HOME`** を提供していること
-  （SDK / NDK は repo の flake では持たない — [ADR 0006](../../docs/adr/0006-android-distribution.md) 決定 1）
+- ホストが **`ANDROID_HOME`** を提供していること（SDK は repo の flake では持たない —
+  [ADR 0006](../../docs/adr/0006-android-distribution.md) 決定 1）。**`ANDROID_NDK_ROOT` は要らない**
+  — コアは `.aar` の中に .so として入っており、このサンプルは Rust をビルドしない
 - arm64-v8a の AVD（ADR 0006 決定 5 のとおり ABI は arm64-v8a 単独）
 
-```sh
-# 1) .so と Kotlin バインディングを生成（examples/android/app 配下へ配置される）
-./scripts/build_android.sh          # リポジトリルートから
+まず `.aar` を `app/libs/` に置く。外部利用者と同じ経路を通すなら
+[Releases](https://github.com/kinjo-ryura/handball-toolkit/releases) から落とす:
 
-# 2) ビルドしてインストール
-cd examples/android
-gradle :app:assembleDebug
+```sh
+mkdir -p app/libs
+gh release download v0.1.0 --pattern '*.aar' --dir app/libs
+```
+
+```sh
+gradle :app:assembleDebug           # examples/android から
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n com.example.handballshell/.MainActivity
 ```
 
-生成物（`app/src/main/jniLibs/`、`app/src/generated/`）と `local.properties` はコミットしない。
-バイナリと生成コードを git 履歴に積まない方針は iOS 側（ADR 0004 決定 8）と同じ。
+**コアを直したときは** `.aar` を作り直して差し替える（ここだけは NDK が要る）:
+
+```sh
+./scripts/build_aar.sh                                              # リポジトリルートから
+cp target/aar/handball-toolkit-0.1.0.aar examples/android/app/libs/
+```
+
+`app/libs/` と `local.properties` はコミットしない。
 
 ### バージョンの対応関係
 
@@ -60,7 +73,8 @@ adb shell am start -n com.example.handballshell/.MainActivity
 | Kotlin | 2.1.21 | KSP と組で上げること |
 | KSP | 2.1.21-2.0.1 | Kotlin と完全一致が必要 |
 | Room | 2.7.2 | |
-| JNA | 5.17.0（`@aar`） | 生成コードが `Native.register` で使う |
+| handball-toolkit | 0.1.0 | `app/libs/handball-toolkit-0.1.0.aar`。コア crate の version に従う |
+| JNA | 5.17.0（`@aar`） | 生成コードが `Native.register` で使う。**`.aar` は依存情報を運ばない**ので利用側で宣言する |
 | compileSdk / targetSdk | 36 | `buildToolsVersion = "37.0.0"` を明示（nix の SDK には 1 つしか無い） |
 | minSdk | **24** | 下記参照 |
 

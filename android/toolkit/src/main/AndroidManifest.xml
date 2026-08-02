@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ライブラリモジュールの最小マニフェスト。permission も component も宣言しない
+  （コアは I/O を一切しない — 設計不変条件 1「状態を所有しない stateless コア」）。
+  namespace / minSdk は build.gradle.kts が持つ。
+-->
+<manifest />

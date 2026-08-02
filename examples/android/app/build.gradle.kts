@@ -52,26 +52,29 @@ android {
         }
     }
 
-    // scripts/build_android.sh が生成する Kotlin バインディング。
-    // 生成物なのでコミットしない（.gitignore 済み）。
-    sourceSets["main"].kotlin.srcDir("src/generated/kotlin")
-
     packaging {
         jniLibs {
-            // .so を strip しない。panic = "abort"（ADR 0006 決定 4）ではコアの panic が
-            // Kotlin 例外ではなくネイティブ abort になるため、シンボルが残っているかどうかが
-            // そのまま診断可否になる。サンプルではサイズより診断性を採る。
+            // .aar が同梱してくる .so を strip しない。panic = "abort"（ADR 0006 決定 4）
+            // ではコアの panic が Kotlin 例外ではなくネイティブ abort になるため、
+            // シンボルが残っているかどうかがそのまま診断可否になる。
             keepDebugSymbols += "**/*.so"
         }
     }
 }
 
 dependencies {
-    // ── UniFFI 生成コードの実行時依存 ──
-    // JNA: 生成コードが Native.register（direct mapping）で .so を dlopen する。
-    // Android では aar 版（各 ABI のネイティブ支援ライブラリ同梱）を使う。
+    // ── コア ──
+    // 配布された .aar を app/libs/ に置いて参照する。**外部利用者とまったく同じ経路**で、
+    // Rust / Nix / NDK は要らない（handball-project#135）。入手方法は 2 通り:
+    //   - 外部利用者と同じ: GitHub Release から .aar をダウンロードして libs/ へ置く
+    //   - 手元でコアを直したとき: ./scripts/build_aar.sh の出力を libs/ へコピー
+    // どちらも手順は examples/android/README.md「ビルドと実行」。
+    implementation(files("libs/handball-toolkit-0.1.0.aar"))
+
+    // .aar ファイル単体は依存情報を運ばない（運ぶのは Maven の POM で、ローカルファイル
+    // 参照では POM が介在しない）。そのため利用側がこの 2 つを自分で宣言する必要がある。
+    // 生成コードが Native.register で .so を dlopen するのに JNA、suspend 関数に coroutines。
     implementation("net.java.dev.jna:jna:5.17.0@aar")
-    // 生成コードの suspend 関数・GlobalScope.launch が依存する。
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     // ── 永続化（シェルの責務。コアは DB を所有しない）──

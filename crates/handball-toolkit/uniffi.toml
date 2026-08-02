@@ -50,9 +50,14 @@ from_custom = "UInt32({})"
 # Kotlin バインディング（Android シェル向け — handball-project#59）。
 # custom_types は Swift 側（上）と同じ写像を Kotlin の等価型で行い、両シェルの API 面を揃える。
 # 設定なしだと Uuid / *Id は kotlin.String、CoreInt は kotlin.UInt の builtin ブリッジに落ちる。
-# package_name は既定（uniffi.handball_toolkit）のまま。Android シェルのパッケージ構成が決まった
-# 時点で設定する（Swift の module_name = ADR 0004 決定 8 に相当する Kotlin 側の決定は本境界では未確定）。
+#
+# package_name は Maven 座標 io.github.kinjo-ryura:handball-toolkit に対応させる
+# （handball-project#135 で .aar の配布先を Maven Central に決めた時点で確定 — ADR 0006 決定 6）。
+# Java パッケージ名にハイフンは使えないので groupId から除去した形になる。既定の
+# uniffi.handball_toolkit は他の uniffi ライブラリと共有される名前空間であり、publish する
+# 成果物としては自分の座標下に置く（Swift の module_name = ADR 0004 決定 8 と同じ規律）。
 [bindings.kotlin]
+package_name = "io.github.kinjoryura.handballtoolkit"
 
 # Uuid（String ブリッジ — src/ffi_support.rs）を Kotlin の java.util.UUID へ写す。
 [bindings.kotlin.custom_types.Uuid]

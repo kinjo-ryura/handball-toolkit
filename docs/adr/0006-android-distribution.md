@@ -119,6 +119,39 @@ Swift 側の `module_name = "HandballToolkit"`（ADR 0004 決定 8）に対応�
 - **決定 5（2Hz ホットパス）の前提が Android では成り立たない**。ADR 0004 決定 5 は「object ハンドル + スカラー引数なら FFI 越えは µs オーダー」を根拠に per-call の参照系を許容したが、Android では JNA の `Structure` by-value マーシャリングが支配的で **1 呼び出しあたり 20〜50 µs**（fact 数にほぼ非依存）、fact 列を渡す呼び出しは **約 10 µs/fact** かかる。iOS の「描画のたびに fact 件数ぶん resolver を参照する」形は 305 件で 1 描画 約 11 ms になり成立しない。Android シェルは tick ごとの粗い呼び出し 1 本に畳むか、ADR 0004 が温存した**材料化テーブル方式**（`all_segments()` を 1 回引いて以後 Kotlin 側で解決）を採ること。実測値の表は README。**この実測が ADR 0004 の「性能問題が実測されたときに再検討」の発火にあたる**（エミュレータでの値であり、実機では改善する可能性がある）
 - **Gradle は flake が提供する**（`pkgs.gradle`。closure 約 200 MB）。SDK / NDK をホストに委ねる決定 1 は変えないが、ビルドツールである gradle は wasm-bindgen-cli と同格として repo 側で宣言した。Gradle が読む `ANDROID_HOME` もホスト提供に加わる（決定 1 の「ホストへ要求するインターフェースは `ANDROID_NDK_ROOT` のみ」は `ANDROID_HOME` を含む形へ広がった）
 
+## 実装追記（2026-08-01 — #135 で `.aar` 配布を確立）
+
+`android/toolkit`（`com.android.library` モジュール）と `scripts/build_aar.sh` を追加し、prebuilt `.aar` を Maven Central へ配る経路を通した。保留していた決定 6 が確定し、利用者側の前提（Rust / Nix / NDK）が消えた。
+
+**決定 6（`package_name`）→ `io.github.kinjoryura.handballtoolkit` で確定**。確定トリガー（「#135 で配布先を決めるとき」）が発火した。Maven 座標を `io.github.kinjo-ryura:handball-toolkit` と決めたので、Java パッケージ名に使えないハイフンを除去した形を採る。既定の `uniffi.handball_toolkit` は他の uniffi ライブラリと共有される名前空間であり、publish する成果物としては自分の座標下に置く（Swift の `module_name` を既定から変えた ADR 0004 決定 8 と同じ規律）。
+
+**配布先は GitHub Release**（`.aar` を添付）。検討順は JitPack → Maven Central → GitHub Release。
+
+- **JitPack を却下**: ビルダーが Linux なのに対し `flake.nix` は `system = "aarch64-darwin"` 固定（NDK clang のパスも `prebuilt/darwin-x86_64` 前提）。JitPack 上では `nix develop` が使えず、`rustup` + NDK を `jitpack.yml` で組む**第二のビルド経路**を抱えることになり、決定 1・2 と二重管理になる
+- **Maven Central を見送り**: 利用側が `implementation("io.github.kinjo-ryura:handball-toolkit:0.1.0")` の一行で済む唯一の選択肢で、技術的には最良だった。実際に publish 設定（vanniktech プラグイン / POM / 署名 / sources・javadoc jar）まで組み、`publishToMavenLocal` で成果物が揃うことも確認した。しかし namespace 所有確認と GPG 署名が要り、**鍵の失効管理・パスフレーズ保管という継続的な負担**が発生する。外部シェル実装者がまだ 1 人も現れていない段階でこれを背負うのは投資として過大と判断し、撤回した
+- **GitHub Release を採用**: `gh release upload` だけで配れ、鍵の管理はゼロ。**障壁除去の本体（Rust / Nix / NDK を不要にする）は同じく達成される** — 利用側に残る差は「`.aar` を `app/libs/` に置き、依存 2 行を自分で書く」だけ。**実際に使う人が現れたら Maven Central へ格上げする**（決定 5 の「必要になってから足す」と同じ規律。撤回した publish 設定は git 履歴に残してあり、復元は容易）
+
+**サイズ実測**（決定 5 の arm64-v8a 単独構成）:
+
+| 成果物 | サイズ | 備考 |
+|---|---|---|
+| `.aar` | 1,595,274 B (1.52 MiB) | 配布物本体 |
+| ├ `classes.jar` | 1,088,644 B | 生成 Kotlin 665 クラス |
+| ├ `jni/arm64-v8a/*.so` | 1,721,976 B | **strip しない**（決定 4 の診断性優先）。実装追記 2026-07-26 の not-stripped 実測 1,721,016 B と整合 |
+| └ `proguard.txt` | 1,272 B | consumer ProGuard ルール（後述） |
+| サンプル APK（debug） | 5,166,925 B | JNA の `libjnidispatch.so` 176,520 B を含む |
+
+（撤回した Maven Central 経路で併産していた `sources.jar` 65,691 B / `javadoc.jar` 1,340,390 B は Central Portal の必須要件だったもので、Release 配布では作らない。格上げ時にまた要る）
+
+新たに判明した制約:
+
+- **consumer ProGuard ルールの同梱が要る**。UniFFI 生成コードは JNA の direct mapping（`Native.register`）で `.so` を解決し、JNA は実行時に reflection でクラス・フィールドを引く。消費側が R8 で minify するとこれらが削られ / 改名され、`UnsatisfiedLinkError` や `Structure` のフィールド不一致になる。サンプルは `isMinifyEnabled = false` なので**サンプルだけでは絶対に露見しない種類の壊れ方**であり、外部利用者の release ビルドで初めて出る。`consumer-rules.pro` を `.aar` に同梱し、利用者が何も書かなくても効くようにした
+- **core library desugaring は消費側でも要る**。ライブラリ側での有効化は消費アプリへ伝播しない。生成 Kotlin の API 面に `java.time.Instant` が出る以上、minSdk < 26 の消費アプリは自分でも `isCoreLibraryDesugaringEnabled` と `coreLibraryDesugaring(...)` を書く必要がある（README に利用者向けの注意として明記）
+- **`.aar` ファイル単体は依存情報を運ばない**。運ぶのは Maven の POM であり、Release に置いた `.aar` を `implementation(files(...))` で参照する形では POM が介在しない。そのため JNA と kotlinx-coroutines は**利用側が自分で宣言する必要がある**（README とサンプルの両方に明記した）。Maven Central へ格上げすればこの手間は消える — 格上げの利益はほぼこの一点に集約される
+- **`scripts/build_android.sh` は役割を終えた**。サンプルが `.aar` を引く側に回り、「サンプルへ `.so` と生成 Kotlin を直接配置する」用途が無くなったため削除した。同じ生成は `build_aar.sh` がライブラリモジュール向けに行う
+
+検証: サンプルアプリ（`examples/android`）を配布 `.aar` を `app/libs/` から参照する形へ切り替え、**`ANDROID_NDK_ROOT` 未設定・クロスリンカ未設定の状態でビルドが通ること**を確認した（外部利用者と同じ条件）。エミュレータ上で seed / ゴール記録 / サンプル試合の atomic import / 2Hz ホットパス実測まで実動作し、クラッシュ 0 件。Maven（`mavenLocal`）経由と `libs/` 経由で生成される APK は**バイト単位で同一**（5,166,925 B）だったため、配布方式の違いによる挙動差は無い。生成 Kotlin の import は `uniffi.handball_toolkit.*` から `io.github.kinjoryura.handballtoolkit.*` へ移っている。
+
 ## Considered options
 
 - **`flake.nix` に NDK / SDK を入れて repo 完結にする** → 却下（決定 1）。closure 10.9 GiB を repo ごとに抱えることになり、他プロジェクトでも使う実態と合わない。再現性は「`ANDROID_NDK_ROOT` だけを要求する」形で最小限確保する

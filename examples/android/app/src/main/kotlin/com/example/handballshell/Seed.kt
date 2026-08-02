@@ -3,14 +3,14 @@ package com.example.handballshell
 import com.example.handballshell.db.ShellDatabase
 import java.time.Instant
 import java.util.UUID
-import uniffi.handball_toolkit.Match
-import uniffi.handball_toolkit.MatchConfiguration
-import uniffi.handball_toolkit.Player
-import uniffi.handball_toolkit.RosterSelection
-import uniffi.handball_toolkit.Team
-import uniffi.handball_toolkit.recordSaveMatch
-import uniffi.handball_toolkit.recordSavePlayer
-import uniffi.handball_toolkit.recordSaveTeam
+import io.github.kinjoryura.handballtoolkit.Match
+import io.github.kinjoryura.handballtoolkit.MatchConfiguration
+import io.github.kinjoryura.handballtoolkit.Player
+import io.github.kinjoryura.handballtoolkit.RosterSelection
+import io.github.kinjoryura.handballtoolkit.Team
+import io.github.kinjoryura.handballtoolkit.recordSaveMatch
+import io.github.kinjoryura.handballtoolkit.recordSavePlayer
+import io.github.kinjoryura.handballtoolkit.recordSaveTeam
 
 private const val KEY_SEEDED_MATCH_ID = "seededMatchId"
 
