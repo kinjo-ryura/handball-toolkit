@@ -112,17 +112,77 @@ const view = JSON.parse(buildMatchView('foo', json, ids));
 
 ### Android
 
-同じコアから UniFFI が Kotlin バインディングを生成する。JNA が実行時に `dlopen` する `.so`（cdylib）として届ける。
+**使う側に Rust / Nix / NDK は要らない。** Maven Central から prebuilt `.aar` を引くだけで始められる。
 
-```bash
-cargo build --release -p handball-toolkit-ffi --target aarch64-linux-android
+```kotlin
+dependencies {
+    implementation("io.github.kinjo-ryura:handball-toolkit:0.1.0")
+}
 ```
 
-ABI は `arm64-v8a`。生成 `.so` の実行時依存は `libdl.so` / `libc.so` のみで、`libc++_shared.so` の同梱は要らない。
+`.aar` の中身は「生成 Kotlin + `arm64-v8a` の `.so` + 依存宣言（JNA / kotlinx-coroutines）」。`mavenCentral()` は Gradle の既定リポジトリなので、リポジトリ宣言を足す必要もない。
 
-**NDK はこのリポジトリの flake では提供しない**（他プロジェクトでも使うため、closure 約 11 GiB をリポジトリごとに抱えない判断 — [ADR 0006](docs/adr/0006-android-distribution.md)）。Android 向けにビルドするには、ホスト環境で Android NDK を用意し `ANDROID_NDK_ROOT` を設定する。設定されていれば devShell がクロスリンカを自動で構成する。未設定の場合に影響を受けるのは Android ターゲットのみで、Web / iOS / CLI のビルドは通常どおり動く。
+利用側の前提は 1 つだけ。**minSdk が 26 未満なら core library desugaring を有効にすること** — 生成 Kotlin の API 面に `java.time.Instant`（`UtcDateTime`）が出るため:
 
-シェルの書き方は [`examples/android/`](examples/android/) が参照実装になっている（Room による永続化 + 3 trait の実装 + 最小 UI）。このコアの上にシェルを載せるなら、公開されている実装例はこれ。
+```kotlin
+android {
+    compileOptions { isCoreLibraryDesugaringEnabled = true }
+}
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+}
+```
+
+R8 の keep ルール（JNA と生成コードは reflection / direct mapping で引かれるため minify で壊れる）は `.aar` が consumer ProGuard ルールとして同梱しているので、利用側で書く必要はない。
+
+シェルの書き方は [`examples/android/`](examples/android/) が参照実装になっている（Room による永続化 + 3 trait の実装 + 最小 UI）。**このサンプル自身が publish 済みの `.aar` を引く形**になっており、外部利用者とまったく同じ経路を通っている。
+
+#### 配布物をビルドする
+
+```bash
+./scripts/build_aar.sh   # → target/aar/handball-toolkit-<version>.aar
+```
+
+ABI は `arm64-v8a` 単独。生成 `.so` の実行時依存は `libdl.so` / `libc.so` のみで、`libc++_shared.so` の同梱は要らない。`.so` は **strip しない** — `panic = "abort"` 構成（[ADR 0006](docs/adr/0006-android-distribution.md) 決定 4）ではコアの panic がネイティブ abort になるため、シンボルの有無がそのまま診断可否になる。
+
+**NDK / SDK はこのリポジトリの flake では提供しない**（他プロジェクトでも使うため、closure 約 11 GiB をリポジトリごとに抱えない判断 — ADR 0006 決定 1）。`.aar` をビルドするには、ホスト環境で Android NDK / SDK を用意し `ANDROID_NDK_ROOT` と `ANDROID_HOME` を設定する。設定されていれば devShell がクロスリンカを自動で構成する。未設定の場合に影響を受けるのは Android ターゲットのみで、Web / iOS / CLI のビルドは通常どおり動く。
+
+#### バージョンの対応関係
+
+配布物のバージョンは**コア crate の `version`（ワークスペース `Cargo.toml` の `[workspace.package]`）に従う**。
+
+| | 値 |
+|---|---|
+| コア crate | `0.1.0` |
+| Maven 座標 | `io.github.kinjo-ryura:handball-toolkit:0.1.0` |
+| git タグ | `v0.1.0` |
+
+`build_aar.sh` はビルド前に `Cargo.toml` と `android/toolkit/build.gradle.kts` の値を照合し、不一致なら止める。上げるときは両方を同時に直して `v<version>` のタグを打つ。
+
+#### publish
+
+Maven Central（Sonatype Central Portal）へ開発機から手動で上げる。CI 自動化はリリース頻度が上がってから（ADR 0006 実装追記 2026-08-01）。
+
+```bash
+./scripts/build_aar.sh                                       # 先に .so と生成 Kotlin を揃える
+gradle -p android :toolkit:publishAndReleaseToMavenCentral   # 署名して Portal へ
+```
+
+初回のみ次の準備が要る:
+
+- Sonatype Central Portal のアカウントと、namespace `io.github.kinjo-ryura` の所有確認（GitHub アカウントで検証される）
+- 公開鍵サーバへ登録した GPG 鍵
+
+認証情報は**リポジトリにはコミットせず** `~/.gradle/gradle.properties` に置く:
+
+```properties
+mavenCentralUsername=<Portal の User Token 名>
+mavenCentralPassword=<Portal の User Token パスワード>
+signingInMemoryKey=<GPG 秘密鍵（armor 形式から改行を除いたもの）>
+signingInMemoryKeyPassword=<鍵のパスフレーズ>
+```
+
+署名鍵が無い環境では署名タスクがスキップされ、`gradle -p android :toolkit:publishToMavenLocal` によるローカル検証だけができる。設定漏れのまま公開される事故は、Central Portal が署名の無い bundle を reject するので手前で止まる。
 
 ### CLI
 
