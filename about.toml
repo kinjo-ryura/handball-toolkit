@@ -1,0 +1,44 @@
+# cargo-about の設定（handball-project#140）。
+#
+# 配布バイナリ（iOS の staticlib / Android の .so）へリンクされる依存のライセンスを
+# 収集し、scripts/generate_licenses.sh が THIRD_PARTY_LICENSES.json を組み立てる。
+# 一覧を手書きしないための唯一の入力がこのファイル。
+
+# ライセンスの許容集合。**並び順が優先順位**で、"MIT OR Apache-2.0" のような選択式は
+# ここで先に書いたものが採用される（MIT を先頭にすると 49 crate が MIT に集約される）。
+#
+# ここに無いライセンスの crate が依存に入ると生成が失敗する（--fail）。これが
+# 「気づかないうちに copyleft を取り込む」ことへの唯一の防波堤なので、
+# **落ちたときに安易にここへ追記して通さない** — まずその依存を入れてよいかを判断する。
+accepted = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "Unlicense",
+    "CC0-1.0",
+    # uniffi 一式（handball-project#140 時点で 6 crate）。ファイル copyleft なので
+    # 改変せず利用する限り義務は「本文の同梱 + ソース入手方法の告知」に留まる（MPL-2.0 §3.2）。
+    # 告知は生成物の sourceUrl（crates.io の当該バージョン）が担う。
+    "MPL-2.0",
+]
+
+# 配布物が乗るターゲット全部を並べる。ここから漏れたターゲット限定の依存は
+# 一覧に載らない = 義務を取りこぼすので、配布先を増やしたらここも増やす。
+targets = [
+    "aarch64-apple-ios",
+    "aarch64-apple-ios-sim",
+    "aarch64-apple-darwin",
+    "aarch64-linux-android",
+]
+
+# build-dependencies / dev-dependencies は配布バイナリに入らないので対象外。
+# 一方 proc-macro crate は cargo 上「通常依存」なので残る（syn / quote 等）。
+# バイナリには入らないため過剰計上だが、**過剰に載せるのは無害で、取りこぼしは有害**
+# なので削らない。
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+ignore-transitive-dependencies = false

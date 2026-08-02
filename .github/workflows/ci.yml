@@ -45,3 +45,10 @@ jobs:
       # 不在時は該当テストが自動でスキップされるので CI でも green になる。
       - name: cargo test
         run: nix develop --command cargo test --workspace
+
+      # 配布バイナリの OSS ライセンス一覧が依存の現況と一致するかを検査する
+      # （handball-project#140）。依存を足して再生成を忘れると、シェルが表示する
+      # 一覧から crate が欠けて表示義務を取りこぼすため、ここで止める。
+      # accepted に無いライセンスの混入もこのステップが検出する（about.toml）。
+      - name: ライセンス一覧が最新か
+        run: nix develop --command ./scripts/generate_licenses.sh --check

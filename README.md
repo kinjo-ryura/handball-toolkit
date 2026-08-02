@@ -250,3 +250,22 @@ crates.io へは未公開（当面は Git リポジトリを直接参照する�
 ## ライセンス
 
 MIT。[LICENSE](LICENSE) を参照。
+
+### 依存の OSS ライセンス表示（配布物を作る人向け）
+
+配布バイナリ（iOS の staticlib / Android の `.so`）には MIT / MPL-2.0 / Unicode-3.0 の OSS がリンクされる。**Executable Form で配る側にはライセンス本文と著作権表示を受領者へ届ける義務がある**（MPL-2.0 は加えて §3.2 の「ソース入手方法の告知」）。このリポはその一覧を [`THIRD_PARTY_LICENSES.json`](THIRD_PARTY_LICENSES.json) として持ち、**シェル側はこれを同梱して画面に出す**。
+
+```bash
+./scripts/generate_licenses.sh           # 生成して書き出す
+./scripts/generate_licenses.sh --check   # 依存の現況と一致するか検査（CI が実行）
+```
+
+- 一覧は `cargo-about` が Cargo.lock から起こす。**手で書かない・手で直さない**。依存を足したら再生成してコミットする（忘れても CI の `--check` が落ちる）
+- 許容ライセンスは [`about.toml`](about.toml) の `accepted`。ここに無いものが混ざると生成が失敗する。**落ちたときに安易に追記して通さない** — まずその依存を入れてよいかを判断する
+- 生成物の形（`schemaVersion: 1`）:
+  - `licenses[]` — ライセンス本文。同一本文は 1 件に集約する。MIT が 19 件に分かれるのは crate ごとに著作権表示が違うため
+  - `libraries[]` — crate 一覧。`licenseIndexes` で `licenses[]` を参照する。1 crate が複数ライセンスに服することがある（`unicode-ident` は MIT と Unicode-3.0 の両方）
+  - `sourceUrl` — crates.io の**当該バージョン**。MPL-2.0 §3.2 の告知をこれで満たす
+- **自前の workspace crate も一覧に残している**。外部利用者にとって `handball-toolkit` は third party であり、`.aar` を配る経路ではこちらの MIT 表示も必要になるため
+
+iOS は `HandballRecorder` の `Packages/HandballToolkit/bootstrap.sh` がこの JSON をパッケージリソースへ取り込み、生成 Swift と同じく一致検証する。Android の `.aar` への同梱は未実施（handball-project#140）。

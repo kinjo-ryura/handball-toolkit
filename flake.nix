@@ -49,6 +49,12 @@
           # JDK は gradle が自前で wrap したものを使うため別途入れない。
           # Gradle 自身のバージョンは AGP の要求と対応する — examples/android/README.md 参照。
           pkgs.gradle
+
+          # 依存ライセンス一覧の生成（handball-project#140。scripts/generate_licenses.sh）。
+          # 配布バイナリの OSS ライセンス表示は手書きせず Cargo.lock から起こす。
+          # cargo-about が収集、jq が各シェル向けの JSON へ整形する。
+          pkgs.cargo-about
+          pkgs.jq
         ];
 
         # Android クロスリンク（handball-project#106）。
