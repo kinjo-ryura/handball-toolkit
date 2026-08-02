@@ -11,9 +11,9 @@
 # 成果物（コミットしない — ADR 0004 決定 8 のバイナリ非コミット方針を踏襲）:
 #   - target/aar/handball-toolkit-<version>.aar
 #
-# publish は別手順（README「配布」節）:
-#   本スクリプトを通したあと `gradle -p android :toolkit:publishToMavenCentral`。
-#   .so と生成 Kotlin が揃っていないと中身の無い .aar が上がるため、順序を守ること。
+# 配布は別手順（README「リリース」節）:
+#   本スクリプトを通したあと `gh release create v<version> target/aar/*.aar`。
+#   配布先に Maven Central を採らなかった理由は ADR 0006 実装追記 2026-08-02。
 #
 # 前提:
 #   - nix develop（または direnv）環境内で実行する

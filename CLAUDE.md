@@ -63,7 +63,9 @@ XCFramework は ios / ios-sim / macos の 3 スライス構成（HandballRecorde
 ./scripts/build_aar.sh   # → target/aar/handball-toolkit-<version>.aar
 ```
 
-配布物は **Maven Central の prebuilt `.aar`**（`io.github.kinjo-ryura:handball-toolkit`。handball-project#135）。中身は「生成 Kotlin + `arm64-v8a` の `.so` + 依存宣言（JNA / kotlinx-coroutines）+ consumer ProGuard ルール」で、**利用者は Rust / Nix / NDK を一切要しない**。Gradle モジュールは `android/toolkit/`、publish 手順（Central Portal のアカウント・GPG 鍵・認証情報の置き場所）は README「配布」。
+配布物は **GitHub Release に添付する prebuilt `.aar`**（handball-project#135）。中身は「生成 Kotlin + `arm64-v8a` の `.so` + consumer ProGuard ルール」で、**利用者は Rust / Nix / NDK を一切要しない**。Gradle モジュールは `android/toolkit/`、リリース手順は README「リリース」。
+
+**Maven Central は採らなかった** — namespace 所有確認と GPG 署名（鍵の失効管理・パスフレーズ保管という継続的負担）が要り、外部シェル実装者がまだ現れていない段階では見合わないため。障壁除去の本体は Release 配布でも達成される。**使う人が現れたら格上げする**（ADR 0006 実装追記 2026-08-02）。
 
 NDK / SDK は**この repo の flake ではなくホスト環境**が提供する（ADR 0006 決定 1）。`ANDROID_NDK_ROOT` があれば devShell の shellHook がクロスリンカを `CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER` に export する。未設定の環境では Android ターゲットだけがビルドできず、host / iOS / wasm は影響を受けない。
 
@@ -73,12 +75,13 @@ NDK / SDK は**この repo の flake ではなくホスト環境**が提供す�
 - **NDK clang を PATH に出さないこと**: ホストリンクを Xcode CLT の `/usr/bin/cc` に任せる方針は Android でも変えない。クロスリンカはフルパスで名指しする
 - **エラー型のフィールドに `message` という名前を使わないこと**: Kotlin backend は error 型を `sealed class … : kotlin.Exception()` として生成するため `Throwable.message` と衝突し、生成コードがコンパイルできない（Swift では露見しない。診断文字列は `detail` に統一 — ADR 0006 実装追記）
 - **consumer ProGuard ルールを消さないこと**（`android/toolkit/consumer-rules.pro`）: JNA は reflection で引くため、消費側が R8 で minify すると壊れる。サンプルは `isMinifyEnabled = false` なので**サンプルでは絶対に露見しない**
+- **`.aar` ファイル単体は依存情報を運ばない**: 運ぶのは Maven の POM で、Release 配布（`implementation(files(...))`）では POM が介在しない。JNA と kotlinx-coroutines は**利用側が自分で宣言する必要がある** — README とサンプルの両方に明記してあるので、依存を増減したら 3 箇所（`android/toolkit/build.gradle.kts` / README / `examples/android/app/build.gradle.kts`）を揃えること
 
 ### Android サンプルシェル（`examples/android/`）
 
 Room + 3 trait の 15 メソッド + 最小 UI の参照実装（handball-project#133）。**公開できるシェル実装はこれだけ**（iOS 側は private かつ Swift）。ビルド手順・Android 固有の落とし穴（async foreign trait の取り回し / minSdk と desugaring / 2Hz ホットパスの実測値）は [`examples/android/README.md`](examples/android/README.md)。
 
-**このサンプルは publish 済みの `.aar` を引く**（#135）。外部利用者と同じ経路を通すためで、NDK 無しでビルドできる。コアを直したら `./scripts/build_aar.sh && gradle -p android :toolkit:publishToMavenLocal` で `~/.m2` を更新する。Gradle は flake が提供、SDK はホスト（`ANDROID_HOME`）。
+**このサンプルは配布された `.aar` を `app/libs/` から参照する**（#135）。外部利用者と同じ経路を通すためで、NDK 無しでビルドできる。コアを直したら `./scripts/build_aar.sh` の出力を `examples/android/app/libs/` へコピーする。Gradle は flake が提供、SDK はホスト（`ANDROID_HOME`）。
 
 ### 設計不変条件（コアに入れてよいもの / いけないもの）
 

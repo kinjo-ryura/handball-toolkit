@@ -30,7 +30,7 @@ UI は plain View、エラー表示は素の文字列、依存は最小に絞っ
 
 ## ビルドと実行
 
-このサンプルは **publish 済みの `.aar` を Maven から引く**（handball-project#135）。外部利用者と
+このサンプルは **配布された `.aar` を `app/libs/` から参照する**（handball-project#135）。外部利用者と
 まったく同じ経路を通すためで、`.so` や生成 Kotlin を自前で抱えることはしない。
 
 前提:
@@ -41,22 +41,28 @@ UI は plain View、エラー表示は素の文字列、依存は最小に絞っ
   — コアは `.aar` の中に .so として入っており、このサンプルは Rust をビルドしない
 - arm64-v8a の AVD（ADR 0006 決定 5 のとおり ABI は arm64-v8a 単独）
 
+まず `.aar` を `app/libs/` に置く。外部利用者と同じ経路を通すなら
+[Releases](https://github.com/kinjo-ryura/handball-toolkit/releases) から落とす:
+
+```sh
+mkdir -p app/libs
+gh release download v0.1.0 --pattern '*.aar' --dir app/libs
+```
+
 ```sh
 gradle :app:assembleDebug           # examples/android から
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n com.example.handballshell/.MainActivity
 ```
 
-**コアを直したときは** `.aar` を作り直して ~/.m2 を更新する（ここだけは NDK が要る）:
+**コアを直したときは** `.aar` を作り直して差し替える（ここだけは NDK が要る）:
 
 ```sh
-./scripts/build_aar.sh                                  # リポジトリルートから
-gradle -p android :toolkit:publishToMavenLocal
+./scripts/build_aar.sh                                              # リポジトリルートから
+cp target/aar/handball-toolkit-0.1.0.aar examples/android/app/libs/
 ```
 
-`settings.gradle.kts` の `mavenLocal()` がこれを拾う。Maven Central へ実際に上がった成果物を
-検証したいときは、その `mavenLocal()` をコメントアウトする（ローカルの同一バージョンが勝って
-しまい、公開物の検証にならないため）。`local.properties` はコミットしない。
+`app/libs/` と `local.properties` はコミットしない。
 
 ### バージョンの対応関係
 
@@ -67,8 +73,8 @@ gradle -p android :toolkit:publishToMavenLocal
 | Kotlin | 2.1.21 | KSP と組で上げること |
 | KSP | 2.1.21-2.0.1 | Kotlin と完全一致が必要 |
 | Room | 2.7.2 | |
-| handball-toolkit | 0.1.0 | `io.github.kinjo-ryura:handball-toolkit`。コア crate の version に従う |
-| JNA | 5.17.0（`@aar`） | 生成コードが `Native.register` で使う。**`.aar` が api 依存として連れてくる**ので、このサンプルは自分では宣言しない |
+| handball-toolkit | 0.1.0 | `app/libs/handball-toolkit-0.1.0.aar`。コア crate の version に従う |
+| JNA | 5.17.0（`@aar`） | 生成コードが `Native.register` で使う。**`.aar` は依存情報を運ばない**ので利用側で宣言する |
 | compileSdk / targetSdk | 36 | `buildToolsVersion = "37.0.0"` を明示（nix の SDK には 1 つしか無い） |
 | minSdk | **24** | 下記参照 |
 

@@ -64,14 +64,18 @@ android {
 
 dependencies {
     // ── コア ──
-    // publish 済みの .aar を、外部利用者とまったく同じ経路で引く（handball-project#135）。
-    // Rust / Nix / NDK は要らない。中身は「生成 Kotlin + arm64-v8a の .so + 依存宣言」で、
-    // JNA と kotlinx-coroutines は .aar が api 依存として連れてくるのでここには書かない。
-    //
-    // ローカルで検証するときは、コアを直したあとに
-    //   ./scripts/build_aar.sh && gradle -p android :toolkit:publishToMavenLocal
-    // を回して ~/.m2 を更新する（settings.gradle.kts の mavenLocal() が拾う）。
-    implementation("io.github.kinjo-ryura:handball-toolkit:0.1.0")
+    // 配布された .aar を app/libs/ に置いて参照する。**外部利用者とまったく同じ経路**で、
+    // Rust / Nix / NDK は要らない（handball-project#135）。入手方法は 2 通り:
+    //   - 外部利用者と同じ: GitHub Release から .aar をダウンロードして libs/ へ置く
+    //   - 手元でコアを直したとき: ./scripts/build_aar.sh の出力を libs/ へコピー
+    // どちらも手順は examples/android/README.md「ビルドと実行」。
+    implementation(files("libs/handball-toolkit-0.1.0.aar"))
+
+    // .aar ファイル単体は依存情報を運ばない（運ぶのは Maven の POM で、ローカルファイル
+    // 参照では POM が介在しない）。そのため利用側がこの 2 つを自分で宣言する必要がある。
+    // 生成コードが Native.register で .so を dlopen するのに JNA、suspend 関数に coroutines。
+    implementation("net.java.dev.jna:jna:5.17.0@aar")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     // ── 永続化（シェルの責務。コアは DB を所有しない）──
     implementation("androidx.room:room-runtime:2.7.2")

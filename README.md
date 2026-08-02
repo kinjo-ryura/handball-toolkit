@@ -112,15 +112,21 @@ const view = JSON.parse(buildMatchView('foo', json, ids));
 
 ### Android
 
-**使う側に Rust / Nix / NDK は要らない。** Maven Central から prebuilt `.aar` を引くだけで始められる。
+**使う側に Rust / Nix / NDK は要らない。** [Releases](https://github.com/kinjo-ryura/handball-toolkit/releases) から prebuilt `.aar` をダウンロードし、アプリの `app/libs/` に置くだけで始められる。
 
 ```kotlin
 dependencies {
-    implementation("io.github.kinjo-ryura:handball-toolkit:0.1.0")
+    implementation(files("libs/handball-toolkit-0.1.0.aar"))
+
+    // .aar ファイル単体は依存情報を運ばない（運ぶのは Maven の POM）ので、
+    // この 2 つは利用側で宣言する。生成コードが Native.register で .so を dlopen する
+    // のに JNA、suspend 関数に coroutines を使う。
+    implementation("net.java.dev.jna:jna:5.17.0@aar")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 }
 ```
 
-`.aar` の中身は「生成 Kotlin + `arm64-v8a` の `.so` + 依存宣言（JNA / kotlinx-coroutines）」。`mavenCentral()` は Gradle の既定リポジトリなので、リポジトリ宣言を足す必要もない。
+`.aar` の中身は「生成 Kotlin + `arm64-v8a` の `.so` + consumer ProGuard ルール」。
 
 利用側の前提は 1 つだけ。**minSdk が 26 未満なら core library desugaring を有効にすること** — 生成 Kotlin の API 面に `java.time.Instant`（`UtcDateTime`）が出るため:
 
@@ -154,35 +160,22 @@ ABI は `arm64-v8a` 単独。生成 `.so` の実行時依存は `libdl.so` / `li
 | | 値 |
 |---|---|
 | コア crate | `0.1.0` |
-| Maven 座標 | `io.github.kinjo-ryura:handball-toolkit:0.1.0` |
-| git タグ | `v0.1.0` |
+| `.aar` ファイル名 | `handball-toolkit-0.1.0.aar` |
+| git タグ / Release | `v0.1.0` |
 
 `build_aar.sh` はビルド前に `Cargo.toml` と `android/toolkit/build.gradle.kts` の値を照合し、不一致なら止める。上げるときは両方を同時に直して `v<version>` のタグを打つ。
 
-#### publish
+#### リリース
 
-Maven Central（Sonatype Central Portal）へ開発機から手動で上げる。CI 自動化はリリース頻度が上がってから（ADR 0006 実装追記 2026-08-01）。
+GitHub Release に `.aar` を添付して配る。署名も外部アカウントも要らない。
 
 ```bash
-./scripts/build_aar.sh                                       # 先に .so と生成 Kotlin を揃える
-gradle -p android :toolkit:publishAndReleaseToMavenCentral   # 署名して Portal へ
+./scripts/build_aar.sh                     # → target/aar/handball-toolkit-<version>.aar
+gh release create v0.1.0 target/aar/handball-toolkit-0.1.0.aar \
+  --title "v0.1.0" --notes "..."
 ```
 
-初回のみ次の準備が要る:
-
-- Sonatype Central Portal のアカウントと、namespace `io.github.kinjo-ryura` の所有確認（GitHub アカウントで検証される）
-- 公開鍵サーバへ登録した GPG 鍵
-
-認証情報は**リポジトリにはコミットせず** `~/.gradle/gradle.properties` に置く:
-
-```properties
-mavenCentralUsername=<Portal の User Token 名>
-mavenCentralPassword=<Portal の User Token パスワード>
-signingInMemoryKey=<GPG 秘密鍵（armor 形式から改行を除いたもの）>
-signingInMemoryKeyPassword=<鍵のパスフレーズ>
-```
-
-署名鍵が無い環境では署名タスクがスキップされ、`gradle -p android :toolkit:publishToMavenLocal` によるローカル検証だけができる。設定漏れのまま公開される事故は、Central Portal が署名の無い bundle を reject するので手前で止まる。
+**Maven Central（`implementation("io.github.kinjo-ryura:handball-toolkit:0.1.0")` の一行で済む形）は採らなかった** — namespace 所有確認と GPG 署名が要り、鍵の失効管理・パスフレーズ保管という継続的な負担が発生する。外部シェル実装者がまだ現れていない段階では、その負担に見合わないと判断した。障壁除去の本体（Rust / Nix / NDK を不要にする）は GitHub Release でも達成され、利用側に残る差は「`.aar` を `libs/` に置き、依存 2 行を書く」だけ。**実際に使う人が現れたら Maven Central へ格上げする**（判断の経緯は [ADR 0006](docs/adr/0006-android-distribution.md) 実装追記 2026-08-02）。
 
 ### CLI
 
