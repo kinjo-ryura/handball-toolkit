@@ -2,26 +2,26 @@ package com.example.handballshell.db
 
 import java.time.Instant
 import java.util.UUID
-import uniffi.handball_toolkit.ControlFact
-import uniffi.handball_toolkit.FactAnchor
-import uniffi.handball_toolkit.Match
-import uniffi.handball_toolkit.MatchClock
-import uniffi.handball_toolkit.MatchConfiguration
-import uniffi.handball_toolkit.MatchFact
-import uniffi.handball_toolkit.MatchFactPayload
-import uniffi.handball_toolkit.PhaseKind
-import uniffi.handball_toolkit.PhaseStartPayload
-import uniffi.handball_toolkit.PlayEventKind
-import uniffi.handball_toolkit.PlayFact
-import uniffi.handball_toolkit.Player
-import uniffi.handball_toolkit.PlayerPhoto
-import uniffi.handball_toolkit.RosterSelection
-import uniffi.handball_toolkit.StoppageKind
-import uniffi.handball_toolkit.StoppagePayload
-import uniffi.handball_toolkit.Team
-import uniffi.handball_toolkit.VideoClock
-import uniffi.handball_toolkit.VideoProvider
-import uniffi.handball_toolkit.VideoSource
+import io.github.kinjoryura.handballtoolkit.ControlFact
+import io.github.kinjoryura.handballtoolkit.FactAnchor
+import io.github.kinjoryura.handballtoolkit.Match
+import io.github.kinjoryura.handballtoolkit.MatchClock
+import io.github.kinjoryura.handballtoolkit.MatchConfiguration
+import io.github.kinjoryura.handballtoolkit.MatchFact
+import io.github.kinjoryura.handballtoolkit.MatchFactPayload
+import io.github.kinjoryura.handballtoolkit.PhaseKind
+import io.github.kinjoryura.handballtoolkit.PhaseStartPayload
+import io.github.kinjoryura.handballtoolkit.PlayEventKind
+import io.github.kinjoryura.handballtoolkit.PlayFact
+import io.github.kinjoryura.handballtoolkit.Player
+import io.github.kinjoryura.handballtoolkit.PlayerPhoto
+import io.github.kinjoryura.handballtoolkit.RosterSelection
+import io.github.kinjoryura.handballtoolkit.StoppageKind
+import io.github.kinjoryura.handballtoolkit.StoppagePayload
+import io.github.kinjoryura.handballtoolkit.Team
+import io.github.kinjoryura.handballtoolkit.VideoClock
+import io.github.kinjoryura.handballtoolkit.VideoProvider
+import io.github.kinjoryura.handballtoolkit.VideoSource
 
 // コアのドメイン型 ↔ Room 行の変換。**シェル側の関心事のみ**で、ドメイン規則は一切持たない
 // （持ってはいけない。判断はすべてコア — ADR 0005）。

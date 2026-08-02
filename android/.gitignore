@@ -1,0 +1,12 @@
+# SDK の場所はホスト環境（ANDROID_HOME）から取る。local.properties はユーザー固有の
+# 絶対パスが入るのでコミットしない（ADR 0006 決定 2 と同じ理由）。
+local.properties
+
+# scripts/build_aar.sh の生成物。バイナリと生成コードは git 履歴に積まない
+# （ADR 0004 決定 8 の方針を .aar 側でも踏襲）。
+toolkit/src/generated/
+toolkit/src/main/jniLibs/
+
+.gradle/
+build/
+toolkit/build/

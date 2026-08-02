@@ -52,27 +52,26 @@ android {
         }
     }
 
-    // scripts/build_android.sh が生成する Kotlin バインディング。
-    // 生成物なのでコミットしない（.gitignore 済み）。
-    sourceSets["main"].kotlin.srcDir("src/generated/kotlin")
-
     packaging {
         jniLibs {
-            // .so を strip しない。panic = "abort"（ADR 0006 決定 4）ではコアの panic が
-            // Kotlin 例外ではなくネイティブ abort になるため、シンボルが残っているかどうかが
-            // そのまま診断可否になる。サンプルではサイズより診断性を採る。
+            // .aar が同梱してくる .so を strip しない。panic = "abort"（ADR 0006 決定 4）
+            // ではコアの panic が Kotlin 例外ではなくネイティブ abort になるため、
+            // シンボルが残っているかどうかがそのまま診断可否になる。
             keepDebugSymbols += "**/*.so"
         }
     }
 }
 
 dependencies {
-    // ── UniFFI 生成コードの実行時依存 ──
-    // JNA: 生成コードが Native.register（direct mapping）で .so を dlopen する。
-    // Android では aar 版（各 ABI のネイティブ支援ライブラリ同梱）を使う。
-    implementation("net.java.dev.jna:jna:5.17.0@aar")
-    // 生成コードの suspend 関数・GlobalScope.launch が依存する。
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    // ── コア ──
+    // publish 済みの .aar を、外部利用者とまったく同じ経路で引く（handball-project#135）。
+    // Rust / Nix / NDK は要らない。中身は「生成 Kotlin + arm64-v8a の .so + 依存宣言」で、
+    // JNA と kotlinx-coroutines は .aar が api 依存として連れてくるのでここには書かない。
+    //
+    // ローカルで検証するときは、コアを直したあとに
+    //   ./scripts/build_aar.sh && gradle -p android :toolkit:publishToMavenLocal
+    // を回して ~/.m2 を更新する（settings.gradle.kts の mavenLocal() が拾う）。
+    implementation("io.github.kinjo-ryura:handball-toolkit:0.1.0")
 
     // ── 永続化（シェルの責務。コアは DB を所有しない）──
     implementation("androidx.room:room-runtime:2.7.2")
