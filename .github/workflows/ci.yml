@@ -26,14 +26,24 @@ jobs:
 
       # ツールチェーンは rust-toolchain.toml 経由で rust-overlay が供給する（rustup 不使用）。
       # cargo のレジストリと target/ だけをキャッシュする。
+      #
+      # キーに run_id を足して**毎回書き戻す**。Cargo.lock のハッシュだけを主キーに
+      # すると完全一致してしまい、actions/cache は「Cache hit occurred on the primary
+      # key, not saving cache」で新しい成果物を一切保存しない。その結果 target/ は
+      # 最初に保存された時点の内容（debug のみ）で凍結され、release プロファイルや
+      # --features bindgen の成果物が毎回ゼロから作り直されていた（handball-project#143
+      # の実測で判明。cdylib ビルド 45 秒 + bindgen 76 秒が毎回発生していた）。
+      # restore-keys は「同じ Cargo.lock の直近」→「任意の直近」の順に落とす。
       - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-          restore-keys: cargo-${{ runner.os }}-
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: |
+            cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}-
+            cargo-${{ runner.os }}-
 
       - name: cargo fmt
         run: nix develop --command cargo fmt --all --check
