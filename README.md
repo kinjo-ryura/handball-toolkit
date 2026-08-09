@@ -126,7 +126,43 @@ dependencies {
 }
 ```
 
-`.aar` の中身は「生成 Kotlin + `arm64-v8a` の `.so` + consumer ProGuard ルール」。
+`.aar` の中身は「生成 Kotlin + シム + 文言リソース + `arm64-v8a` の `.so` + consumer ProGuard ルール」。
+
+##### シム — 生成型に付く自明なアクセサ
+
+コアは「データ」だけを公開し、`when` 一発で書ける導出値は境界を越えさせない（FFI 呼び出し 1 回のコストに見合わないため — [ADR 0004](docs/adr/0004-ios-full-boundary.md) 決定 4）。その分の薄いアクセサは `.aar` が持っているので、利用側で書き直す必要はない:
+
+```kotlin
+val clock = anchor.matchClockOrNull          // when (anchor) { … } を書かずに済む
+val rate = teamSummaryLine.scoringRate       // 試投 0 なら null
+val source = configuration.videoSource       // Timer なら null
+```
+
+null を返しうるものに `OrNull` が付いているのは、`FactAnchor.Both` などの sealed subclass が同名の non-null メンバを持っており、同名にすると「受け手の静的型で戻り値型が変わる」ためである。
+
+##### 文言リソース — validation / write エラーの既定文言
+
+コアはユーザー向け文言を持たず、`(scope, code)` の構造化エラーだけを返す（[ADR 0002](docs/adr/0002-error-model.md) 決定 3）。**その写像の既定値を `.aar` が en / ja の 2 ロケール分持っている**ので、「最初に書くコードが 39 ケース分のエラーメッセージ」にはならない:
+
+```kotlin
+val message = issue.userMessage(context)     // DomainValidationIssue →
+Text(message.title); Text(message.body)      //   title / body
+
+try { … } catch (e: CoreWriteException) {    // ValidationFailed は
+    show(e.userMessage(context))             //   issue 側の文言へ委譲する
+}
+```
+
+**文言を差し替えたいときは、自分のアプリの `strings.xml` に同じ name を宣言するだけでよい**（Android のリソースマージはアプリ側が優先する）。写像を書き直す必要はない:
+
+```xml
+<!-- app/src/main/res/values/strings.xml -->
+<string name="handball_toolkit_fact_negative_match_clock_title">時間が不正です</string>
+```
+
+name は `handball_toolkit_<scope>_<code>_title` / `_body`（`code` は snake_case）。コードの一覧は [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md)。ロケールを足したい場合は `values-<locale>/strings.xml` に同じ name を並べる。
+
+`CoreWriteException` の `detail` は**開発者向けの診断文字列であって UI に出さない**（ADR 0002 決定 5）。
 
 利用側の前提は 1 つだけ。**minSdk が 26 未満なら core library desugaring を有効にすること** — 生成 Kotlin の API 面に `java.time.Instant`（`UtcDateTime`）が出るため:
 
