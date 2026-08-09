@@ -319,6 +319,9 @@ MIT。[LICENSE](LICENSE) を参照。
   - `licenses[]` — ライセンス本文。同一本文は 1 件に集約する。MIT が 19 件に分かれるのは crate ごとに著作権表示が違うため
   - `libraries[]` — crate 一覧。`licenseIndexes` で `licenses[]` を参照する。1 crate が複数ライセンスに服することがある（`unicode-ident` は MIT と Unicode-3.0 の両方）
   - `sourceUrl` — crates.io の**当該バージョン**。MPL-2.0 §3.2 の告知をこれで満たす
+  - `origin` — `"workspace"`（この repo の crate）か `"registry"`（外部）か。workspace メンバの判定は `cargo metadata` が行う
 - **自前の workspace crate も一覧に残している**。外部利用者にとって `handball-toolkit` は third party であり、`.aar` を配る経路ではこちらの MIT 表示も必要になるため
+- **`origin` は「自作かどうか」ではない**（handball-project#145）。誰から見て自作かは配布経路で変わる — この repo の作者にとってコアは自作だが、`.aar` を受け取った外部シェル実装者にとっては third party そのもの。同じ JSON が両方へ届く以上、**生成側は視点に依存しない事実だけを載せ、どう見せるかは各シェルが決める**。HandballRecorder は `origin == "workspace"` を「このアプリのコア」として独立セクションに出している
+- **`origin` は `schemaVersion` を上げずに足した任意フィールド**。印を持たない版の一覧も読めなければならない（読み手は欠落を `"registry"` 相当として扱う）。**必須にするなら版を上げること**
 
 iOS は `HandballRecorder` の `Packages/HandballToolkit/bootstrap.sh` がこの JSON をパッケージリソースへ取り込み、生成 Swift と同じく一致検証する。Android は `scripts/build_aar.sh` が `.aar` の `assets/handball_toolkit/third-party-licenses.json` へ同梱する（handball-project#142）。**`.aar` を受け取った側に何の義務が移るか**は「Android」節の「同梱される OSS ライセンス一覧」を参照。
