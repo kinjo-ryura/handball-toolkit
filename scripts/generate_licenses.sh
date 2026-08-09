@@ -35,6 +35,10 @@ fi
 # 配布物のバージョン。生成物がどのコアのものかを追えるようにする。
 version=$(grep -m1 '^version = ' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
 
+# workspace メンバの名前一覧。libraries[].origin の判定に使う（handball-project#145）。
+# 読み手に crate 名を持たせないための情報で、判定はここで一度だけ行う。
+workspace_members=$(cargo metadata --no-deps --format-version 1 | jq -c '[ .packages[].name ]')
+
 # 対象は FFI パッケージング crate。これが iOS の staticlib / Android の .so の実体で、
 # コア crate を feature `uniffi` 込みで引く（= 配布バイナリの依存グラフそのもの）。
 # --fail: ライセンス式を読めない / accepted に無い crate があれば止める。
@@ -46,6 +50,10 @@ version=$(grep -m1 '^version = ' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
 #                   本文を crate ごとに複製すると 3 倍近く太るため間接参照にする。
 #   - sourceUrl   … crates.io の**当該バージョン**を指す。MPL-2.0 §3.2 の
 #                   「ソース入手方法の告知」をこれで満たす。
+#   - origin      … "workspace"（この repo の crate）か "registry"（外部）か。
+#                   **「自作かどうか」ではない** — 誰から見て自作かは配布経路で変わる
+#                   （`.aar` を受け取った外部シェルにとって handball-toolkit は third party）。
+#                   ここには視点に依存しない事実だけを載せ、どう見せるかは各シェルに委ねる。
 #   - 並び順は全段で固定する（--check の差分が実質変更のときだけ出るように）。
 generate() {
   cargo-about generate \
@@ -53,7 +61,11 @@ generate() {
     --manifest-path "$MANIFEST" \
     --format json \
     --fail \
-  | jq --arg version "$version" '
+  | jq --arg version "$version" --argjson workspace "$workspace_members" '
+      def origin:
+        .name as $n
+        | if ($workspace | index($n)) then "workspace" else "registry" end;
+
       def source_url:
         if ((.source // "") | startswith("registry+https://github.com/rust-lang/crates.io-index"))
         then "https://crates.io/crates/\(.name)/\(.version)"
@@ -72,7 +84,7 @@ generate() {
           libraries: (
             [ range(0; ($ls | length)) as $i
               | $ls[$i].crates[]
-              | { name, version, sourceUrl: source_url, licenseIndex: $i }
+              | { name, version, origin: origin, sourceUrl: source_url, licenseIndex: $i }
             ]
             # 1 crate が複数ライセンスに服することがある（例: unicode-ident は
             # "(MIT OR Apache-2.0) AND Unicode-3.0" で MIT と Unicode-3.0 の両方に載る）。
@@ -81,6 +93,7 @@ generate() {
             | map({
                 name: .[0].name,
                 version: .[0].version,
+                origin: .[0].origin,
                 sourceUrl: .[0].sourceUrl,
                 licenseIndexes: ([ .[].licenseIndex ] | sort)
               })
@@ -115,4 +128,5 @@ fi
 generate > "$OUT"
 echo "完了: $OUT"
 jq -r '"  ライブラリ \(.libraries | length) 件 / ライセンス本文 \(.licenses | length) 件"' "$OUT"
+jq -r '.libraries | group_by(.origin) | .[] | "  - origin=\(.[0].origin): \(length) 件"' "$OUT"
 jq -r '.licenses | group_by(.id) | .[] | "  - \(.[0].id): 本文 \(length) 件"' "$OUT"
