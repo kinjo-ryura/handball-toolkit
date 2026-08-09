@@ -52,3 +52,65 @@ jobs:
       # accepted に無いライセンスの混入もこのステップが検出する（about.toml）。
       - name: ライセンス一覧が最新か
         run: nix develop --command ./scripts/generate_licenses.sh --check
+
+      # ── ここから Android 配布物（.aar）の JVM 単体テスト（handball-project#143）──
+      #
+      # 狙いは `values-ja` の足し忘れ検出。既定ロケールの漏れは写像の `when` が
+      # 非網羅になってコンパイルが落ちるが、**日本語側の漏れはコンパイラに見えない**
+      # （実行時に黙って既定ロケールへ落ちる）。見張れるのはこのテストだけで、
+      # #136 まではローカル実行に頼っていた。
+      #
+      # **NDK は要らない**。ADR 0006 決定 3 で crate-type に cdylib を足したので host
+      # ビルドでも .dylib が出る。uniffi の bindgen は library mode でライブラリ内の
+      # メタデータから生成するため、そこから Kotlin を作れる（Android の .so から
+      # 生成したものとバイト単位で一致することを #143 で確認済み）。実機用 .so も
+      # 端末も不要 — シムは生成 data class を組み替えるだけでネイティブに触らない。
+      # したがって ADR 0006 決定 1（NDK / SDK は repo の flake が持たない）と衝突しない。
+
+      - name: Android SDK の状態を確認
+        id: android_sdk
+        run: |
+          root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          echo "ANDROID_HOME=${ANDROID_HOME:-(unset)}"
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-(unset)}"
+          if [ -n "$root" ] && [ -d "$root/platforms" ]; then
+            echo "preinstalled=true" >> "$GITHUB_OUTPUT"
+            echo "ANDROID_HOME=$root" >> "$GITHUB_ENV"
+            echo "--- ランナー同梱の SDK を使う: $root ---"
+            ls "$root"
+            echo "--- platforms ---";    ls "$root/platforms"    || true
+            echo "--- build-tools ---";  ls "$root/build-tools"  || true
+          else
+            echo "preinstalled=false" >> "$GITHUB_OUTPUT"
+            echo "--- ランナーに SDK が無い。次のステップで導入する ---"
+          fi
+
+      # ランナー同梱の SDK が無い場合のみ導入する。compileSdk = 36 /
+      # buildToolsVersion = "37.0.0"（android/toolkit/build.gradle.kts）に対応させる。
+      - uses: android-actions/setup-android@v3
+        if: steps.android_sdk.outputs.preinstalled != 'true'
+        with:
+          packages: 'platforms;android-36 build-tools;37.0.0'
+
+      # Gradle は flake が提供する（pkgs.gradle。ADR 0006 実装追記 2026-07-28）が、
+      # AGP / Kotlin プラグインと依存 jar は Maven から引くのでキャッシュする。
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle.kts', 'android/gradle.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: host 向け cdylib をビルド（NDK 不要）
+        run: nix develop --command cargo build --release -p handball-toolkit-ffi
+
+      - name: Kotlin バインディングを生成（host の .dylib から）
+        run: |
+          nix develop --command cargo run -q -p handball-toolkit-ffi --features bindgen --bin uniffi-bindgen -- \
+            generate --library target/release/libhandball_toolkit_ffi.dylib \
+            --language kotlin --out-dir android/toolkit/src/generated/kotlin --no-format
+
+      # 25 件（DomainValidationMessagesTest 5 / ShimAccessorsTest 20）。
+      - name: Kotlin シムの単体テスト
+        run: nix develop --command gradle -p android :toolkit:testDebugUnitTest --console=plain
