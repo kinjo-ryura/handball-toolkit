@@ -63,7 +63,9 @@ XCFramework は ios / ios-sim / macos の 3 スライス構成（HandballRecorde
 ./scripts/build_aar.sh   # → target/aar/handball-toolkit-<version>.aar
 ```
 
-配布物は **GitHub Release に添付する prebuilt `.aar`**（handball-project#135）。中身は「生成 Kotlin + `arm64-v8a` の `.so` + consumer ProGuard ルール」で、**利用者は Rust / Nix / NDK を一切要しない**。Gradle モジュールは `android/toolkit/`、リリース手順は README「リリース」。
+配布物は **GitHub Release に添付する prebuilt `.aar`**（handball-project#135）。中身は「生成 Kotlin + 手書きシム + 文言リソース（en / ja）+ `arm64-v8a` の `.so` + consumer ProGuard ルール」で、**利用者は Rust / Nix / NDK を一切要しない**。Gradle モジュールは `android/toolkit/`、リリース手順は README「リリース」。
+
+**シムと文言リソース**（`android/toolkit/src/main/kotlin/` と `src/main/res/values*/`。handball-project#136）は手書きで、生成物の `src/generated/kotlin/` とはディレクトリで分かれている（後者は `build_aar.sh` が毎回消して作り直す）。シムの許可基準は ADR 0004 決定 4、文言の位置づけは ADR 0006 実装追記 2026-08-08。
 
 **Maven Central は採らなかった** — namespace 所有確認と GPG 署名（鍵の失効管理・パスフレーズ保管という継続的負担）が要り、外部シェル実装者がまだ現れていない段階では見合わないため。障壁除去の本体は Release 配布でも達成される。**使う人が現れたら格上げする**（ADR 0006 実装追記 2026-08-02）。
 
@@ -76,6 +78,9 @@ NDK / SDK は**この repo の flake ではなくホスト環境**が提供す�
 - **エラー型のフィールドに `message` という名前を使わないこと**: Kotlin backend は error 型を `sealed class … : kotlin.Exception()` として生成するため `Throwable.message` と衝突し、生成コードがコンパイルできない（Swift では露見しない。診断文字列は `detail` に統一 — ADR 0006 実装追記）
 - **consumer ProGuard ルールを消さないこと**（`android/toolkit/consumer-rules.pro`）: JNA は reflection で引くため、消費側が R8 で minify すると壊れる。サンプルは `isMinifyEnabled = false` なので**サンプルでは絶対に露見しない**
 - **`.aar` ファイル単体は依存情報を運ばない**: 運ぶのは Maven の POM で、Release 配布（`implementation(files(...))`）では POM が介在しない。JNA と kotlinx-coroutines は**利用側が自分で宣言する必要がある** — README とサンプルの両方に明記してあるので、依存を増減したら 3 箇所（`android/toolkit/build.gradle.kts` / README / `examples/android/app/build.gradle.kts`）を揃えること
+- **validation / write の case を増やしたら文言を 2 ロケール分足すこと**（`src/main/res/values/` と `values-ja/`）。既定ロケールの漏れは写像の `when` が非網羅になってコンパイルが落ちるが、**`values-ja` の漏れはコンパイラに見えない**（実行時に既定ロケールへ黙って落ちる）。`gradle -p android :toolkit:testDebugUnitTest` の `DomainValidationMessagesTest` が検出する
+- **リソース名には `handball_toolkit_` 接頭辞を付けること**（`resourcePrefix` が lint で見張る）: ライブラリのリソースは利用側アプリの名前空間へマージされるため、接頭辞なしは衝突事故になる
+- **シムに探索やドメイン規則を書かないこと**: 許可されるのは「self のみ / ループ・再帰・探索なし / ドメイン規則を含まない」の 3 条件を満たすものだけ（ADR 0004 決定 4）。半開区間・優先順位・丸め・閾値に触れる計算はコアに置く
 
 ### Android サンプルシェル（`examples/android/`）
 

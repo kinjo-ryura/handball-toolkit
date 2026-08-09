@@ -152,6 +152,38 @@ Swift 側の `module_name = "HandballToolkit"`（ADR 0004 決定 8）に対応�
 
 検証: サンプルアプリ（`examples/android`）を配布 `.aar` を `app/libs/` から参照する形へ切り替え、**`ANDROID_NDK_ROOT` 未設定・クロスリンカ未設定の状態でビルドが通ること**を確認した（外部利用者と同じ条件）。エミュレータ上で seed / ゴール記録 / サンプル試合の atomic import / 2Hz ホットパス実測まで実動作し、クラッシュ 0 件。Maven（`mavenLocal`）経由と `libs/` 経由で生成される APK は**バイト単位で同一**（5,166,925 B）だったため、配布方式の違いによる挙動差は無い。生成 Kotlin の import は `uniffi.handball_toolkit.*` から `io.github.kinjoryura.handballtoolkit.*` へ移っている。
 
+## 実装追記（2026-08-08 — #136 でシムと文言を配布物に含めた）
+
+`.aar` の中身を「生成 Kotlin + `.so`」から **「生成 Kotlin + 手書きシム + 文言リソース（en / ja）+ `.so`」** へ広げた。#135 で配布経路は通ったが、受け取った側が最初に書くコードが「`when` で埋めるアクセサ」と「39 ケース分のエラーメッセージ」だったため、そこを配布物側へ寄せた（#133 のサンプルシェルで実際に必要になったものの製品化 — リポの「拡張判断のはしご」に沿う）。
+
+**Kotlin シムは ADR 0004 決定 4 の許可基準をそのまま適用**した。Swift シム 329 行に対応するのは 6 ファイルで、`src/main/kotlin/`（手書き）に置き、生成物の `src/generated/kotlin/` とはディレクトリで分ける。
+
+移植しなかったものが 2 つある。いずれも Kotlin では言語機能が肩代わりする:
+
+- **Identifiable 適合** — SwiftUI `ForEach` 専用の概念で、Compose は `key = { it.id }` のラムダを取る。`id` フィールドを持つ生成型はそのまま使える。ただし `TeamOption` だけは移植した（コアが UUID を生成しない以上、「新規作成」候補の識別子はシムが供給するしかない — ADR 0005 決定 2 追記）
+- **CaseIterable 適合**（`PlayEventKind`）— Kotlin の enum は `entries` を標準で持つ
+
+**API 名は 3 箇所だけ iOS シムと意図的に変えた**。Swift の enum case はメンバを持たないが Kotlin の sealed subclass は持つため、`FactAnchor.matchClock` / `videoClock`、`MatchConfiguration.phaseDurationSeconds` を基底型の拡張プロパティにすると `FactAnchor.Both` / `MatchConfiguration.Timer` の同名 non-null メンバと衝突し、**受け手の静的型で戻り値型（nullable か否か）が変わる**という静かな罠になる。null を返す側に `OrNull` を付けて避けた。iOS シムの命名は移植元 Swift API の呼び出し側を無改修に保つための制約だったが、Kotlin には合わせる先の既存 API が無いので、その制約は引き継がない。同じ理由で projection の導出値は `Int` へ narrow せず `Long` のまま返す。
+
+**文言は「シェル所有」を崩さずに既定値だけを配る**。ADR 0002 決定 3 が文言を追い出した先は**コア（Rust）**であり、シム層に置くことは iOS でも既に決定済み（ADR 0004 決定 7 が `DomainValidationMessage` をシム package へ移設した）。Android では配布物がシム層を兼ねるため既定文言も `.aar` に入るが、**利用側アプリが同じ name の string を宣言すれば上書きされる**（Android のリソースマージはアプリが優先）ので、シェルの所有権は保たれる。写像を書き直さずに文言だけ差し替えられる形になった。
+
+網羅性の担保は 2 段構え:
+
+- **既定ロケールはコンパイラ**が見る。生成型は sealed なので、コアに case が増えると写像の `when` が非網羅になってビルドが落ちる（ADR 0002 決定 1 の「文言を書かない限りコンパイルが通らない」が Kotlin でも成立する）
+- **追加ロケールと写経ミスはテスト**が見る。コンパイラは `values-ja` の足し忘れも「別 case の resource を指す取り違え」も検出できないため、`DomainValidationMessagesTest` がリソース XML を直接読んでロケール間の name 集合一致・接頭辞・全 case 分の存在・ケース数（3 / 2 / 22 / 12 / 7）を assert する
+
+新たに判明した制約:
+
+- **ライブラリのリソースは利用側アプリの名前空間へマージされる**ため、接頭辞なしの name は衝突事故になる。`resourcePrefix = "handball_toolkit_"` を宣言して lint に見張らせている
+- **`CoreWriteError` は Kotlin 側で `CoreWriteException` に改名される**（uniffi の Kotlin backend が error 型を `sealed class … : kotlin.Exception()` にするため）。リソース名の scope は Rust 側の名前に合わせて `write` で統一した
+- **シムのテストは JVM 単体テストで回る**（`.so` も端末も不要）。シムは生成 data class を組み替えるだけでネイティブに触らないため。25 テストが `gradle :toolkit:testDebugUnitTest` で通る
+
+サイズへの影響は実測で `.aar` 1,595,274 B → **1,619,674 B**（+24,400 B、+1.5%）。内訳は `classes.jar` 1,088,644 → 1,107,990 B（+19,346 B）と `res/values*` の 27,067 B（非圧縮。zip 内では縮む）。サンプル APK（debug）は 5,201,946 B → **5,189,049 B** と逆にわずかに減った — シェル側の手書き文言（dex 内の文字列）が消え、共有のリソーステーブルへ移ったため。
+
+**APK サイズを測るときは clean ビルドで測ること。** インクリメンタルな再パッケージでは entry が STORED のまま残ることがあり、同じ内容でも zip が 2.2 MB 膨らんだ状態が観測される（非圧縮合計は 10.5 MB で一致するのに zip が 5.2 MB と 7.4 MB に割れる）。#136 の計測中に踏んだ。
+
+検証: `scripts/build_aar.sh` を通し、生成バインディングを作り直した状態でシムがコンパイルされること、`.aar` に `res/values/values.xml` と `res/values-ja/values-ja.xml`（string 93 件 = 46 ケース × 2 + 複数件の前置き 1）が入ることを確認した。
+
 ## Considered options
 
 - **`flake.nix` に NDK / SDK を入れて repo 完結にする** → 却下（決定 1）。closure 10.9 GiB を repo ごとに抱えることになり、他プロジェクトでも使う実態と合わない。再現性は「`ANDROID_NDK_ROOT` だけを要求する」形で最小限確保する
