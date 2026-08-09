@@ -124,3 +124,23 @@ jobs:
       # 25 件（DomainValidationMessagesTest 5 / ShimAccessorsTest 20）。
       - name: Kotlin シムの単体テスト
         run: nix develop --command gradle -p android :toolkit:testDebugUnitTest --console=plain
+
+      # 依存 OSS のライセンス一覧が .aar に入るか（handball-project#142）。同梱が
+      # 抜けると、.aar を受け取った側は表示義務を果たす材料を持たないまま配ることに
+      # なる。scripts/build_aar.sh は NDK を要求して前段で止まるので、ここでは
+      # assets の配置だけ再現して assembleRelease を回す。jni/ が空の .aar になるが、
+      # 同梱漏れの検出はこれで足りる（実機 .so を載せたフルビルドはリリース時）。
+      #
+      # **build_aar.sh の手順 4/5 と同じ内容を書いている。片方を直したらもう片方も
+      # 直すこと。** gradle 側へ寄せて単一化する案は見送った — .aar を作る経路は
+      # build_aar.sh 1 本で、二重管理の実害がまだ無いため。
+      - name: ライセンス一覧が .aar に入るか
+        run: |
+          asset_dir=android/toolkit/src/main/assets/handball_toolkit
+          rm -rf android/toolkit/src/main/assets
+          mkdir -p "$asset_dir"
+          cp THIRD_PARTY_LICENSES.json "$asset_dir/third-party-licenses.json"
+          nix develop --command gradle -p android --quiet :toolkit:assembleRelease
+          # 見つからなければ grep が非ゼロで返り、このステップが落ちる。
+          unzip -l android/toolkit/build/outputs/aar/toolkit-release.aar \
+            | grep -F 'assets/handball_toolkit/third-party-licenses.json'
