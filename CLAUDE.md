@@ -78,7 +78,7 @@ NDK / SDK は**この repo の flake ではなくホスト環境**が提供す�
 - **エラー型のフィールドに `message` という名前を使わないこと**: Kotlin backend は error 型を `sealed class … : kotlin.Exception()` として生成するため `Throwable.message` と衝突し、生成コードがコンパイルできない（Swift では露見しない。診断文字列は `detail` に統一 — ADR 0006 実装追記）
 - **consumer ProGuard ルールを消さないこと**（`android/toolkit/consumer-rules.pro`）: JNA は reflection で引くため、消費側が R8 で minify すると壊れる。サンプルは `isMinifyEnabled = false` なので**サンプルでは絶対に露見しない**
 - **`.aar` ファイル単体は依存情報を運ばない**: 運ぶのは Maven の POM で、Release 配布（`implementation(files(...))`）では POM が介在しない。JNA と kotlinx-coroutines は**利用側が自分で宣言する必要がある** — README とサンプルの両方に明記してあるので、依存を増減したら 3 箇所（`android/toolkit/build.gradle.kts` / README / `examples/android/app/build.gradle.kts`）を揃えること
-- **validation / write の case を増やしたら文言を 2 ロケール分足すこと**（`src/main/res/values/` と `values-ja/`）。既定ロケールの漏れは写像の `when` が非網羅になってコンパイルが落ちるが、**`values-ja` の漏れはコンパイラに見えない**（実行時に既定ロケールへ黙って落ちる）。`gradle -p android :toolkit:testDebugUnitTest` の `DomainValidationMessagesTest` が検出する
+- **validation / write の case を増やしたら文言を 2 ロケール分足すこと**（`src/main/res/values/` と `values-ja/`）。既定ロケールの漏れは写像の `when` が非網羅になってコンパイルが落ちるが、**`values-ja` の漏れはコンパイラに見えない**（実行時に既定ロケールへ黙って落ちる）。`gradle -p android :toolkit:testDebugUnitTest` の `DomainValidationMessagesTest` が検出する（handball-project#143 で CI にも載せたので、叩き忘れても push すれば CI が止める）
 - **リソース名には `handball_toolkit_` 接頭辞を付けること**（`resourcePrefix` が lint で見張る）: ライブラリのリソースは利用側アプリの名前空間へマージされるため、接頭辞なしは衝突事故になる
 - **シムに探索やドメイン規則を書かないこと**: 許可されるのは「self のみ / ループ・再帰・探索なし / ドメイン規則を含まない」の 3 条件を満たすものだけ（ADR 0004 決定 4）。半開区間・優先順位・丸め・閾値に触れる計算はコアに置く
 

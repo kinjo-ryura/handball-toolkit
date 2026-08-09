@@ -184,6 +184,47 @@ Swift 側の `module_name = "HandballToolkit"`（ADR 0004 決定 8）に対応�
 
 検証: `scripts/build_aar.sh` を通し、生成バインディングを作り直した状態でシムがコンパイルされること、`.aar` に `res/values/values.xml` と `res/values-ja/values-ja.xml`（string 93 件 = 46 ケース × 2 + 複数件の前置き 1）が入ることを確認した。
 
+## 実装追記（2026-08-09 — #143 で Android 単体テストを CI に載せた）
+
+#136 で入れた Kotlin シムと文言リソースの担保がローカル実行だけだったため、**JVM 単体テスト 25 件（`DomainValidationMessagesTest` 5 / `ShimAccessorsTest` 20）を CI の `check` ジョブに追加した**。`.aar` の組み立て（NDK 要）とサンプル APK のビルドは**載せない**。
+
+**決定 1 は変更しない。** ランナー同梱の SDK を「ホスト環境が提供する」の一形態として使い、`flake.nix` には何も足していない。ランナーに SDK が無い場合のみ `android-actions/setup-android` を通す分岐を置いたが、実測では発火しなかった（後述）。
+
+**NDK が要らないのは決定 3 の副産物**。`crate-type` に `cdylib` を足したため host ビルドでも `.dylib` が出る。uniffi の bindgen は library mode でライブラリ内のメタデータから生成するので、そこから Kotlin バインディングを作れる。**Android の `.so` から生成したものとバイト単位で完全一致する**ことを確認した（13,716 行 / 488,389 B）。生成 Kotlin はターゲット非依存であり、実機用 `.so` も端末も要らない — シムは生成 data class を組み替えるだけでネイティブに触らないため（実装追記 2026-08-08）。
+
+したがって CI の追加ステップは 3 つで済む:
+
+1. `cargo build --release -p handball-toolkit-ffi`（host。NDK 不要）
+2. `uniffi-bindgen generate --library target/release/libhandball_toolkit_ffi.dylib --language kotlin`
+3. `gradle -p android :toolkit:testDebugUnitTest`
+
+**別ジョブにせず既存の `check` へ相乗りさせた**。nix のインストール（約 30 秒）と cargo キャッシュの復元を二重に払わずに済むため。
+
+**ランナーの SDK 実測**（`macos-latest`）: `ANDROID_HOME=/Users/runner/Library/Android/sdk` が既に設定済みで、`platforms` に `android-36`（= `compileSdk`）、`build-tools` に `37.0.0`（= `buildToolsVersion`）がそのまま入っている。**追加インストールも AGP の自動ダウンロードも発生せず、コストは 0 秒**。NDK もランナーに同梱されているため、将来 `.aar` 組み立てを載せる判断になった場合も導入時間は要らない見込み。
+
+**コスト実測**（いずれもキャッシュ温。既存ジョブへの上乗せ）:
+
+| ステップ | キャッシュキー修正前 | 修正後 |
+|---|---:|---:|
+| host 向け cdylib をビルド | 45 s | 20 s |
+| Kotlin バインディングを生成 | 76 s | 5 s |
+| Kotlin シムの単体テスト | 14 s | 10 s |
+| Gradle キャッシュ復元 | 5 s | 4 s |
+| **上乗せ合計** | **2 m 20 s** | **39 s** |
+
+CI 全体は **3 m 57 s** で、Android 追加前のベースライン（main 直近 5 回で 2 m 38 s 〜 4 m 07 s）の範囲に収まる。
+
+**併せて cargo キャッシュキーを直した**。主キーが `Cargo.lock` のハッシュだけだと完全一致し、`actions/cache` が `Cache hit occurred on the primary key, not saving cache` で新しい成果物を保存しない。`target/` が最初の保存時点（debug のみ）で凍結され、release プロファイルと `--features bindgen` の成果物が毎回ゼロから作られていた。キーに `run_id` を足して毎回書き戻す形にしたところ、bindgen が 76 秒 → 5 秒になった。**#143 が持ち込んだ問題ではなく、元からあった CI の無駄**が Android ステップの追加で可視化された形。
+
+**検出力の実証**: `values-ja/strings.xml` から string を 1 件削って回すと `DomainValidationMessagesTest > 既定ロケールと日本語ロケールで string の集合が一致する` が FAILED になる（`25 tests completed, 1 failed`）。守りたかった事故 — 既定ロケールの漏れはコンパイラが見るが**日本語側の漏れは実行時に黙って既定へ落ちる**（実装追記 2026-08-08）— が CI で赤くなることを確認した。
+
+**`.aar` 組み立て（段階 b）とサンプル APK（段階 c）を載せない理由**:
+
+- (b) は `build_aar.sh` が `ANDROID_NDK_ROOT` を要求し、決定 1 の射程をランナーへ広げる話になる。一方で (b) が追加で検出できるのは「クロスリンクとパッケージングの壊れ」だが、**それはリリース時に `build_aar.sh` を通す時点で必ず露見する**。CI で前倒しする価値は、リリース頻度が上がるまで小さい
+- (c) はエミュレータ（system image 4.3 GB）の起動が要り、コストが段違いに大きい。サンプルは外部利用者向けの参照実装であり、壊れても配布物には影響しない
+
+**再検討トリガー**: (b) を載せるのは、`.aar` のリリースが月次以上の頻度になったとき、または ABI を追加して（決定 5）クロスビルドの組み合わせが増えたとき。(c) は、サンプルが「動く参照実装」として外部から実際に参照され始めたとき。
+
 ## Considered options
 
 - **`flake.nix` に NDK / SDK を入れて repo 完結にする** → 却下（決定 1）。closure 10.9 GiB を repo ごとに抱えることになり、他プロジェクトでも使う実態と合わない。再現性は「`ANDROID_NDK_ROOT` だけを要求する」形で最小限確保する
@@ -204,4 +245,4 @@ Swift 側の `module_name = "HandballToolkit"`（ADR 0004 決定 8）に対応�
 - [ADR 0001](0001-boundary-api.md) — 境界 API 目録（型・関数の正典。「将来の境界拡張候補」= 決定 7 の対象）
 - [ADR 0004](0004-ios-full-boundary.md) — iOS FFI 本境界（決定 9 が Kotlin との関係、実装順序 2 が release プロファイルの実測）
 - `crates/handball-toolkit/uniffi.toml` — Kotlin バインディング設定（#59 で設定済み）
-- handball-project#106（本 ADR）/ #59（切り出し元）/ #133（サンプルシェル）/ #135（`.aar` publish）/ #134（OSS 公開の前提物）
+- handball-project#106（本 ADR）/ #59（切り出し元）/ #133（サンプルシェル）/ #135（`.aar` publish）/ #134（OSS 公開の前提物）/ #136（シムと文言の同梱）/ #143（単体テストの CI 化）
