@@ -19,10 +19,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import io.github.kinjoryura.handballtoolkit.CoreWriteException
-import io.github.kinjoryura.handballtoolkit.DomainValidationIssue
 import io.github.kinjoryura.handballtoolkit.FactAnchor
 import io.github.kinjoryura.handballtoolkit.MatchClock
-import io.github.kinjoryura.handballtoolkit.MatchConfiguration
 import io.github.kinjoryura.handballtoolkit.NewFactStamp
 import io.github.kinjoryura.handballtoolkit.PlayEventKind
 import io.github.kinjoryura.handballtoolkit.SegmentResolver
@@ -34,11 +32,13 @@ import io.github.kinjoryura.handballtoolkit.countPhaseCompletionFacts
 import io.github.kinjoryura.handballtoolkit.defaultImportDecisions
 import io.github.kinjoryura.handballtoolkit.newImportTeamOption
 import io.github.kinjoryura.handballtoolkit.parseSampleMatch
+import io.github.kinjoryura.handballtoolkit.phaseDurationSecondsOrNull
 import io.github.kinjoryura.handballtoolkit.recordAppendFact
 import io.github.kinjoryura.handballtoolkit.recordDeleteTeam
 import io.github.kinjoryura.handballtoolkit.recordFactWithPhaseCompletion
 import io.github.kinjoryura.handballtoolkit.sampleImportRequiredIdCount
 import io.github.kinjoryura.handballtoolkit.toolkitVersion
+import io.github.kinjoryura.handballtoolkit.userMessage
 
 /**
  * write 経路をひととおり踏むだけの最小シェル。UI の作り込みはしていない
@@ -293,7 +293,8 @@ class MainActivity : Activity() {
             db.dao().factLog(seed.matchId.toString()).map { it.toDomain() }
         }
         val summary = buildSummary(match, facts)
-        val phase = (match.configuration as? MatchConfiguration.Timer)?.phaseDurationSeconds
+        // シムのアクセサ（handball-project#136）。as? での分解を書かずに済む。
+        val phase = match.configuration.phaseDurationSecondsOrNull
         append(
             "  スコア ${summary.homeScore} - ${summary.awayScore}" +
                 "（fact ${facts.size} 件 / phase 規定長 ${phase?.toInt()}s）",
@@ -302,35 +303,14 @@ class MainActivity : Activity() {
 
     /**
      * 構造化エラー → ユーザー向け文言。**この写像はシェルの責務**であり、コアは
-     * コードとパラメータしか返さない（ADR 0002）。実プロダクトでは
-     * DomainValidationIssue の (scope, code) ごとに文言表を持つ。
+     * コードとパラメータしか返さない（ADR 0002）。
+     *
+     * ただし全 39 ケース分を一から書かなくてよい: `.aar` が en / ja の既定文言を
+     * 持っており、`userMessage` がそれを引く（handball-project#136）。文言を変えたい
+     * ときは、このアプリの `strings.xml` に同じ name の string を宣言すればよく
+     * （リソースマージはアプリ側が優先）、写像を書き直す必要はない。
      */
-    private fun describe(e: CoreWriteException): String =
-        when (e) {
-            is CoreWriteException.ValidationFailed ->
-                "記録できません: " + e.issues.joinToString("; ") { describeIssue(it) }
-            is CoreWriteException.TeamInUse ->
-                "このチームは ${e.matchCount} 試合で使われているため削除できません"
-            is CoreWriteException.PlayerInUse ->
-                "この選手は ${e.factCount} 件の記録で参照されているため削除できません"
-            is CoreWriteException.InsufficientNewIds ->
-                "ID の供給が不足しました（必要 ${e.required} / 渡した ${e.provided}）。やり直してください"
-            is CoreWriteException.Repository ->
-                "保存に失敗しました（開発者向け: ${e.detail}）"
-            is CoreWriteException.MigrationPlanInfeasible ->
-                "動画への移行を計画できませんでした（開発者向け: ${e.detail}）"
-            is CoreWriteException.ImportDecodeFailed ->
-                "取り込むデータを解釈できませんでした（開発者向け: ${e.detail}）"
-        }
-
-    // サンプルなので issue は toString で出す。実シェルは (scope, code) で文言を引く。
-    private fun describeIssue(issue: DomainValidationIssue): String =
-        when (issue) {
-            is DomainValidationIssue.Match -> issue.v1.toString()
-            is DomainValidationIssue.Configuration -> issue.v1.toString()
-            is DomainValidationIssue.Fact -> issue.v1.toString()
-            is DomainValidationIssue.Timeline -> issue.v1.toString()
-        }
+    private fun describe(e: CoreWriteException): String = e.userMessage(this).body
 
     private fun append(line: String) {
         log.append(line + "\n")
