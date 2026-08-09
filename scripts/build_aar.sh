@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # UniFFI → Android 配布物（.aar）のビルド（handball-project#135。配布境界は ADR 0006）。
 #
-# 作るのは **外部利用者へ配る 1 ファイル**。中身は「コンパイル済み Kotlin +
-# jniLibs/arm64-v8a/*.so + 依存宣言（JNA / coroutines）+ consumer ProGuard ルール」で、
-# 利用者は Rust も Nix も NDK も要らなくなる。
+# 作るのは **外部利用者へ配る 1 ファイル**。中身は「コンパイル済み Kotlin（生成
+# バインディング + 手書きシム）+ jniLibs/arm64-v8a/*.so + 文言リソース（en / ja）+
+# 依存宣言（JNA / coroutines）+ consumer ProGuard ルール」で、利用者は Rust も Nix も
+# NDK も要らなくなる。シムと文言は handball-project#136。
 #
 # 旧 scripts/build_android.sh（サンプルへ .so と生成 Kotlin を直接配置していた）は
 # #135 で役割を終えたため削除した。サンプルは publish 済みの .aar を引く側に回っている。
@@ -93,4 +94,4 @@ echo "==> 完了: $OUT"
 ls -lh "$OUT"
 echo
 echo "同梱物:"
-unzip -l "$OUT/handball-toolkit-$cargo_version.aar" | grep -E "classes.jar|\.so|AndroidManifest|proguard"
+unzip -l "$OUT/handball-toolkit-$cargo_version.aar" | grep -E "classes.jar|\.so|AndroidManifest|proguard|res/values"

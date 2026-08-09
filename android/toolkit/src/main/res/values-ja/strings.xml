@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  validation / write エラーのユーザー向け日本語文言（ADR 0002 決定 3「文言はシェル所有」）。
+
+  コア（Rust）は (scope, code) の構造化エラーだけを返し、文言は持たない。ここはその
+  写像をシェル実装者が一から書かずに済ませるための既定値で、**利用側アプリが同じ名前の
+  string を宣言すれば上書きされる**（Android のリソースマージはアプリ側が優先）。
+
+  文言の正典は HandballRecorder の docs/redesign/DOMAIN_VALIDATION_MESSAGES.md。
+  fact / timeline は iOS シム（DomainValidationMessage.swift）と同一文言。
+
+  **エラー case を追加・改名したら、この 2 ロケール両方に行を足すこと。**
+  漏れは DomainValidationMessagesTest が検出する。
+-->
+<resources>
+
+    <!-- ── match scope（MatchValidationError 3 ケース）── -->
+    <string name="handball_toolkit_match_same_team_on_both_sides_title">ホームとアウェイに同じチームが選ばれています</string>
+    <string name="handball_toolkit_match_same_team_on_both_sides_body">ホームとアウェイには別のチームを選んでください。</string>
+    <string name="handball_toolkit_match_empty_title_title">空のタイトルは保存できません</string>
+    <string name="handball_toolkit_match_empty_title_body">試合タイトルに空文字だけが入っています。名前を入れるか、未入力に戻してください。</string>
+    <string name="handball_toolkit_match_overlapping_roster_selections_title">同じ選手が複数の区分に入っています</string>
+    <string name="handball_toolkit_match_overlapping_roster_selections_body">ベンチ入りと名簿外の両方に同じ選手が選ばれています。どちらか一方にしてください。</string>
+
+    <!-- ── configuration scope（ConfigurationValidationError 2 ケース）── -->
+    <string name="handball_toolkit_configuration_non_positive_phase_duration_title">ピリオド時間が不正です</string>
+    <string name="handball_toolkit_configuration_non_positive_phase_duration_body">ピリオド時間は 1 秒以上で指定してください。</string>
+    <string name="handball_toolkit_configuration_empty_video_external_id_title">動画が指定されていません</string>
+    <string name="handball_toolkit_configuration_empty_video_external_id_body">動画の指定が空です。動画を選び直してください。</string>
+
+    <!-- ── fact scope（FactValidationError 22 ケース）── -->
+    <string name="handball_toolkit_fact_negative_match_clock_title">試合時間が不正です</string>
+    <string name="handball_toolkit_fact_negative_match_clock_body">0 秒より前の試合時間は指定できません。時間を確認してください。</string>
+    <string name="handball_toolkit_fact_negative_video_clock_title">動画時間が不正です</string>
+    <string name="handball_toolkit_fact_negative_video_clock_body">0 秒より前の動画時間は指定できません。再生位置を確認してください。</string>
+    <string name="handball_toolkit_fact_non_finite_match_clock_title">試合時間を取得できませんでした</string>
+    <string name="handball_toolkit_fact_non_finite_match_clock_body">試合時間の値が正しく取れていません。時間を入力し直してください。</string>
+    <string name="handball_toolkit_fact_non_finite_video_clock_title">再生位置を取得できませんでした</string>
+    <string name="handball_toolkit_fact_non_finite_video_clock_body">動画の再生位置が正しく取れていません。動画が読み込まれるまで待つか、少し再生してからやり直してください。</string>
+    <string name="handball_toolkit_fact_invalid_anchor_for_configuration_title">記録基準が一致していません</string>
+    <string name="handball_toolkit_fact_invalid_anchor_for_configuration_body">現在の記録モードでは使えない時刻基準です。記録モードに合う時間へ修正してください。</string>
+    <string name="handball_toolkit_fact_empty_title_title">空のタイトルは保存できません</string>
+    <string name="handball_toolkit_fact_empty_title_body">タイトル欄に空文字だけが入っています。名前を入れるか、未入力に戻してください。</string>
+    <string name="handball_toolkit_fact_empty_note_title">メモを入力してください</string>
+    <string name="handball_toolkit_fact_empty_note_body">メモ欄が空のままです。内容を入れるか、未入力に戻してください。</string>
+    <string name="handball_toolkit_fact_duplicate_primary_and_related_player_title">同じ選手を重複して選べません</string>
+    <string name="handball_toolkit_fact_duplicate_primary_and_related_player_body">主選手と関連選手に同じ選手が選ばれています。別の選手を選んでください。</string>
+    <string name="handball_toolkit_fact_missing_player_for_play_kind_title">選手を選択してください</string>
+    <string name="handball_toolkit_fact_missing_player_for_play_kind_body">この記録には選手が必要です。対象の選手を選んでください。</string>
+    <string name="handball_toolkit_fact_free_note_has_no_content_title">記録内容が空です</string>
+    <string name="handball_toolkit_fact_free_note_has_no_content_body">タイトル・メモ・チーム・選手のいずれも入っていません。少なくとも 1 つ入力してください。</string>
+    <string name="handball_toolkit_fact_phase_start_missing_end_anchor_title">ピリオドの終了時刻が未設定です</string>
+    <string name="handball_toolkit_fact_phase_start_missing_end_anchor_body">ピリオド開始記録には終了時刻も必要です。ピリオド時間を入力してください。</string>
+    <string name="handball_toolkit_fact_phase_start_anchor_mismatch_title">開始と終了の時刻基準が一致しません</string>
+    <string name="handball_toolkit_fact_phase_start_anchor_mismatch_body">ピリオドの開始と終了で時計の基準が違います。同じ基準に揃えてください。</string>
+    <string name="handball_toolkit_fact_phase_start_end_before_start_title">ピリオドの終了が開始より前です</string>
+    <string name="handball_toolkit_fact_phase_start_end_before_start_body">ピリオドの終了時刻は開始時刻より後でなければなりません。時刻を確認してください。</string>
+    <string name="handball_toolkit_fact_stoppage_end_before_start_title">中断の終了が開始より前です</string>
+    <string name="handball_toolkit_fact_stoppage_end_before_start_body">中断の終了時刻は開始時刻より後でなければなりません。時刻を確認してください。</string>
+    <string name="handball_toolkit_fact_stoppage_end_nil_in_video_mode_title">中断の終了時刻が必要です</string>
+    <string name="handball_toolkit_fact_stoppage_end_nil_in_video_mode_body">動画モードでは中断の終了時刻を記録する必要があります。終了時刻を入力してください。</string>
+    <string name="handball_toolkit_fact_stoppage_end_present_in_timer_mode_title">中断の終了時刻は保存されません</string>
+    <string name="handball_toolkit_fact_stoppage_end_present_in_timer_mode_body">タイマーモードでは中断の終了時刻は記録しません。終了時刻を削除してください。</string>
+    <string name="handball_toolkit_fact_timeout_has_note_title">タイムアウトにメモは付けられません</string>
+    <string name="handball_toolkit_fact_timeout_has_note_body">タイムアウトにメモは保存できません。メモを削除するか、中断として記録してください。</string>
+    <string name="handball_toolkit_fact_empty_stoppage_note_title">空のメモは保存できません</string>
+    <string name="handball_toolkit_fact_empty_stoppage_note_body">中断のメモが空文字になっています。内容を入れるか、未入力に戻してください。</string>
+    <string name="handball_toolkit_fact_unknown_team_reference_title">試合に含まれないチームです</string>
+    <string name="handball_toolkit_fact_unknown_team_reference_body">この記録は現在の試合に含まれないチームを参照しています。ホームかアウェイのチームを選んでください。</string>
+    <string name="handball_toolkit_fact_unknown_player_reference_title">試合に含まれない選手です</string>
+    <string name="handball_toolkit_fact_unknown_player_reference_body">この記録は現在の試合に含まれない選手を参照しています。ホームかアウェイに所属する選手を選んでください。</string>
+    <string name="handball_toolkit_fact_player_team_mismatch_title">選手とチームの組み合わせが不正です</string>
+    <string name="handball_toolkit_fact_player_team_mismatch_body">選んだ選手が指定チームに属していません。チームか選手を選び直してください。</string>
+    <string name="handball_toolkit_fact_related_player_team_mismatch_title">関連選手とチームの組み合わせが不正です</string>
+    <string name="handball_toolkit_fact_related_player_team_mismatch_body">選んだ関連選手が指定チームに属していません。チームか選手を選び直してください。</string>
+
+    <!-- ── timeline scope（TimelineValidationError 12 ケース）── -->
+    <string name="handball_toolkit_timeline_timer_with_facts_missing_phase_start_title">ピリオド開始が記録されていません</string>
+    <string name="handball_toolkit_timeline_timer_with_facts_missing_phase_start_body">記録があるのにピリオド開始がありません。先にピリオドを開始してください。</string>
+    <string name="handball_toolkit_timeline_video_with_facts_missing_phase_start_title">ピリオド開始が記録されていません</string>
+    <string name="handball_toolkit_timeline_video_with_facts_missing_phase_start_body">記録があるのにピリオド開始がありません。先にピリオドを開始してください。</string>
+    <string name="handball_toolkit_timeline_video_highlight_contains_phase_start_title">ハイライトにピリオドは記録できません</string>
+    <string name="handball_toolkit_timeline_video_highlight_contains_phase_start_body">ハイライト記録ではピリオドを扱いません。ピリオド開始記録を削除してください。</string>
+    <string name="handball_toolkit_timeline_video_highlight_contains_stoppage_title">ハイライトに中断は記録できません</string>
+    <string name="handball_toolkit_timeline_video_highlight_contains_stoppage_body">ハイライト記録では中断を扱いません。中断記録を削除してください。</string>
+    <string name="handball_toolkit_timeline_video_highlight_missing_title_title">ハイライトにはタイトルが必要です</string>
+    <string name="handball_toolkit_timeline_video_highlight_missing_title_body">ハイライト記録はタイトルが必須です。タイトルを入力してください。</string>
+    <string name="handball_toolkit_timeline_play_recorded_outside_phase_range_title">ピリオド外に記録があります</string>
+    <string name="handball_toolkit_timeline_play_recorded_outside_phase_range_body">ピリオドの外側に記録があります。記録の時刻かピリオドの範囲を見直してください。</string>
+    <string name="handball_toolkit_timeline_play_recorded_inside_stoppage_title">中断中の記録があります</string>
+    <string name="handball_toolkit_timeline_play_recorded_inside_stoppage_body">試合が止まっている区間に記録があります。中断の範囲か記録時刻を見直してください。</string>
+    <string name="handball_toolkit_timeline_duplicate_shootout_title">シュートアウトが複数あります</string>
+    <string name="handball_toolkit_timeline_duplicate_shootout_body">1 試合にシュートアウトは 1 件までです。不要なシュートアウト記録を削除してください。</string>
+    <string name="handball_toolkit_timeline_shootout_not_last_title">シュートアウト後にピリオドがあります</string>
+    <string name="handball_toolkit_timeline_shootout_not_last_body">シュートアウトは最後のピリオドです。シュートアウトより後にピリオド開始記録は置けません。</string>
+    <string name="handball_toolkit_timeline_phase_start_not_continuous_from_previous_title">ピリオドの開始が直前ピリオドの終了と一致しません</string>
+    <string name="handball_toolkit_timeline_phase_start_not_continuous_from_previous_body">新しいピリオドの開始は直前ピリオドの終了と同じ時刻にしてください。</string>
+    <string name="handball_toolkit_timeline_stoppages_overlap_title">中断区間が重複しています</string>
+    <string name="handball_toolkit_timeline_stoppages_overlap_body">中断区間が他の中断と重なっています。記録を整理してください。</string>
+    <string name="handball_toolkit_timeline_stoppage_outside_phase_range_title">ピリオド外の中断記録があります</string>
+    <string name="handball_toolkit_timeline_stoppage_outside_phase_range_body">中断記録がピリオドの範囲外にあります。ピリオド範囲か中断時刻を見直してください。</string>
+
+    <!-- ── write scope（CoreWriteError 7 ケース）── -->
+    <string name="handball_toolkit_write_validation_failed_title">保存できませんでした</string>
+    <string name="handball_toolkit_write_validation_failed_body">入力内容に問題があります。修正してからもう一度お試しください。</string>
+    <!-- 複数 issue をまとめて出すときの前置き。%1$d は件数。 -->
+    <string name="handball_toolkit_write_validation_failed_multiple_body">%1$d 件の修正が必要です。</string>
+    <string name="handball_toolkit_write_team_in_use_title">使用中のチームは削除できません</string>
+    <string name="handball_toolkit_write_team_in_use_body">このチームは試合で使われています。先に該当の試合を削除してください。</string>
+    <string name="handball_toolkit_write_player_in_use_title">使用中の選手は削除できません</string>
+    <string name="handball_toolkit_write_player_in_use_body">この選手には記録が紐づいています。先に該当の記録を削除してください。</string>
+    <string name="handball_toolkit_write_repository_title">保存に失敗しました</string>
+    <string name="handball_toolkit_write_repository_body">データの保存中に問題が起きました。時間をおいて再度お試しください。</string>
+    <string name="handball_toolkit_write_insufficient_new_ids_title">保存に失敗しました</string>
+    <string name="handball_toolkit_write_insufficient_new_ids_body">保存の準備が整いませんでした。もう一度お試しください。</string>
+    <string name="handball_toolkit_write_migration_plan_infeasible_title">動画モードへ切り替えられません</string>
+    <string name="handball_toolkit_write_migration_plan_infeasible_body">試合時間と動画の対応が取れていません。同期の基準を追加してからやり直してください。</string>
+    <string name="handball_toolkit_write_import_decode_failed_title">試合データを読み込めませんでした</string>
+    <string name="handball_toolkit_write_import_decode_failed_body">ファイルの内容が想定と違います。別のファイルで試してください。</string>
+
+</resources>

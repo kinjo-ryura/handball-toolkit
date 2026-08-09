@@ -12,6 +12,11 @@ android {
     // 生成 Kotlin の package_name（crates/handball-toolkit/uniffi.toml）と揃える。
     namespace = "io.github.kinjoryura.handballtoolkit"
     compileSdk = 36
+
+    // ライブラリのリソースは利用側アプリの名前空間へマージされるため、衝突しない
+    // 接頭辞を強制する（付け忘れは lint が警告する）。文言リソースは
+    // src/main/res/values*/strings.xml — handball-project#136。
+    resourcePrefix = "handball_toolkit_"
     // nix が提供する SDK には build-tools が 1 つしか入っていないため明示する。既定値
     // （AGP のバンドル値）を要求されると read-only な nix store へダウンロードしようと
     // して失敗する（examples/android/app と同じ理由）。
@@ -47,6 +52,8 @@ android {
 
     // scripts/build_aar.sh が生成する Kotlin バインディング（生成物なのでコミットしない）。
     sourceSets["main"].kotlin.srcDir("src/generated/kotlin")
+    // 手書きのシム層（handball-project#136）。生成物と混ざらないよう別ディレクトリに置く。
+    sourceSets["main"].kotlin.srcDir("src/main/kotlin")
 
     packaging {
         jniLibs {
@@ -74,4 +81,8 @@ dependencies {
     api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+
+    // シムの単体テスト（handball-project#136）。JVM 上で回り、.so も端末も要らない
+    // — シムは生成 data class を組み替えるだけでネイティブに触らないため。
+    testImplementation(kotlin("test"))
 }

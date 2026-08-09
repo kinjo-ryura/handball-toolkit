@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Default (English) user-facing wording for validation and write errors.
+  See values-ja/strings.xml for the Japanese set and the full rationale.
+
+  The core (Rust) only returns structured (scope, code) errors and holds no wording
+  at all — ADR 0002 decision 3. These strings are a starting point so that a shell
+  implementer does not have to write 39 messages before showing anything to a user.
+  **A consuming app overrides any of them by declaring the same string name**, since
+  Android resource merging gives the application priority over its libraries.
+
+  Terminology follows docs/ERROR_CODES.md, which is the reference table for shell
+  implementers. When an error case is added or renamed, add a row to BOTH locales;
+  DomainValidationMessagesTest fails if one is missing.
+-->
+<resources>
+
+    <!-- scope: match (MatchValidationError, 3 codes) -->
+    <string name="handball_toolkit_match_same_team_on_both_sides_title">Both sides are the same team</string>
+    <string name="handball_toolkit_match_same_team_on_both_sides_body">Pick a different team for home and away.</string>
+    <string name="handball_toolkit_match_empty_title_title">Title cannot be blank</string>
+    <string name="handball_toolkit_match_empty_title_body">The match title contains only whitespace. Enter a name or leave it unset.</string>
+    <string name="handball_toolkit_match_overlapping_roster_selections_title">A player appears in both rosters</string>
+    <string name="handball_toolkit_match_overlapping_roster_selections_body">The same player is selected as both benched and out of roster. Keep only one.</string>
+
+    <!-- scope: configuration (ConfigurationValidationError, 2 codes) -->
+    <string name="handball_toolkit_configuration_non_positive_phase_duration_title">Phase length is invalid</string>
+    <string name="handball_toolkit_configuration_non_positive_phase_duration_body">The phase length must be greater than zero seconds.</string>
+    <string name="handball_toolkit_configuration_empty_video_external_id_title">No video selected</string>
+    <string name="handball_toolkit_configuration_empty_video_external_id_body">The video reference is blank. Select the video again.</string>
+
+    <!-- scope: fact (FactValidationError, 22 codes) -->
+    <string name="handball_toolkit_fact_negative_match_clock_title">Match time is invalid</string>
+    <string name="handball_toolkit_fact_negative_match_clock_body">Match time cannot be before zero seconds. Check the time.</string>
+    <string name="handball_toolkit_fact_negative_video_clock_title">Video time is invalid</string>
+    <string name="handball_toolkit_fact_negative_video_clock_body">Video time cannot be before zero seconds. Check the playback position.</string>
+    <string name="handball_toolkit_fact_non_finite_match_clock_title">Could not read the match time</string>
+    <string name="handball_toolkit_fact_non_finite_match_clock_body">The match time did not come through as a usable value. Enter the time again.</string>
+    <string name="handball_toolkit_fact_non_finite_video_clock_title">Could not read the playback position</string>
+    <string name="handball_toolkit_fact_non_finite_video_clock_body">The video position did not come through as a usable value. Wait for the video to load, or start playback and try again.</string>
+    <string name="handball_toolkit_fact_invalid_anchor_for_configuration_title">Wrong kind of timestamp</string>
+    <string name="handball_toolkit_fact_invalid_anchor_for_configuration_body">This recording mode does not accept that kind of timestamp. Use a time that matches the mode.</string>
+    <string name="handball_toolkit_fact_empty_title_title">Title cannot be blank</string>
+    <string name="handball_toolkit_fact_empty_title_body">The title field contains only whitespace. Enter a name or leave it unset.</string>
+    <string name="handball_toolkit_fact_empty_note_title">Enter a note</string>
+    <string name="handball_toolkit_fact_empty_note_body">The note field is blank. Enter something or leave it unset.</string>
+    <string name="handball_toolkit_fact_duplicate_primary_and_related_player_title">The same player is selected twice</string>
+    <string name="handball_toolkit_fact_duplicate_primary_and_related_player_body">The primary and related player are the same. Choose a different player.</string>
+    <string name="handball_toolkit_fact_missing_player_for_play_kind_title">Select a player</string>
+    <string name="handball_toolkit_fact_missing_player_for_play_kind_body">This kind of record needs a player. Choose the player it applies to.</string>
+    <string name="handball_toolkit_fact_free_note_has_no_content_title">The record is empty</string>
+    <string name="handball_toolkit_fact_free_note_has_no_content_body">Title, note, team, and player are all empty. Fill in at least one.</string>
+    <string name="handball_toolkit_fact_phase_start_missing_end_anchor_title">The phase has no end time</string>
+    <string name="handball_toolkit_fact_phase_start_missing_end_anchor_body">A phase start also needs an end time. Enter the phase length.</string>
+    <string name="handball_toolkit_fact_phase_start_anchor_mismatch_title">Start and end use different clocks</string>
+    <string name="handball_toolkit_fact_phase_start_anchor_mismatch_body">The phase start and end are anchored to different clocks. Use the same one for both.</string>
+    <string name="handball_toolkit_fact_phase_start_end_before_start_title">The phase ends before it starts</string>
+    <string name="handball_toolkit_fact_phase_start_end_before_start_body">The phase end must be later than its start. Check the times.</string>
+    <string name="handball_toolkit_fact_stoppage_end_before_start_title">The stoppage ends before it starts</string>
+    <string name="handball_toolkit_fact_stoppage_end_before_start_body">The stoppage end must be later than its start. Check the times.</string>
+    <string name="handball_toolkit_fact_stoppage_end_nil_in_video_mode_title">The stoppage needs an end time</string>
+    <string name="handball_toolkit_fact_stoppage_end_nil_in_video_mode_body">Video mode records a closed stoppage interval. Enter the end time.</string>
+    <string name="handball_toolkit_fact_stoppage_end_present_in_timer_mode_title">The stoppage end will not be saved</string>
+    <string name="handball_toolkit_fact_stoppage_end_present_in_timer_mode_body">Timer mode does not record a stoppage end. Remove the end time.</string>
+    <string name="handball_toolkit_fact_timeout_has_note_title">Timeouts cannot carry a note</string>
+    <string name="handball_toolkit_fact_timeout_has_note_body">A note cannot be saved on a timeout. Remove the note, or record it as a pause instead.</string>
+    <string name="handball_toolkit_fact_empty_stoppage_note_title">A blank note cannot be saved</string>
+    <string name="handball_toolkit_fact_empty_stoppage_note_body">The stoppage note contains only whitespace. Enter something or leave it unset.</string>
+    <string name="handball_toolkit_fact_unknown_team_reference_title">That team is not in this match</string>
+    <string name="handball_toolkit_fact_unknown_team_reference_body">This record refers to a team that is not part of the match. Choose the home or away team.</string>
+    <string name="handball_toolkit_fact_unknown_player_reference_title">That player is not in this match</string>
+    <string name="handball_toolkit_fact_unknown_player_reference_body">This record refers to a player that is not part of the match. Choose a player from either team.</string>
+    <string name="handball_toolkit_fact_player_team_mismatch_title">Player and team do not match</string>
+    <string name="handball_toolkit_fact_player_team_mismatch_body">The selected player does not belong to the selected team. Change the team or the player.</string>
+    <string name="handball_toolkit_fact_related_player_team_mismatch_title">Related player and team do not match</string>
+    <string name="handball_toolkit_fact_related_player_team_mismatch_body">The selected related player does not belong to the selected team. Change the team or the player.</string>
+
+    <!-- scope: timeline (TimelineValidationError, 12 codes) -->
+    <string name="handball_toolkit_timeline_timer_with_facts_missing_phase_start_title">No phase has been started</string>
+    <string name="handball_toolkit_timeline_timer_with_facts_missing_phase_start_body">There are records but no phase start. Start a phase first.</string>
+    <string name="handball_toolkit_timeline_video_with_facts_missing_phase_start_title">No phase has been started</string>
+    <string name="handball_toolkit_timeline_video_with_facts_missing_phase_start_body">There are records but no phase start. Start a phase first.</string>
+    <string name="handball_toolkit_timeline_video_highlight_contains_phase_start_title">Highlights cannot contain phases</string>
+    <string name="handball_toolkit_timeline_video_highlight_contains_phase_start_body">Highlight recordings have no phase concept. Delete the phase start record.</string>
+    <string name="handball_toolkit_timeline_video_highlight_contains_stoppage_title">Highlights cannot contain stoppages</string>
+    <string name="handball_toolkit_timeline_video_highlight_contains_stoppage_body">Highlight recordings have no stoppage concept. Delete the stoppage record.</string>
+    <string name="handball_toolkit_timeline_video_highlight_missing_title_title">Highlights need a title</string>
+    <string name="handball_toolkit_timeline_video_highlight_missing_title_body">A highlight recording requires a title. Enter one.</string>
+    <string name="handball_toolkit_timeline_play_recorded_outside_phase_range_title">A record falls outside every phase</string>
+    <string name="handball_toolkit_timeline_play_recorded_outside_phase_range_body">A record sits outside the phases. Check its time, or the phase range.</string>
+    <string name="handball_toolkit_timeline_play_recorded_inside_stoppage_title">A record falls inside a stoppage</string>
+    <string name="handball_toolkit_timeline_play_recorded_inside_stoppage_body">A record sits in an interval where the match was stopped. Check the stoppage range, or the record time.</string>
+    <string name="handball_toolkit_timeline_duplicate_shootout_title">More than one shootout</string>
+    <string name="handball_toolkit_timeline_duplicate_shootout_body">A match has at most one shootout. Delete the extra shootout record.</string>
+    <string name="handball_toolkit_timeline_shootout_not_last_title">A phase follows the shootout</string>
+    <string name="handball_toolkit_timeline_shootout_not_last_body">The shootout is the final phase. No phase start can come after it.</string>
+    <string name="handball_toolkit_timeline_phase_start_not_continuous_from_previous_title">The phase does not follow on from the previous one</string>
+    <string name="handball_toolkit_timeline_phase_start_not_continuous_from_previous_body">A new phase must start at exactly the time the previous phase ended.</string>
+    <string name="handball_toolkit_timeline_stoppages_overlap_title">Stoppages overlap</string>
+    <string name="handball_toolkit_timeline_stoppages_overlap_body">One stoppage interval overlaps another. Tidy up the records.</string>
+    <string name="handball_toolkit_timeline_stoppage_outside_phase_range_title">A stoppage falls outside every phase</string>
+    <string name="handball_toolkit_timeline_stoppage_outside_phase_range_body">A stoppage sits outside the phases. Check the phase range, or the stoppage time.</string>
+
+    <!-- scope: write (CoreWriteError, 7 codes) -->
+    <string name="handball_toolkit_write_validation_failed_title">Could not save</string>
+    <string name="handball_toolkit_write_validation_failed_body">Something in the input needs fixing. Correct it and try again.</string>
+    <!-- Lead-in when several issues are reported at once. %1$d is the count. -->
+    <string name="handball_toolkit_write_validation_failed_multiple_body">%1$d things need fixing.</string>
+    <string name="handball_toolkit_write_team_in_use_title">This team is in use</string>
+    <string name="handball_toolkit_write_team_in_use_body">The team is used by existing matches. Delete those matches first.</string>
+    <string name="handball_toolkit_write_player_in_use_title">This player is in use</string>
+    <string name="handball_toolkit_write_player_in_use_body">The player has records attached. Delete those records first.</string>
+    <string name="handball_toolkit_write_repository_title">Could not save</string>
+    <string name="handball_toolkit_write_repository_body">Something went wrong while saving. Try again in a moment.</string>
+    <string name="handball_toolkit_write_insufficient_new_ids_title">Could not save</string>
+    <string name="handball_toolkit_write_insufficient_new_ids_body">The save could not be prepared. Try again.</string>
+    <string name="handball_toolkit_write_migration_plan_infeasible_title">Cannot switch to video mode</string>
+    <string name="handball_toolkit_write_migration_plan_infeasible_body">Match time and video cannot be lined up yet. Add a sync point and try again.</string>
+    <string name="handball_toolkit_write_import_decode_failed_title">Could not read the match data</string>
+    <string name="handball_toolkit_write_import_decode_failed_body">The file does not have the expected contents. Try a different file.</string>
+
+</resources>
