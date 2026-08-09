@@ -179,6 +179,23 @@ R8 の keep ルール（JNA と生成コードは reflection / direct mapping �
 
 シェルの書き方は [`examples/android/`](examples/android/) が参照実装になっている（Room による永続化 + 3 trait の実装 + 最小 UI）。**このサンプル自身が publish 済みの `.aar` を引く形**になっており、外部利用者とまったく同じ経路を通っている。
 
+#### 同梱される OSS ライセンス一覧（利用側の表示義務）
+
+`.aar` には、Rust コアがリンクする依存 OSS のライセンス一覧が入っている。
+
+```
+assets/handball_toolkit/third-party-licenses.json
+```
+
+**この `.aar` を組み込んだアプリを配る人が、エンドユーザーへの表示義務を負う。** `.aar` は Executable Form での配布にあたるため、受け取った時点で MIT / Unicode-3.0 の「著作権表示とライセンス本文を届ける」義務と、MPL-2.0 §3.2 の「ソース入手方法を知らせる」義務が利用側へ移る。同梱しているのは**その材料**であって、履行そのものではない。
+
+- **届け方は問われない**（アプリ内画面・同梱テキスト・サポートサイトのいずれでもよい）。どのライセンスも媒体や UI を指定していない。ただしエンドユーザーが到達できる形にすること
+- **一覧から項目を間引かない**。MIT が 19 件に分かれるのは crate ごとに著作権表示が違うためで、まとめると義務を満たさなくなる
+- **`sourceUrl` を表示に含める**。MPL-2.0 §3.2 の告知はこれが担っている
+- JSON の形（`schemaVersion` / `licenses[]` / `libraries[]` / `licenseIndexes`）は「ライセンス」節の「依存の OSS ライセンス表示」を参照
+
+**この一覧は Rust コアの依存だけを含む。** JNA / kotlinx-coroutines / desugar_jdk_libs は Cargo.lock に現れないため入っていない。`.aar` は POM を運ばず利用側がこれらを自分で宣言する（上記のとおり）以上、**表示も利用側で別途用意する**こと。
+
 #### 配布物をビルドする
 
 ```bash
@@ -304,4 +321,4 @@ MIT。[LICENSE](LICENSE) を参照。
   - `sourceUrl` — crates.io の**当該バージョン**。MPL-2.0 §3.2 の告知をこれで満たす
 - **自前の workspace crate も一覧に残している**。外部利用者にとって `handball-toolkit` は third party であり、`.aar` を配る経路ではこちらの MIT 表示も必要になるため
 
-iOS は `HandballRecorder` の `Packages/HandballToolkit/bootstrap.sh` がこの JSON をパッケージリソースへ取り込み、生成 Swift と同じく一致検証する。Android の `.aar` への同梱は未実施（handball-project#140）。
+iOS は `HandballRecorder` の `Packages/HandballToolkit/bootstrap.sh` がこの JSON をパッケージリソースへ取り込み、生成 Swift と同じく一致検証する。Android は `scripts/build_aar.sh` が `.aar` の `assets/handball_toolkit/third-party-licenses.json` へ同梱する（handball-project#142）。**`.aar` を受け取った側に何の義務が移るか**は「Android」節の「同梱される OSS ライセンス一覧」を参照。
