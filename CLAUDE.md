@@ -12,6 +12,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 移植の経緯・作業規律: [`docs/PORTING.md`](docs/PORTING.md)。**移植は完走済みで、同ファイルは完了記録**（現在地の管理台帳ではない）。進行中・未着手の作業は GitHub Issues が正
 - ドキュメント・コードコメントは日本語で書く。**例外は [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md) の 1 本のみ**（handball-project#134）— 外部シェル実装者が文言表を書くための参照表なので英語で保つ。README も含め他はすべて日本語（翻訳の二重管理を作らないため）
 
+## 変更の出し方（main は保護されている）
+
+**main へ直接 push できない。** ruleset [`protect-main`](https://github.com/kinjo-ryura/handball-toolkit/rules/19753789)（2026-07-26〜）が **直 push / force push / main の削除を禁止し、PR 必須 + CI の `check` ジョブ green 必須**にしている。bypass actor は無しなので**オーナーでも通らない**。docs 1 行の修正でもブランチを切る。
+
+```bash
+git switch -c docs/xxx                    # prefix は feat/ fix/ ci/ docs/ + 内容
+# 変更して commit（メッセージ規約は親リポの global-commit skill）
+git push -u origin HEAD
+gh pr create --title "..." --body "..."   # 本文に関連 Issue（handball-project#NN）を書く
+gh pr checks --watch                      # required = `check` ジョブのみ。macOS + Nix で 5〜7 分
+gh pr merge --merge --delete-branch       # required approvals は 0 なので自分の PR を自分で merge できる
+git switch main && git pull               # ローカル main を merge 後の状態へ追従させる
+```
+
+- **CI が落ちている PR は merge できない**。往復を減らすため push 前にローカルで `cargo fmt --all --check` / `cargo clippy --workspace --all-targets -- -D warnings` / `cargo test --workspace` を通す
+- **親リポの submodule pointer は merge 後の main を指す**（PR ブランチの commit を直接指さない）。push 順は **toolkit → 親リポ** — 逆にすると親リポがリモートに無い commit を指す
+- **この保護は toolkit だけにある**: ruleset は public repo でないと無料プランで使えず、他の submodule（すべて private）は従来どおり main へ直 push する。「toolkit は PR 必須、他は直 push」の非対称を忘れないこと
+- 導入の経緯と「force push がどうしても必要になったら ruleset を一時無効化する」という退避策は [`docs/PORTING.md`](docs/PORTING.md)「作業規律」
+
 ## 開発コマンド
 
 開発環境は Nix flake + direnv で宣言的に管理する（rustup 不使用）。ツールチェーンは `rust-toolchain.toml` でバージョン固定し、rust-overlay が提供する。
