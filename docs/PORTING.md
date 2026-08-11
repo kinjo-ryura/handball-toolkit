@@ -20,7 +20,7 @@
 - **親リポの pointer bump は main への merge 時のみ**（作業ブランチの中間状態を親リポが指さない）
 - **コミット粒度**: 1 モジュール（実装 + テスト）= 1 コミット目安。メッセージ規約は親リポ commit skill（日本語 Conventional Commits 風）
 - **push 順**: handball-toolkit → 親リポ。逆にすると親リポがリモートに存在しない commit を指す（2026-07-12 に実際に発生）
-- **ブランチ保護（2026-07-26〜）**: main は ruleset `protect-main` で保護済み。**force push / ブランチ削除の禁止 + PR 必須 + CI（`check` ジョブ）green 必須**、bypass なし（オーナーにも適用）。したがって main への直 push はできず、作業ブランチ → PR → merge の経路を通す。approvals は 0 なので自分の PR を自分で merge できる
+- **ブランチ保護（2026-07-26〜）**: main は ruleset `protect-main` で保護済み（**PR 必須 + CI green 必須**、bypass なし）。**手順の正典は CLAUDE.md「変更の出し方」** — ここには導入の経緯だけ残す（二重管理を作らないため）
   - 当初の再検討トリガーは「外部コントリビュータが現れたら PR + CI へ切替」だったが、到来を待たず public 化と同時に入れた。push 済みコミットを amend しかけた事例が実際に発生し、上の「push 済みコミットの rebase / squash はしない」を機械的に強制する価値が先に立ったため（handball-project#134）
   - force push が本当に必要になったら ruleset を一時的に無効化する。規約上まず起きない想定
 
