@@ -266,3 +266,55 @@ fn video_exactly_at_last_phase_end_returns_ended() {
     );
     assert_eq!(live.timer_state, MatchTimerState::Ended);
 }
+
+// ── 2 経路の一致（handball-project#167）──
+
+/// **resolver だけを受ける入口と、timeline を受ける入口の結果が一致すること。**
+///
+/// FFI の 2Hz tick 経路は `build_video_mode_with_resolver` を呼ぶ（`TimelineProjection` を
+/// record ごと渡すと resolver ハンドルの手前で `resolved_facts` が全量マーシャリングされ、
+/// fact 列が毎 tick 境界を渡るため）。一方 golden parity とオラクル対応のテストは
+/// `build_video_mode` を呼び続ける。**2 経路が育って食い違わないこと**をここで固定する。
+///
+/// 位置は状態が分かれる点を一通り踏む — phase 前 / phase 内 / 停止区間の内側 /
+/// phase 間 / 試合終了後、および `None`。
+#[test]
+fn resolver_entry_point_matches_timeline_entry_point() {
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
+    let match_ = make_video_match(home, away);
+    let timeline = TimelineProjection::build(
+        &match_,
+        &[
+            phase_start_both(PhaseKind::Regular, 0.0, 720.0, 1800.0, 2520.0),
+            video_stoppage(
+                FactId(Uuid::new_v4()),
+                StoppageKind::Timeout,
+                1000.0,
+                1060.0,
+            ),
+            phase_start_both(PhaseKind::Regular, 1800.0, 3000.0, 3600.0, 4800.0),
+        ],
+    );
+
+    let positions = [
+        None,
+        Some(100.0),  // phase 前
+        Some(800.0),  // 1st phase 内
+        Some(1030.0), // タイムアウト区間の内側
+        Some(2700.0), // phase 間（ハーフタイム）
+        Some(3500.0), // 2nd phase 内
+        Some(4800.0), // 最後の phase の end ちょうど = 終了後
+        Some(9000.0), // 試合終了後
+    ];
+
+    for position in positions {
+        let clock = position.map(|elapsed_seconds| VideoClock { elapsed_seconds });
+        let via_timeline = LiveMatchProjection::build_video_mode(&match_, &timeline, clock);
+        let via_resolver =
+            LiveMatchProjection::build_video_mode_with_resolver(&timeline.resolver, clock);
+        assert_eq!(
+            via_timeline, via_resolver,
+            "位置 {position:?} で 2 経路の結果が食い違った"
+        );
+    }
+}

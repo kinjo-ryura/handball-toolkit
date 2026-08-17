@@ -83,28 +83,24 @@ pub fn build_score_progression_with_timeline(
     ScoreProgressionProjection::build_with_timeline(&match_, &timeline)
 }
 
-/// `LiveMatchProjection::build_video_mode`。動画モードの 2Hz tick 経路。
+/// `LiveMatchProjection::build_video_mode_with_resolver`。動画モードの 2Hz tick 経路。
 ///
-/// **この経路は軽くない。** `timeline` は 1 tick ごとに丸ごとマーシャリングされる。
-/// resolver 自体は object ハンドルだが、同じ record に同居する `resolved_facts` を
-/// 生成 Swift の `FfiConverterTypeTimelineProjection::write` が**その手前で全量書く**ため、
-/// fact 列は毎 tick 境界を渡る。ADR 0004 決定 5 の「facts の再マーシャリングは発生しない」は
-/// **resolver 単体にしか当てはまらない** — record ごと渡すこの関数には効かない。
+/// **resolver ハンドルだけを受け取る**（handball-project#167）。以前は `TimelineProjection` を
+/// record ごと受けていたため、resolver が object ハンドルでも同居する `resolved_facts` が
+/// 生成コードの converter の write 順で**その手前に全量書かれ**、fact 列が毎 tick 境界を
+/// 渡っていた。中身は元から `timeline.resolver` しか読んでおらず（`match` も未使用だった）、
+/// 転送された fact 列は使われずに捨てられていたので、引数を落としても導出結果は変わらない。
 ///
-/// `build_video_mode` は `timeline.resolver` しか読まない（`_match` も未使用）ので、転送された
-/// fact 列は使われずに捨てられる。無くすには resolver だけを受け取る形への API 変更が要る
-/// （handball-project#167 の β 項目）。**それまでは、呼ぶ側が「再生位置が変わった tick でだけ
-/// 呼ぶ」ことで費用を抑える**（シェル側の実装は同 Issue）。
-///
-/// ここに処理を足す前に上記を読むこと。以前は「facts の再マーシャリングは発生しない」とだけ
-/// 書いてあり、実態と食い違ったまま「ここは軽い」と読ませる罠になっていた。
+/// これで ADR 0004 決定 5 の「facts の再マーシャリングは発生しない」が、この関数についても
+/// 実際に成り立つ。**`TimelineProjection` を引数に戻さないこと** — record ごと渡した瞬間に
+/// 同じ問題が戻る。fact 列が要る projection は `build_summary_with_timeline` のように
+/// tick 経路ではない関数に置く。
 #[uniffi::export]
 pub fn build_live_match_video_mode(
-    match_: Match,
-    timeline: TimelineProjection,
+    resolver: std::sync::Arc<SegmentResolver>,
     current_video_clock: Option<VideoClock>,
 ) -> LiveMatchProjection {
-    LiveMatchProjection::build_video_mode(&match_, &timeline, current_video_clock)
+    LiveMatchProjection::build_video_mode_with_resolver(&resolver, current_video_clock)
 }
 
 // ── validators（ADR 0002: 非空 = blocking。文言はシェル所有）──

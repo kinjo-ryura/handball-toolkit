@@ -59,13 +59,30 @@ pub struct AvailableActions {
 impl LiveMatchProjection {
     /// video mode の build。現在 videoClock を segment 上で lookup し、timerState / phase を決定する。
     /// Swift 版同様 `match` は未使用だが API 対称性のため引数に保持する（ADR 0001 関数目録）。
+    ///
+    /// 実体は `build_video_mode_with_resolver`。**この関数は元から `timeline.resolver` しか
+    /// 読んでいない**ので、委譲しても導出結果は変わらない。
     pub fn build_video_mode(
         _match: &Match,
         timeline: &TimelineProjection,
         current_video_clock: Option<VideoClock>,
     ) -> LiveMatchProjection {
-        let resolver = &timeline.resolver;
+        Self::build_video_mode_with_resolver(&timeline.resolver, current_video_clock)
+    }
 
+    /// resolver だけを入力にした build（FFI の 2Hz tick 経路が使う — handball-project#167）。
+    ///
+    /// 上と結果は同一で、**分けてあるのは境界の転送量のため**。ドメイン上の違いは無い。
+    /// `TimelineProjection` を record ごと FFI へ渡すと、resolver が object ハンドルでも
+    /// 同居する `resolved_facts` が converter の write 順で全量マーシャリングされ、
+    /// fact 列が毎 tick 境界を渡っていた。ハンドル 1 本だけを渡せばそれが消える。
+    ///
+    /// 一致は `live_match_projection_tests` の `resolver_entry_point_matches_timeline_entry_point`
+    /// が見張る（2 経路が育って食い違うのを防ぐため）。
+    pub fn build_video_mode_with_resolver(
+        resolver: &SegmentResolver,
+        current_video_clock: Option<VideoClock>,
+    ) -> LiveMatchProjection {
         let Some(current_video_clock) = current_video_clock else {
             return LiveMatchProjection {
                 current_phase_kind: None,

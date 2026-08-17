@@ -101,13 +101,22 @@ impl SegmentResolver {
 
 #[uniffi::export]
 pub fn build_live_match_video_mode(
-    match_: Match,
-    timeline: TimelineProjection,   // resolver はハンドルなので facts の再送なし
+    resolver: Arc<SegmentResolver>,   // ハンドル 1 本のみ。facts の再送なし
     current_video_clock: Option<VideoClock>,
 ) -> LiveMatchProjection;
 ```
 
 object は**不変の導出スナップショットへのハンドル**であり、コアが状態を所有するのではない（設計不変条件 1「stateless 純粋関数コア」は維持。fact が変わったらシェルが作り直す）。tick 時 FFI ゼロの材料化テーブル方式は、性能問題が実測されたときの後付け最適化として温存する。
+
+**実装追記（2026-08-17 — handball-project#167）**: 当初の実装は `build_live_match_video_mode(match_, timeline, …)` と **`TimelineProjection` を record ごと**受けており、**この決定は満たせていなかった**。resolver は確かに object ハンドルだが、同じ record に同居する `resolved_facts` を converter の write 順が resolver の手前で全量書くため、fact 列が毎 tick 境界を渡っていた（生成 Swift の `FfiConverterTypeTimelineProjection.write`）。中身は元から `timeline.resolver` しか読んでおらず（`match` も未使用）、転送された fact 列は使われずに捨てられていた。
+
+引数を `Arc<SegmentResolver>` 1 本に変えて解消した。コア側は `LiveMatchProjection::build_video_mode_with_resolver` を新設し、オラクル対応の `build_video_mode(&Match, &TimelineProjection, …)`（ADR 0001 関数目録の形）はそれへ委譲する薄いラッパとして残す。2 経路の一致は `live_match_projection_tests::resolver_entry_point_matches_timeline_entry_point` が固定する。
+
+ここから引ける一般則:
+
+- **「object ハンドルだから軽い」は、ハンドルを *単体で* 渡すときにしか成り立たない。** record に同居させた瞬間、同居フィールドの転送費用が付いてくる
+- **tick 経路の関数に record を受けさせない。** fact 列が要る projection は `build_summary_with_timeline` のような非 tick 経路に置く
+- **doc コメントだけの変更でも FFI チェックサムは動く**（uniffi は docstring 込みで計算する。#167 で 56908 → 55076 を実測）。生成バインディングだけを取り込んでバイナリを作り直さないと、起動時に `apiChecksumMismatch` で落ちる
 
 ### 6. ID・時刻・コレクションの写像
 
