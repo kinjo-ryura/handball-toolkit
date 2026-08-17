@@ -19,14 +19,15 @@ use crate::configuration::{MatchConfiguration, PhaseKind, VideoProvider, VideoSo
 use crate::entities::{Match, Player, RosterSelection, Team};
 use crate::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
-    StoppageKind, StoppagePayload,
+    PossessionFact, StoppageKind, StoppagePayload,
 };
 use crate::ids::{FactId, MatchId, PlayerId, TeamId};
 
 use super::sample_match_dtos::{
     SCHEMA_VERSION_CURRENT, SampleControlFactDtoV2, SampleFactAnchorDtoV2, SampleFactDtoV2,
     SampleFactPayloadDtoV2, SampleMatchConfigurationDtoV2, SampleMatchDecodeErrorV2,
-    SampleMatchDtoV2, SamplePlayFactDtoV2, SampleTeamDtoV2, SampleVideoSourceDtoV2,
+    SampleMatchDtoV2, SamplePlayFactDtoV2, SamplePossessionFactDtoV2, SampleTeamDtoV2,
+    SampleVideoSourceDtoV2,
 };
 
 /// 1 試合分の変換結果。
@@ -280,10 +281,35 @@ fn decode_payload(
             };
             Ok(MatchFactPayload::Control(decode_control_fact(control)?))
         }
+        "possession" => {
+            let Some(possession) = &dto.possession else {
+                return Err(SampleMatchDecodeErrorV2::MissingPayloadBody(
+                    "possession".to_owned(),
+                ));
+            };
+            Ok(MatchFactPayload::Possession(decode_possession_fact(
+                possession,
+                teams_by_key,
+            )?))
+        }
         _ => Err(SampleMatchDecodeErrorV2::UnknownPayloadKind(
             dto.kind.clone(),
         )),
     }
+}
+
+/// `team_key` は必須なので `Option` を剥がす手当てが要らない（play とは非対称）。
+/// anchor の end 系は読まない — ポゼッションは点で、区間は次の開始から導出する。
+fn decode_possession_fact(
+    dto: &SamplePossessionFactDtoV2,
+    teams_by_key: &BTreeMap<String, TeamId>,
+) -> Result<PossessionFact, SampleMatchDecodeErrorV2> {
+    let team_id = teams_by_key
+        .get(&dto.team_key)
+        .copied()
+        .ok_or_else(|| SampleMatchDecodeErrorV2::UnknownTeamKey(dto.team_key.clone()))?;
+    let anchor = decode_start_anchor(&dto.anchor)?;
+    Ok(PossessionFact { team_id, anchor })
 }
 
 fn decode_play_fact(

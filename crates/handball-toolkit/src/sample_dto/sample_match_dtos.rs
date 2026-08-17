@@ -203,12 +203,15 @@ pub struct SampleFactDtoV2 {
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct SampleFactPayloadDtoV2 {
-    /// `"play"` | `"control"`
+    /// `"play"` | `"control"` | `"possession"`
     pub kind: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub play: Option<SamplePlayFactDtoV2>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub control: Option<SampleControlFactDtoV2>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub possession: Option<SamplePossessionFactDtoV2>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -241,6 +244,21 @@ pub struct SampleControlFactDtoV2 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stoppage: Option<SampleStoppagePayloadDtoV2>,
     /// 開始 anchor。end 情報は `anchor.end_match_elapsed_seconds` / `anchor.end_video_elapsed_seconds`。
+    pub anchor: SampleFactAnchorDtoV2,
+}
+
+/// ポゼッション開始（handball-project#154）。
+///
+/// 判別子（`kind`）を持たない — ポゼッションの fact は「開始」1 種類だけで、2 つ目が出た時点で
+/// どのみちスキーマ変更になるため、空の判別子を先置きしない（`v2/SCHEMA.md` 参照）。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[serde(rename_all = "camelCase")]
+pub struct SamplePossessionFactDtoV2 {
+    /// `"home"` | `"away"`。**必須**（`SamplePlayFactDtoV2::team_key` と違い `Option` ではない）。
+    pub team_key: String,
+    /// ボールを保持した瞬間。end 系（`end_match_elapsed_seconds` / `end_video_elapsed_seconds`）は
+    /// 両方 None（区間は次のポゼッション開始から導出する）。
     pub anchor: SampleFactAnchorDtoV2,
 }
 

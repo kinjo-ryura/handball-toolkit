@@ -239,6 +239,7 @@ fn play_fact_dto(player_key: Option<&str>) -> SampleFactDtoV2 {
                 note: None,
             }),
             control: None,
+            possession: None,
         },
     }
 }
@@ -258,6 +259,7 @@ fn phase_start_fact_dto() -> SampleFactDtoV2 {
                 stoppage: None,
                 anchor: anchor_dto(Some(0.0), Some(1800.0)),
             }),
+            possession: None,
         },
     }
 }

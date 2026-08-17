@@ -276,29 +276,33 @@ pub fn video_migration_plan(
                 new_fact.payload = MatchFactPayload::Control(ControlFact::Stoppage(new_payload));
                 updated_control.push(new_fact);
             }
-            MatchFactPayload::Play(_) => plays_to_convert.push(fact.clone()),
+            // play / possession はどちらも anchor 1 本の点なので同じ変換に乗せる。
+            MatchFactPayload::Play(_) | MatchFactPayload::Possession(_) => {
+                plays_to_convert.push(fact.clone())
+            }
         }
     }
 
-    // 更新済み control 全部から SegmentResolver を構築し、play fact の anchor を変換。
+    // 更新済み control 全部から SegmentResolver を構築し、単一 anchor fact の anchor を変換。
     let resolver = SegmentResolver::build(&updated_control);
     let mut updated_plays: Vec<MatchFact> = Vec::new();
     for mut fact in plays_to_convert {
-        let MatchFactPayload::Play(play) = &mut fact.payload else {
-            unreachable!("plays_to_convert は Play のみ");
+        let fact_id = fact.id;
+        let Some(anchor) = fact.single_anchor_mut() else {
+            unreachable!("plays_to_convert は Play / Possession のみ");
         };
-        let FactAnchor::MatchClock(match_clock) = play.anchor else {
+        let FactAnchor::MatchClock(match_clock) = *anchor else {
             // 既に videoClock / both なら触らない（安全側）。
             updated_plays.push(fact);
             continue;
         };
         let video = resolver.resolve_video_clock(match_clock).ok_or(
             VideoMigrationPlanError::CannotResolveVideoClock {
-                fact_id: fact.id,
+                fact_id,
                 match_clock_seconds: match_clock.elapsed_seconds,
             },
         )?;
-        play.anchor = FactAnchor::VideoClock(video);
+        *anchor = FactAnchor::VideoClock(video);
         updated_plays.push(fact);
     }
 
@@ -599,7 +603,9 @@ pub fn initial_timer_seconds(facts: &[MatchFact]) -> f64 {
         .rev()
         .find_map(|fact| match &fact.payload {
             MatchFactPayload::Play(play) => Some(play.anchor.match_clock()),
-            MatchFactPayload::Control(_) => None,
+            // possession はタイマーの頭出し基準にしない（動画解析由来の読み取り専用 fact で、
+            // 記録者がタイマーモードで積むものではない — handball-project#154）。
+            MatchFactPayload::Control(_) | MatchFactPayload::Possession(_) => None,
         })
         .flatten()
         .map(|clock| clock.elapsed_seconds)
