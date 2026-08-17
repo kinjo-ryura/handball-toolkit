@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 
 use uuid::Uuid;
 
-use crate::clock::{FactAnchor, MatchClock, VideoClock};
+use crate::clock::{FactAnchor, FactAnchorKind, MatchClock, VideoClock};
 use crate::configuration::{MatchConfiguration, PhaseKind, VideoSource};
 use crate::entities::{Match, Player, Team};
 use crate::facts::{ControlFact, MatchFact, PlayEventKind, PlayFact, StoppageKind};
@@ -251,6 +251,16 @@ pub fn build_stoppage_fact(
 #[uniffi::export]
 pub fn apply_play_fact_edit(play: PlayFact, edit: PlayFactEdit) -> PlayFact {
     write::apply_play_fact_edit(play, edit)
+}
+
+/// `FactAnchor::with_elapsed_seconds`（時刻編集で入力された累積秒の書き戻し）。
+///
+/// 自明なアクセサではなく**遷移規則**（`Both` の片側保持 = 強制同期点の意味そのもの）なので、
+/// シム再実装の許可基準（ADR 0004 決定 4）に当てはまらず境界へ出す。iOS / Mac の時刻編集 UI が
+/// 同じ 9 分岐を各自持っていた状態の解消（handball-project#168）。
+#[uniffi::export]
+pub fn anchor_with_elapsed(anchor: FactAnchor, kind: FactAnchorKind, seconds: f64) -> FactAnchor {
+    anchor.with_elapsed_seconds(kind, seconds)
 }
 
 // ── sample_dto（SAMPLE_DTO_V2 の parse / 変換 / export — ADR 0004 決定 2）──
