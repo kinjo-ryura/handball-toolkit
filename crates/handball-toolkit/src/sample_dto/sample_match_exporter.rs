@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use crate::clock::FactAnchor;
 use crate::configuration::{MatchConfiguration, VideoProvider, VideoSource};
 use crate::entities::{Match, Player, Team};
-use crate::facts::{ControlFact, MatchFact, MatchFactPayload, PlayFact};
+use crate::facts::{ControlFact, MatchFact, MatchFactPayload, PlayFact, PossessionFact};
 use crate::ids::{PlayerId, TeamId};
 
 use super::sample_match_converter::{phase_kind_raw, play_event_kind_raw, stoppage_kind_raw};
@@ -19,8 +19,9 @@ use super::sample_match_dtos::{
     SCHEMA_VERSION_CURRENT, SampleControlFactDtoV2, SampleFactAnchorDtoV2, SampleFactDtoV2,
     SampleFactPayloadDtoV2, SampleMatchClockDtoV2, SampleMatchConfigurationDtoV2, SampleMatchDtoV2,
     SampleMatchHeaderV2, SamplePhaseStartPayloadDtoV2, SamplePlayFactDtoV2, SamplePlayerDtoV2,
-    SampleStoppagePayloadDtoV2, SampleTeamDtoV2, SampleTeamsDtoV2, SampleTimerConfigurationDtoV2,
-    SampleVideoClockDtoV2, SampleVideoConfigurationDtoV2, SampleVideoSourceDtoV2,
+    SamplePossessionFactDtoV2, SampleStoppagePayloadDtoV2, SampleTeamDtoV2, SampleTeamsDtoV2,
+    SampleTimerConfigurationDtoV2, SampleVideoClockDtoV2, SampleVideoConfigurationDtoV2,
+    SampleVideoSourceDtoV2,
 };
 
 /// domain → DTO。Swift `MatchExporterV2.makeDTO` 相当の純粋関数。
@@ -170,12 +171,36 @@ fn encode_payload(
             kind: "play".to_owned(),
             play: Some(encode_play(play, team_key_by_id, player_key_by_id)),
             control: None,
+            possession: None,
         },
         MatchFactPayload::Control(control) => SampleFactPayloadDtoV2 {
             kind: "control".to_owned(),
             play: None,
             control: Some(encode_control(control)),
+            possession: None,
         },
+        MatchFactPayload::Possession(possession) => SampleFactPayloadDtoV2 {
+            kind: "possession".to_owned(),
+            play: None,
+            control: None,
+            possession: Some(encode_possession(possession, team_key_by_id)),
+        },
+    }
+}
+
+/// team_key は必須だが、team_id が home/away のどちらでもない壊れたデータでは解決できない。
+/// export は validation 済みの fact log を前提とする（`UnknownTeamReference` が先に弾く）ので、
+/// ここでは空文字に落として round-trip 時の decode で `UnknownTeamKey` として顕在化させる。
+fn encode_possession(
+    possession: &PossessionFact,
+    team_key_by_id: &BTreeMap<TeamId, &str>,
+) -> SamplePossessionFactDtoV2 {
+    SamplePossessionFactDtoV2 {
+        team_key: team_key_by_id
+            .get(&possession.team_id)
+            .map(|key| (*key).to_owned())
+            .unwrap_or_default(),
+        anchor: encode_anchor(possession.anchor, None),
     }
 }
 

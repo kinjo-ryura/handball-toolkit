@@ -829,6 +829,7 @@ fn import_dto(player_key: Option<&str>) -> SampleMatchDtoV2 {
                         stoppage: None,
                         anchor: import_anchor(0.0, Some(1800.0)),
                     }),
+                    possession: None,
                 },
             },
             SampleFactDtoV2 {
@@ -846,6 +847,7 @@ fn import_dto(player_key: Option<&str>) -> SampleMatchDtoV2 {
                         note: None,
                     }),
                     control: None,
+                    possession: None,
                 },
             },
         ],

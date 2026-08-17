@@ -3,7 +3,9 @@
 mod control_fact;
 mod match_fact;
 mod play_fact;
+mod possession_fact;
 
 pub use control_fact::{ControlFact, PhaseStartPayload, StoppageKind, StoppagePayload};
 pub use match_fact::{MatchFact, MatchFactPayload};
 pub use play_fact::{PlayEventKind, PlayFact};
+pub use possession_fact::PossessionFact;

@@ -96,6 +96,7 @@ fn play_fact_dto(
                 note: None,
             }),
             control: None,
+            possession: None,
         },
     }
 }
@@ -125,6 +126,7 @@ fn control_fact_dto(
                 }),
                 anchor,
             }),
+            possession: None,
         },
     }
 }

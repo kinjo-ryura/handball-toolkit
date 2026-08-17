@@ -4,7 +4,7 @@
 //!
 //! 役割:
 //! - R3 / R5 / R6: configuration × PhaseStart 整合
-//! - R7 / R8: play fact anchor の範囲（PhaseStart range の内 / Stoppage range の外）
+//! - R7 / R8: 単一 anchor fact（play / possession）の anchor の範囲（PhaseStart range の内 / Stoppage range の外）
 //! - R9: configuration × Stoppage 整合
 //! - R11: configuration × title 整合
 //! - phase 順序 / 連続性（shootout 重複 / shootout 最後 / `Timer` regular 連続性）
@@ -14,11 +14,10 @@
 
 use chrono::{DateTime, Utc};
 
+use crate::clock::FactAnchor;
 use crate::configuration::{MatchConfiguration, PhaseKind};
 use crate::entities::Match;
-use crate::facts::{
-    ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayFact, StoppagePayload,
-};
+use crate::facts::{ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, StoppagePayload};
 use crate::ids::FactId;
 use crate::validation::{DomainValidationIssue, TimelineValidationError};
 
@@ -30,7 +29,7 @@ pub fn validate_fact_log(facts: &[MatchFact], match_: &Match) -> Vec<DomainValid
 
     let phase_start_facts = extract_phase_start_facts(facts);
     let stoppage_facts = extract_stoppage_facts(facts);
-    let play_facts = extract_play_facts(facts);
+    let single_anchor_facts = extract_single_anchor_facts(facts);
 
     // R3 / R5: timer/video + fact 1 件以上 + PhaseStart fact なし
     if phase_start_facts.is_empty() && !facts.is_empty() {
@@ -94,17 +93,20 @@ pub fn validate_fact_log(facts: &[MatchFact], match_: &Match) -> Vec<DomainValid
         configuration,
     ));
 
-    // R7: play fact が PhaseStart range の外（Video のみ）
+    // R7: 単一 anchor fact（play / possession）が PhaseStart range の外（Video のみ）
     if matches!(configuration, MatchConfiguration::Video(_)) {
         issues.extend(validate_play_inside_phase_range(
-            &play_facts,
+            &single_anchor_facts,
             &phase_start_facts,
         ));
     }
 
-    // R8: play fact が Stoppage range の中（Video のみ、Timer は edge-case で未実装 — Swift 準拠）
+    // R8: 単一 anchor fact が Stoppage range の中（Video のみ、Timer は edge-case で未実装 — Swift 準拠）
     if matches!(configuration, MatchConfiguration::Video(_)) {
-        issues.extend(validate_play_outside_stoppage(&play_facts, &stoppage_facts));
+        issues.extend(validate_play_outside_stoppage(
+            &single_anchor_facts,
+            &stoppage_facts,
+        ));
     }
 
     issues
@@ -126,12 +128,17 @@ struct StoppageFact {
     payload: StoppagePayload,
 }
 
-struct PlayMatchFact {
+/// R7 / R8 の対象となる「anchor を 1 本だけ持つ fact」= PlayFact と PossessionFact。
+///
+/// 両ルールは payload から `anchor` しか読まないので、kind / teamID / playerID を落として
+/// この形に潰している（handball-project#154 で PossessionFact を足したときに一般化した）。
+/// range を持つ ControlFact は対象外で、`MatchFact::single_anchor` が `None` を返す。
+struct SingleAnchorFact {
     #[allow(dead_code)]
     id: FactId,
     #[allow(dead_code)]
     recorded_at: DateTime<Utc>,
-    payload: PlayFact,
+    anchor: FactAnchor,
 }
 
 // ── Fact 抽出 ──
@@ -164,16 +171,15 @@ fn extract_stoppage_facts(facts: &[MatchFact]) -> Vec<StoppageFact> {
         .collect()
 }
 
-fn extract_play_facts(facts: &[MatchFact]) -> Vec<PlayMatchFact> {
+fn extract_single_anchor_facts(facts: &[MatchFact]) -> Vec<SingleAnchorFact> {
     facts
         .iter()
-        .filter_map(|fact| match &fact.payload {
-            MatchFactPayload::Play(play) => Some(PlayMatchFact {
+        .filter_map(|fact| {
+            fact.single_anchor().map(|anchor| SingleAnchorFact {
                 id: fact.id,
                 recorded_at: fact.recorded_at,
-                payload: play.clone(),
-            }),
-            _ => None,
+                anchor,
+            })
         })
         .collect()
 }
@@ -337,10 +343,10 @@ fn validate_stoppage_inside_phase(
     issues
 }
 
-// ── R7: play fact が PhaseStart range の内 ──
+// ── R7: 単一 anchor fact が PhaseStart range の内 ──
 
 fn validate_play_inside_phase_range(
-    play_facts: &[PlayMatchFact],
+    single_anchor_facts: &[SingleAnchorFact],
     phase_start_facts: &[PhaseStartFact],
 ) -> Vec<DomainValidationIssue> {
     if phase_start_facts.is_empty() {
@@ -349,8 +355,8 @@ fn validate_play_inside_phase_range(
 
     let mut issues: Vec<DomainValidationIssue> = Vec::new();
     let mut reported = false;
-    for play in play_facts {
-        let Some(play_seconds) = play.payload.anchor.video_elapsed_seconds() else {
+    for play in single_anchor_facts {
+        let Some(play_seconds) = play.anchor.video_elapsed_seconds() else {
             continue;
         };
         let inside_some = phase_start_facts.iter().any(|phase| {
@@ -372,10 +378,10 @@ fn validate_play_inside_phase_range(
     issues
 }
 
-// ── R8: play fact が Stoppage range の外 ──
+// ── R8: 単一 anchor fact が Stoppage range の外 ──
 
 fn validate_play_outside_stoppage(
-    play_facts: &[PlayMatchFact],
+    single_anchor_facts: &[SingleAnchorFact],
     stoppage_facts: &[StoppageFact],
 ) -> Vec<DomainValidationIssue> {
     if stoppage_facts.is_empty() {
@@ -384,8 +390,8 @@ fn validate_play_outside_stoppage(
 
     let mut issues: Vec<DomainValidationIssue> = Vec::new();
     let mut reported = false;
-    for play in play_facts {
-        let Some(play_seconds) = play.payload.anchor.video_elapsed_seconds() else {
+    for play in single_anchor_facts {
+        let Some(play_seconds) = play.anchor.video_elapsed_seconds() else {
             continue;
         };
         let in_some = stoppage_facts.iter().any(|stoppage| {

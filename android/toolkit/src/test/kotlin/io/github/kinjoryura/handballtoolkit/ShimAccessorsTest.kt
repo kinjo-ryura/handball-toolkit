@@ -73,6 +73,37 @@ class ShimAccessorsTest {
     }
 
     @Test
+    fun `possession fact の代表 anchor は possession の anchor`() {
+        val anchor: FactAnchor = FactAnchor.VideoClock(videoClock)
+        val fact = matchFact(MatchFactPayload.Possession(PossessionFact(UUID.randomUUID(), anchor)))
+        assertEquals(anchor, fact.anchor)
+    }
+
+    // ── 単一 anchor fact（R7 / R8 の対象。コアの MatchFact::single_anchor と同一挙動） ──
+
+    @Test
+    fun `play と possession は singleAnchor を持ち control は持たない`() {
+        val point: FactAnchor = FactAnchor.MatchClock(matchClock)
+        val play = matchFact(MatchFactPayload.Play(PlayFact(kind = PlayEventKind.GOAL, anchor = point)))
+        val possession = matchFact(MatchFactPayload.Possession(PossessionFact(UUID.randomUUID(), point)))
+        val control = matchFact(
+            MatchFactPayload.Control(
+                ControlFact.PhaseStart(
+                    PhaseStartPayload(
+                        PhaseKind.REGULAR,
+                        FactAnchor.MatchClock(MatchClock(0.0)),
+                        FactAnchor.MatchClock(MatchClock(1800.0)),
+                    ),
+                ),
+            ),
+        )
+        assertEquals(point, play.singleAnchor)
+        assertEquals(point, possession.singleAnchor)
+        // range を持つ control は対象外。
+        assertNull(control.singleAnchor)
+    }
+
+    @Test
     fun `stoppage の endAnchor は任意`() {
         val start: FactAnchor = FactAnchor.MatchClock(MatchClock(300.0))
         val open = ControlFact.Stoppage(StoppagePayload(StoppageKind.TIMEOUT, start))

@@ -156,8 +156,10 @@ historical gaps).
 
 | code | rule | params | meaning |
 |---|---|---|---|
-| `playRecordedOutsidePhaseRange` | R7 | `kind: string \| null` | A play is anchored outside every phase (e.g. during half time). `kind` hints at the adjacent phase, and is null when it cannot be determined. |
-| `playRecordedInsideStoppage` | R8 | — | A play is anchored inside a stoppage, i.e. while the match was stopped. |
+| `playRecordedOutsidePhaseRange` | R7 | `kind: string \| null` | A single-anchor fact is anchored outside every phase (e.g. during half time). `kind` hints at the adjacent phase, and is null when it cannot be determined. |
+| `playRecordedInsideStoppage` | R8 | — | A single-anchor fact is anchored inside a stoppage, i.e. while the match was stopped. |
+
+> **Both codes cover play *and* possession facts** — every fact that carries exactly one anchor. The `play` prefix is historical: the codes are a stable contract (ADR 0002, decision 2) and were kept when R7 / R8 were widened to possession facts (handball-project#154). Word the user-facing message for "a record", not "a play".
 
 **Ordering and overlap**
 

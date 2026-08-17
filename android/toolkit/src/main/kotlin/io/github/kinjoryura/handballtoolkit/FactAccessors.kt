@@ -5,12 +5,25 @@ package io.github.kinjoryura.handballtoolkit
 
 /**
  * payload を問わず代表 anchor を返す。
- * PlayFact は唯一の anchor、ControlFact は startAnchor を返す。
+ * PlayFact / PossessionFact は唯一の anchor、ControlFact は startAnchor を返す。
  */
 val MatchFact.anchor: FactAnchor
     get() = when (val payload = payload) {
         is MatchFactPayload.Play -> payload.v1.anchor
         is MatchFactPayload.Control -> payload.v1.startAnchor
+        is MatchFactPayload.Possession -> payload.v1.anchor
+    }
+
+/**
+ * anchor を 1 本だけ持つ fact（= range を持たない fact）の anchor。
+ * ControlFact は start / end の range を持つので null。コアの
+ * `MatchFact::single_anchor` と同一挙動（handball-project#154）。
+ */
+val MatchFact.singleAnchor: FactAnchor?
+    get() = when (val payload = payload) {
+        is MatchFactPayload.Play -> payload.v1.anchor
+        is MatchFactPayload.Possession -> payload.v1.anchor
+        is MatchFactPayload.Control -> null
     }
 
 /** payload を問わず開始 anchor を返す。 */

@@ -1,6 +1,6 @@
 //! 移植元: `Validators/FactValidator.swift`。
 //!
-//! 1 件の MatchFact（PlayFact / ControlFact）の value + context validation。
+//! 1 件の MatchFact（PlayFact / ControlFact / PossessionFact）の value + context validation。
 //!
 //! 役割:
 //! - anchor 値の範囲（>= 0）チェック
@@ -17,7 +17,7 @@ use crate::clock::{FactAnchor, FactAnchorKind};
 use crate::configuration::MatchConfiguration;
 use crate::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
-    StoppageKind, StoppagePayload,
+    PossessionFact, StoppageKind, StoppagePayload,
 };
 use crate::ids::{PlayerId, TeamId};
 use crate::validation::{DomainValidationIssue, FactValidationError};
@@ -63,7 +63,41 @@ pub fn validate_match_fact(
     match &fact.payload {
         MatchFactPayload::Play(play) => validate_play_fact(play, configuration, roster),
         MatchFactPayload::Control(control) => validate_control_fact(control, configuration),
+        MatchFactPayload::Possession(possession) => {
+            validate_possession_fact(possession, configuration, roster)
+        }
     }
+}
+
+// ── PossessionFact ──
+
+/// ポゼッション開始の value + context validation（handball-project#154）。
+///
+/// 見るのは anchor の値域 / configuration 整合 / team 参照の 3 つだけ。`team_id` は型で必須なので
+/// 「欠けている」ケースは validation に来ない。end は型に無いので「end があってはならない」も不要。
+///
+/// **意図的に置いていないルール**（`DOMAIN_VALIDATION_RULES.md`「持たないルール」）:
+/// 同一チームの連続禁止 / phase を隙間なく覆う要求 / `.videoHighlight` での禁止。severity は一律
+/// blocking なので、これらを足すと供給源の欠測 1 件で試合まるごと import 拒否になる。
+pub fn validate_possession_fact(
+    fact: &PossessionFact,
+    configuration: &MatchConfiguration,
+    roster: &RosterContext,
+) -> Vec<DomainValidationIssue> {
+    let mut issues: Vec<DomainValidationIssue> = Vec::new();
+
+    issues.extend(validate_anchor_value(fact.anchor));
+    issues.extend(validate_anchor_kind(fact.anchor.kind(), configuration));
+
+    if fact.team_id != roster.home_team_id && fact.team_id != roster.away_team_id {
+        issues.push(DomainValidationIssue::Fact(
+            FactValidationError::UnknownTeamReference {
+                team_id: fact.team_id,
+            },
+        ));
+    }
+
+    issues
 }
 
 // ── PlayFact ──
