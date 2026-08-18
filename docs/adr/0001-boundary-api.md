@@ -207,6 +207,7 @@ pub fn validate_delete(removed_fact_id: FactId, existing_facts: &[MatchFact], ma
 上のリストは移植期間中の凍結対象。移植完走後に**意図して**変えたものはここに積む（パリティ検証で「移植バグ」と誤認しないため）。
 
 - **記録オフセットの境界クランプ（2026-07-20、handball-project#101）** — 移植元 Swift は `max(0, base - offset)` だけで、phase / stoppage の文脈を見ていなかった。現在は `capture_play_anchor(base, offset, clock_kind, facts)` が「押した位置が属する phase の開始」「押した位置より手前で閉じた stoppage の終了」でも下限クランプする。理由は、越えさせると動画モードで R7 / R8 により保存が拒否されて記録そのものが失われ、タイマーモードでは前 phase の得点として静かに集計されるため。**影響は capture 時の anchor 生成のみ**で、既存 fact の projection は不変 → ADR 0003 のゴールデンコーパス（保存済み fact 列 → projection）には影響しない。
+- **`AvailableActions.can_record_free_note` を validation に合わせた（2026-08-18、handball-project#177）** — 移植元 Swift は `Timeout` / `Paused` / `BetweenPhases` / `Ended` でも freeNote だけ true を返していた（R7 / R8 導入前の設計の取り残し）。しかし R7（phase range 外）/ R8（Stoppage 区間内）は kind を問わず全単一 anchor fact に掛かるため、コアが「記録できる」と返した操作をコア自身の validation が blocking で拒否する自己矛盾だった。現在は goal / shotMissed / freeNote の 3 フラグが**全状態で同値（`Playing` でのみ true）**。「フラグを UI ヒントと再定義して可否には使わない」案は採らなかった — 間違った値を残して読むなと言う規約より、値を直す方が消費者（Android / 別シェル）に安全なため。**ゴールデンコーパスの期待値（`liveSamples[].availableActions.canRecordFreeNote`）は手で追随させた**（凍結オラクルは旧値を返すので再 dump では作れない。`tests/golden/README.md`「出所」）
 
 ## 将来の境界拡張候補（移植完了後）
 

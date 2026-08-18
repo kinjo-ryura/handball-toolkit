@@ -22,6 +22,14 @@ Rust 実装の出力が `expected/` と一致することをパリティテス�
 取り込んでいる。`match.date` も projection に現れず期待値に含まれないため、同様に再 dump は
 していない。
 
+**期待値を意図的にオラクルから逸らした箇所が 1 つある**（handball-project#177、2026-08-18）:
+`liveSamples[].availableActions.canRecordFreeNote` は、凍結オラクルが `timeout` / `paused` /
+`betweenPhases` / `ended` で true を返すのに対し、現在の Rust コアは `playing` でのみ true
+（`canRecordGoal` と常に同値）。R7 / R8 と矛盾していたオラクル側の取り残しを直したもので、
+`.video` matches 2 件の該当値を **手で `canRecordGoal` と同値に書き換えた**（他の値は不変）。
+再 dump しても旧値が出るので、期待値を作り直す際はこの箇所だけ同じ置換を再適用すること。
+根拠は ADR 0001「移植完了後に意図的に変えた挙動」。
+
 - 出所ハッシュは **当時の main のコミット**を記録している（`parity/oracle-dump` はパリティ完走後に削除されるため。
   ブランチの不変条件「RecorderDomain ソース不変」により、オラクルの中身 = 当時の main の RecorderDomain）
 - **オラクルは凍結済み**: RecorderDomain は HandballRecorder main から削除された（`8aeffb8`、2026-07-18）。

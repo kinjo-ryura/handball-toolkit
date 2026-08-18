@@ -82,7 +82,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -97,7 +97,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -112,7 +112,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -172,7 +172,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -187,7 +187,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -202,7 +202,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -262,7 +262,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -277,7 +277,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -292,7 +292,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -352,7 +352,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -367,7 +367,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -382,7 +382,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -442,7 +442,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -457,7 +457,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -472,7 +472,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -532,7 +532,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -547,7 +547,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -562,7 +562,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -622,7 +622,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -637,7 +637,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -652,7 +652,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -712,7 +712,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -727,7 +727,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -742,7 +742,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -802,7 +802,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -817,7 +817,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -832,7 +832,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -892,7 +892,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -907,7 +907,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -922,7 +922,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -982,7 +982,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -997,7 +997,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1012,7 +1012,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1072,7 +1072,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1087,7 +1087,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1102,7 +1102,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1162,7 +1162,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1177,7 +1177,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1192,7 +1192,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1252,7 +1252,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1267,7 +1267,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1282,7 +1282,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1342,7 +1342,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1357,7 +1357,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1372,7 +1372,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1432,7 +1432,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1447,7 +1447,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1462,7 +1462,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1522,7 +1522,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1537,7 +1537,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1552,7 +1552,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1612,7 +1612,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1627,7 +1627,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1642,7 +1642,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : true,
@@ -1702,7 +1702,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : false,
@@ -1714,7 +1714,7 @@
     },
     {
       "availableActions" : {
-        "canRecordFreeNote" : true,
+        "canRecordFreeNote" : false,
         "canRecordGoal" : false,
         "canRecordShotMissed" : false,
         "canResume" : false,
