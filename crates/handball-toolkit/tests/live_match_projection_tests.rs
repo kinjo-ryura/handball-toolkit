@@ -118,6 +118,7 @@ fn video_inside_timeout_segment_returns_timeout_state() {
     assert_eq!(live.timer_state, MatchTimerState::Timeout);
     assert!(live.available_actions.can_resume);
     assert!(!live.available_actions.can_record_goal);
+    assert!(!live.available_actions.can_record_free_note);
     assert_eq!(
         live.current_match_clock.map(|c| c.elapsed_seconds),
         Some(600.0)
@@ -154,6 +155,7 @@ fn video_inside_pause_segment_returns_paused_state() {
     );
     assert_eq!(live.timer_state, MatchTimerState::Paused);
     assert!(live.available_actions.can_resume);
+    assert!(!live.available_actions.can_record_free_note);
 }
 
 // ── phase 間 / 試合終了 ──
@@ -177,6 +179,7 @@ fn video_between_phases_returns_between_phases() {
     );
     assert_eq!(live.timer_state, MatchTimerState::BetweenPhases);
     assert!(live.available_actions.can_start_next_phase);
+    assert!(!live.available_actions.can_record_free_note);
 }
 
 #[test]
@@ -194,6 +197,53 @@ fn video_after_last_phase_returns_ended() {
         }),
     );
     assert_eq!(live.timer_state, MatchTimerState::Ended);
+    assert!(!live.available_actions.can_record_free_note);
+}
+
+// ── play fact 3 種の可否は常に同値 ──
+
+/// goal / shotMissed / freeNote の可否は全状態で同値で、`Playing` でのみ true。
+///
+/// 移植元 Swift は freeNote だけ停止区間 / phase 間 / 試合終了後でも true にしていたが、
+/// R7 / R8 は kind を問わず掛かるためコアの validation と矛盾していた（handball-project#177）。
+/// フラグを素直に読む消費者（Android シェル等）が「記録できる」と案内して保存で落ちる経路を、
+/// ここで再発しないよう固定する。
+#[test]
+fn play_fact_flags_agree_and_are_true_only_while_playing() {
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
+    let stoppage_id = FactId(Uuid::new_v4());
+    // 前半 video 0-1800（timeout 600-660）、後半 2700-4500
+    let timeline = TimelineProjection::build(
+        &make_video_match(home, away),
+        &[
+            video_only_phase(0.0, 1800.0),
+            video_stoppage(stoppage_id, StoppageKind::Timeout, 600.0, 660.0),
+            video_only_phase(2700.0, 4500.0),
+        ],
+    );
+    let cases = [
+        (None, MatchTimerState::BeforeMatch),
+        (Some(30.0), MatchTimerState::Playing),
+        (Some(630.0), MatchTimerState::Timeout),
+        (Some(2000.0), MatchTimerState::BetweenPhases),
+        (Some(5000.0), MatchTimerState::Ended),
+    ];
+    for (video_seconds, expected_state) in cases {
+        let live = LiveMatchProjection::build_video_mode(
+            &make_video_match(home, away),
+            &timeline,
+            video_seconds.map(|elapsed_seconds| VideoClock { elapsed_seconds }),
+        );
+        assert_eq!(live.timer_state, expected_state);
+        let actions = live.available_actions;
+        let expected = expected_state == MatchTimerState::Playing;
+        assert_eq!(actions.can_record_goal, expected, "{expected_state:?}");
+        assert_eq!(
+            actions.can_record_shot_missed, expected,
+            "{expected_state:?}"
+        );
+        assert_eq!(actions.can_record_free_note, expected, "{expected_state:?}");
+    }
 }
 
 // ── shootout ──

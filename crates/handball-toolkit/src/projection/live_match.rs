@@ -182,6 +182,17 @@ fn position_outside_phases(
 
 // ── actions ──
 
+/// 状態ごとに「今どの操作ができるか」を返す。
+///
+/// play fact 3 種（goal / shotMissed / freeNote）は **`Playing` でのみ true** で、常に同値。
+/// R7（phase range 外の単一 anchor fact 禁止）/ R8（Stoppage 区間内の単一 anchor fact 禁止）は
+/// kind を問わず掛かる（`validators/fact_log_validator.rs`）ので、停止区間 / phase 間 /
+/// 試合終了後に「記録できる」と返す play kind は存在しない。
+///
+/// 移植元 Swift は `can_record_free_note` を `Timeout` / `Paused` / `BetweenPhases` / `Ended` でも
+/// true にしていた（R7 / R8 導入前の設計の取り残し）。コアが「できる」と言った操作をコア自身の
+/// validation が拒否する自己矛盾だったため、完走後に validation 側へ寄せた
+/// （handball-project#177。ADR 0001「移植完了後に意図的に変えた挙動」）。
 fn available_actions_for(state: MatchTimerState) -> AvailableActions {
     match state {
         MatchTimerState::BeforeMatch => AvailableActions {
@@ -197,20 +208,10 @@ fn available_actions_for(state: MatchTimerState) -> AvailableActions {
             can_start_next_phase: false,
         },
         MatchTimerState::Timeout | MatchTimerState::Paused => AvailableActions {
-            can_record_goal: false,
-            can_record_shot_missed: false,
-            can_record_free_note: true,
-            can_start_timeout: false,
             can_resume: true,
-            can_start_next_phase: false,
-        },
-        MatchTimerState::BetweenPhases => AvailableActions {
-            can_record_free_note: true,
-            can_start_next_phase: true,
             ..AvailableActions::default()
         },
-        MatchTimerState::Ended => AvailableActions {
-            can_record_free_note: true,
+        MatchTimerState::BetweenPhases | MatchTimerState::Ended => AvailableActions {
             can_start_next_phase: true,
             ..AvailableActions::default()
         },
