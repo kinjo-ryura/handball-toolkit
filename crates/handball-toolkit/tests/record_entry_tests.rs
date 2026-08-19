@@ -17,7 +17,7 @@ use handball_toolkit::facts::{
 use handball_toolkit::ids::{FactId, PlayerId, TeamId};
 use handball_toolkit::write::{
     CaptureClockKind, NewFactStamp, PlayFactEdit, apply_play_fact_edit, build_play_fact,
-    build_stoppage_fact, capture_play_anchor, initial_timer_seconds,
+    build_possession_fact, build_stoppage_fact, capture_play_anchor, initial_timer_seconds,
 };
 use uuid::Uuid;
 
@@ -390,6 +390,26 @@ fn 動画モードの_stoppage_は_end_anchor_付きで組む() {
         }))
     );
     assert_eq!(payload.note.as_deref(), Some("負傷"));
+}
+
+// ── build_possession_fact（handball-project#184）──
+
+/// ポゼッション開始は stamp の id / recorded_at を載せ、`team_id` と anchor をそのまま持つ
+/// （正規化するテキストも end も無い）。
+#[test]
+fn ポゼッション開始_fact_は_team_id_と_anchor_をそのまま載せる() {
+    let anchor = FactAnchor::VideoClock(VideoClock {
+        elapsed_seconds: 1234.5,
+    });
+    let fact = build_possession_fact(stamp(7), TeamId(Uuid::from_u128(2)), anchor);
+
+    assert_eq!(fact.id, FactId(Uuid::from_u128(7)));
+    assert_eq!(fact.recorded_at, epoch());
+    let MatchFactPayload::Possession(possession) = fact.payload else {
+        panic!("possession fact のはず");
+    };
+    assert_eq!(possession.team_id, TeamId(Uuid::from_u128(2)));
+    assert_eq!(possession.anchor, anchor);
 }
 
 /// stoppage の note も play fact と同じ規則で正規化する（移植元は

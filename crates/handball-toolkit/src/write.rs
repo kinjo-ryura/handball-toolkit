@@ -13,7 +13,7 @@ use crate::configuration::{MatchConfiguration, PhaseKind, VideoSource};
 use crate::entities::Match;
 use crate::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
-    StoppageKind, StoppagePayload,
+    PossessionFact, StoppageKind, StoppagePayload,
 };
 use crate::ids::{FactId, PlayerId, TeamId};
 use crate::projection::SegmentResolver;
@@ -663,6 +663,28 @@ pub fn build_stoppage_fact(
             end_anchor,
             note: normalize_optional_text(note),
         })),
+    }
+}
+
+/// 新規ポゼッション開始 fact を組む（handball-project#184。移植元なし — #154 で足した第 3 の
+/// fact 種別に、Mac の記録経路が初めて書き込む）。
+///
+/// `team_id` は `PossessionFact` の型で必須なので `Option` を受けない（`build_play_fact` と
+/// 意図的に非対称 — 交互性からの導出も禁じている。`facts/possession_fact.rs`）。anchor は
+/// 呼び出し側が `capture_play_anchor` で組む（記録オフセット + phase / stoppage 境界クランプは
+/// play fact と同じ規則。「ボールを保持した瞬間」を押し遅れ補正込みで取る）。
+///
+/// 正規化対象のテキストは持たない。`start_phase` のように shell が `MatchFact` を直接組む手も
+/// あるが、新規 fact の組立はコアに寄せる（`build_play_fact` / `build_stoppage_fact` と同じ列）。
+pub fn build_possession_fact(
+    stamp: NewFactStamp,
+    team_id: TeamId,
+    anchor: FactAnchor,
+) -> MatchFact {
+    MatchFact {
+        id: stamp.id,
+        recorded_at: stamp.recorded_at,
+        payload: MatchFactPayload::Possession(PossessionFact { team_id, anchor }),
     }
 }
 

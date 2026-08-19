@@ -48,6 +48,11 @@ pub struct AvailableActions {
     pub can_record_shot_missed: bool,
     #[cfg_attr(feature = "uniffi", uniffi(default = false))]
     pub can_record_free_note: bool,
+    /// ポゼッション開始を記録できるか（handball-project#184）。R7 / R8 は「anchor を 1 本持つ fact」
+    /// 全部に掛かるので play 3 種と常に同値（`Playing` でのみ true）。別フラグに分けてあるのは
+    /// 消費側が `can_record_goal` を代表として読む暗黙の約束を増やさないため。
+    #[cfg_attr(feature = "uniffi", uniffi(default = false))]
+    pub can_record_possession: bool,
     #[cfg_attr(feature = "uniffi", uniffi(default = false))]
     pub can_start_timeout: bool,
     #[cfg_attr(feature = "uniffi", uniffi(default = false))]
@@ -184,10 +189,10 @@ fn position_outside_phases(
 
 /// 状態ごとに「今どの操作ができるか」を返す。
 ///
-/// play fact 3 種（goal / shotMissed / freeNote）は **`Playing` でのみ true** で、常に同値。
-/// R7（phase range 外の単一 anchor fact 禁止）/ R8（Stoppage 区間内の単一 anchor fact 禁止）は
-/// kind を問わず掛かる（`validators/fact_log_validator.rs`）ので、停止区間 / phase 間 /
-/// 試合終了後に「記録できる」と返す play kind は存在しない。
+/// play fact 3 種（goal / shotMissed / freeNote）とポゼッション開始は **`Playing` でのみ true** で、
+/// 常に同値。R7（phase range 外の単一 anchor fact 禁止）/ R8（Stoppage 区間内の単一 anchor fact
+/// 禁止）は kind を問わず「anchor を 1 本持つ fact」全部に掛かる（`validators/fact_log_validator.rs`）
+/// ので、停止区間 / phase 間 / 試合終了後に「記録できる」と返す単一 anchor fact は存在しない。
 ///
 /// 移植元 Swift は `can_record_free_note` を `Timeout` / `Paused` / `BetweenPhases` / `Ended` でも
 /// true にしていた（R7 / R8 導入前の設計の取り残し）。コアが「できる」と言った操作をコア自身の
@@ -203,6 +208,7 @@ fn available_actions_for(state: MatchTimerState) -> AvailableActions {
             can_record_goal: true,
             can_record_shot_missed: true,
             can_record_free_note: true,
+            can_record_possession: true,
             can_start_timeout: true,
             can_resume: false,
             can_start_next_phase: false,
