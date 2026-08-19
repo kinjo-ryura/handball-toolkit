@@ -243,6 +243,11 @@ fn play_fact_flags_agree_and_are_true_only_while_playing() {
             "{expected_state:?}"
         );
         assert_eq!(actions.can_record_free_note, expected, "{expected_state:?}");
+        // ポゼッション開始も単一 anchor fact なので R7 / R8 が同じく掛かる（handball-project#184）。
+        assert_eq!(
+            actions.can_record_possession, expected,
+            "{expected_state:?}"
+        );
     }
 }
 
