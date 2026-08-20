@@ -88,6 +88,8 @@ XCFramework は ios / ios-sim / macos の 3 スライス構成（HandballRecorde
 
 **Maven Central は採らなかった** — namespace 所有確認と GPG 署名（鍵の失効管理・パスフレーズ保管という継続的負担）が要り、外部シェル実装者がまだ現れていない段階では見合わないため。障壁除去の本体は Release 配布でも達成される。**使う人が現れたら格上げする**（ADR 0006 実装追記 2026-08-02）。
 
+**FFI 公開面か `.aar` 同梱物を変えたらリリースを積む**（handball-project#190）。対象は ① `ffi_api` / `ffi_support` の関数・型の増減・改名・挙動変更 ② `.aar` 同梱物（生成 Kotlin / シム / 文言リソース / ライセンス JSON / `.so`）の変化。どちらも Release から `.aar` を落とした利用者に見える差なので、main に入れたまま放置すると **README の案内と実配布物が黙って食い違う**（v0.1.0 は 35 コミット分ずれ、Kotlin シム・文言・ライセンス JSON・possession fact のどれも配布物に入っていなかった）。**該当する PR を merge したら、続けて次の版を切ること** — 手順は README「リリース」。**CHANGELOG ファイルは置かない。変更履歴は Release notes が正**（commit / PR が `handball-project#NN` を参照しており、写すと二重管理になるため）。
+
 NDK / SDK は**この repo の flake ではなくホスト環境**が提供する（ADR 0006 決定 1）。`ANDROID_NDK_ROOT` があれば devShell の shellHook がクロスリンカを `CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER` に export する。未設定の環境では Android ターゲットだけがビルドできず、host / iOS / wasm は影響を受けない。
 
 - ABI は `arm64-v8a` 単独（開発機が Apple Silicon で AVD も同 ABI。ADR 0006 決定 5）

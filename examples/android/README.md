@@ -46,7 +46,7 @@ UI は plain View、エラー表示は素の文字列、依存は最小に絞っ
 
 ```sh
 mkdir -p app/libs
-gh release download v0.1.0 --pattern '*.aar' --dir app/libs
+gh release download v0.2.0 --pattern '*.aar' --dir app/libs
 ```
 
 ```sh
@@ -59,7 +59,7 @@ adb shell am start -n com.example.handballshell/.MainActivity
 
 ```sh
 ./scripts/build_aar.sh                                              # リポジトリルートから
-cp target/aar/handball-toolkit-0.1.0.aar examples/android/app/libs/
+cp target/aar/handball-toolkit-0.2.0.aar examples/android/app/libs/
 ```
 
 `app/libs/` と `local.properties` はコミットしない。
@@ -73,7 +73,7 @@ cp target/aar/handball-toolkit-0.1.0.aar examples/android/app/libs/
 | Kotlin | 2.1.21 | KSP と組で上げること |
 | KSP | 2.1.21-2.0.1 | Kotlin と完全一致が必要 |
 | Room | 2.7.2 | |
-| handball-toolkit | 0.1.0 | `app/libs/handball-toolkit-0.1.0.aar`。コア crate の version に従う |
+| handball-toolkit | 0.2.0 | `app/libs/handball-toolkit-0.2.0.aar`。コア crate の version に従う |
 | JNA | 5.17.0（`@aar`） | 生成コードが `Native.register` で使う。**`.aar` は依存情報を運ばない**ので利用側で宣言する |
 | compileSdk / targetSdk | 36 | `buildToolsVersion = "37.0.0"` を明示（nix の SDK には 1 つしか無い） |
 | minSdk | **24** | 下記参照 |
@@ -162,7 +162,8 @@ seed 自体もコア入口（`record_save_team` / `record_save_player` / `record
 |---|---|
 | ① ゴールを記録 | `count_phase_completion_facts` → スタンプ生成 → `record_fact_with_phase_completion`。phase が無ければコアが自動補完する |
 | ② シュート失敗を記録 | `record_append_fact` |
-| ③ 動画時刻の anchor で記録 | タイマーモードは matchClock のみ許可 → `ValidationFailed`（発火せず DB は不変） |
-| ④ 使用中チームを削除 | `record_delete_team` → `TeamInUse`。判定はコア、シェルはカウントを返しただけ |
-| ⑤ サンプル試合を import | `commit_sample_match_import` → `commit_import` を 1 トランザクションで |
-| ⑥ 2Hz 相当パスを実測 | 上記の計測。結果は logcat にも出る（`adb logcat -s HandballShell`） |
+| ③ ポゼッション開始を記録 | `build_possession_fact` → `record_append_fact`。play / control のどちらでもない**第 3 の payload**（handball-project#154 / #184）で、teamId は必須・anchor は 1 本のみ |
+| ④ 動画時刻の anchor で記録 | タイマーモードは matchClock のみ許可 → `ValidationFailed`（発火せず DB は不変） |
+| ⑤ 使用中チームを削除 | `record_delete_team` → `TeamInUse`。判定はコア、シェルはカウントを返しただけ |
+| ⑥ サンプル試合を import | `commit_sample_match_import` → `commit_import` を 1 トランザクションで |
+| ⑦ 2Hz 相当パスを実測 | 上記の計測。結果は logcat にも出る（`adb logcat -s HandballShell`） |

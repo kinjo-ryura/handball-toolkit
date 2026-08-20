@@ -116,7 +116,7 @@ const view = JSON.parse(buildMatchView('foo', json, ids));
 
 ```kotlin
 dependencies {
-    implementation(files("libs/handball-toolkit-0.1.0.aar"))
+    implementation(files("libs/handball-toolkit-0.2.0.aar"))
 
     // .aar ファイル単体は依存情報を運ばない（運ぶのは Maven の POM）ので、
     // この 2 つは利用側で宣言する。生成コードが Native.register で .so を dlopen する
@@ -212,9 +212,9 @@ ABI は `arm64-v8a` 単独。生成 `.so` の実行時依存は `libdl.so` / `li
 
 | | 値 |
 |---|---|
-| コア crate | `0.1.0` |
-| `.aar` ファイル名 | `handball-toolkit-0.1.0.aar` |
-| git タグ / Release | `v0.1.0` |
+| コア crate | `0.2.0` |
+| `.aar` ファイル名 | `handball-toolkit-0.2.0.aar` |
+| git タグ / Release | `v0.2.0` |
 
 `build_aar.sh` はビルド前に `Cargo.toml` と `android/toolkit/build.gradle.kts` の値を照合し、不一致なら止める。上げるときは両方を同時に直して `v<version>` のタグを打つ。
 
@@ -224,11 +224,15 @@ GitHub Release に `.aar` を添付して配る。署名も外部アカウント
 
 ```bash
 ./scripts/build_aar.sh                     # → target/aar/handball-toolkit-<version>.aar
-gh release create v0.1.0 target/aar/handball-toolkit-0.1.0.aar \
-  --title "v0.1.0" --notes "..."
+gh release create v0.2.0 target/aar/handball-toolkit-0.2.0.aar \
+  --title "v0.2.0" --notes "..."
 ```
 
-**Maven Central（`implementation("io.github.kinjo-ryura:handball-toolkit:0.1.0")` の一行で済む形）は採らなかった** — namespace 所有確認と GPG 署名が要り、鍵の失効管理・パスフレーズ保管という継続的な負担が発生する。外部シェル実装者がまだ現れていない段階では、その負担に見合わないと判断した。障壁除去の本体（Rust / Nix / NDK を不要にする）は GitHub Release でも達成され、利用側に残る差は「`.aar` を `libs/` に置き、依存 2 行を書く」だけ。**実際に使う人が現れたら Maven Central へ格上げする**（判断の経緯は [ADR 0006](docs/adr/0006-android-distribution.md) 実装追記 2026-08-02）。
+**CHANGELOG ファイルは置かない。変更履歴は Release notes が正**とする。commit / PR は必ず `handball-project#NN` を参照しており「なぜ」は Issue 側に残るので、同じ内容を `CHANGELOG.md` へ写すと二重管理になる。notes には**その版で FFI 公開面と `.aar` 同梱物がどう変わったか**を参照 Issue つきで列挙する。
+
+**リリースを積むトリガーは 2 つ**: ① FFI 公開面（`ffi_api` / `ffi_support` の関数・型）を変えた ② `.aar` の同梱物（生成 Kotlin / シム / 文言リソース / ライセンス JSON / `.so`）を変えた。どちらも配布物を落とした利用者から見える変化で、main に入れたまま放置すると Release と main が黙って乖離する（v0.1.0 は実際に 35 コミット分ずれた — [handball-project#190](https://github.com/kinjo-ryura/handball-project/issues/190)）。**該当する変更を merge したら、そのまま次の版を切ること。**
+
+**Maven Central（`implementation("io.github.kinjo-ryura:handball-toolkit:0.2.0")` の一行で済む形）は採らなかった** — namespace 所有確認と GPG 署名が要り、鍵の失効管理・パスフレーズ保管という継続的な負担が発生する。外部シェル実装者がまだ現れていない段階では、その負担に見合わないと判断した。障壁除去の本体（Rust / Nix / NDK を不要にする）は GitHub Release でも達成され、利用側に残る差は「`.aar` を `libs/` に置き、依存 2 行を書く」だけ。**実際に使う人が現れたら Maven Central へ格上げする**（判断の経緯は [ADR 0006](docs/adr/0006-android-distribution.md) 実装追記 2026-08-02）。
 
 ### CLI
 
