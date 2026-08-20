@@ -26,6 +26,7 @@ import io.github.kinjoryura.handballtoolkit.PlayEventKind
 import io.github.kinjoryura.handballtoolkit.SegmentResolver
 import io.github.kinjoryura.handballtoolkit.VideoClock
 import io.github.kinjoryura.handballtoolkit.buildPlayFact
+import io.github.kinjoryura.handballtoolkit.buildPossessionFact
 import io.github.kinjoryura.handballtoolkit.buildSummary
 import io.github.kinjoryura.handballtoolkit.commitSampleMatchImport
 import io.github.kinjoryura.handballtoolkit.countPhaseCompletionFacts
@@ -92,10 +93,11 @@ class MainActivity : Activity() {
 
         button("① ゴールを記録（phase 自動補完つき）") { recordGoalWithPhaseCompletion() }
         button("② シュート失敗を記録（record_append_fact）") { recordShotMissed() }
-        button("③ 動画時刻の anchor で記録 → ValidationFailed") { recordInvalidAnchor() }
-        button("④ 使用中チームを削除 → TeamInUse") { deleteTeamInUse() }
-        button("⑤ サンプル試合を import（atomic / commit_import）") { importSampleMatch() }
-        button("⑥ 2Hz 相当パスを実測（SegmentResolver）") { benchmarkHotPath() }
+        button("③ ポゼッション開始を記録（build_possession_fact）") { recordPossession() }
+        button("④ 動画時刻の anchor で記録 → ValidationFailed") { recordInvalidAnchor() }
+        button("⑤ 使用中チームを削除 → TeamInUse") { deleteTeamInUse() }
+        button("⑥ サンプル試合を import（atomic / commit_import）") { importSampleMatch() }
+        button("⑦ 2Hz 相当パスを実測（SegmentResolver）") { benchmarkHotPath() }
 
         log = TextView(this).apply {
             textSize = 12f
@@ -166,6 +168,23 @@ class MainActivity : Activity() {
         )
         recordAppendFact(matchRepo, seed.matchId, fact)
         append("✓ シュート失敗 @ ${clockSeconds.toInt()}s")
+        clockSeconds += 60.0
+        showSummary()
+    }
+
+    /**
+     * ポゼッション開始（handball-project#154 / #184）。play / control のどちらでもない
+     * **第 3 の payload** で、teamId は必須・anchor は 1 本だけ持つ。記録可否は
+     * `AvailableActions.can_record_possession` が持つ（R7 / R8 が掛かるので play 3 種と同値）。
+     */
+    private suspend fun recordPossession() {
+        val fact = buildPossessionFact(
+            stamp = newStamp(),
+            teamId = seed.homeTeamId,
+            anchor = FactAnchor.MatchClock(MatchClock(clockSeconds)),
+        )
+        recordAppendFact(matchRepo, seed.matchId, fact)
+        append("✓ ポゼッション開始 @ ${clockSeconds.toInt()}s")
         clockSeconds += 60.0
         showSummary()
     }

@@ -28,7 +28,7 @@ fn timer_match() -> Match {
 
 #[test]
 fn バージョン文字列を返す() {
-    assert_eq!(ffi_api::toolkit_version(), "0.1.0");
+    assert_eq!(ffi_api::toolkit_version(), "0.2.0");
 }
 
 #[test]

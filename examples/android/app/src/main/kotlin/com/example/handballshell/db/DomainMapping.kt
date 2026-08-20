@@ -15,6 +15,7 @@ import io.github.kinjoryura.handballtoolkit.PlayEventKind
 import io.github.kinjoryura.handballtoolkit.PlayFact
 import io.github.kinjoryura.handballtoolkit.Player
 import io.github.kinjoryura.handballtoolkit.PlayerPhoto
+import io.github.kinjoryura.handballtoolkit.PossessionFact
 import io.github.kinjoryura.handballtoolkit.RosterSelection
 import io.github.kinjoryura.handballtoolkit.StoppageKind
 import io.github.kinjoryura.handballtoolkit.StoppagePayload
@@ -235,6 +236,17 @@ fun MatchFact.toRow(matchId: UUID): FactRow {
                 )
             }
         }
+        is MatchFactPayload.Possession -> {
+            val possession = payload.v1
+            val start = possession.anchor.columns()
+            base.copy(
+                payloadKind = "possession",
+                startAnchorKind = start.kind,
+                startMatchSeconds = start.matchSeconds,
+                startVideoSeconds = start.videoSeconds,
+                teamId = possession.teamId.key(),
+            )
+        }
     }
 }
 
@@ -271,6 +283,13 @@ fun FactRow.toDomain(): MatchFact {
                     endAnchor = endAnchor,
                     note = note,
                 ),
+            ),
+        )
+        "possession" -> MatchFactPayload.Possession(
+            PossessionFact(
+                // ポゼッションの teamId は「常に値あり」がドメインの不変条件。
+                teamId = requireNotNull(teamId) { "possession に teamId が無い" }.toUuid(),
+                anchor = startAnchor,
             ),
         )
         else -> error("未知の payloadKind: $payloadKind")
