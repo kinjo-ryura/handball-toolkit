@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "matches": [
     {
-      "slug": "bad-score",
+      "slug": "2026-02-01-bad-score",
       "displayName": "Bad Score",
       "date": "2026-02-01T10:00:00Z",
       "homeScore": 5,
@@ -10,7 +10,7 @@
       "hasVideo": true
     },
     {
-      "slug": "missing-file",
+      "slug": "2026-02-02-missing-file",
       "displayName": "Missing",
       "date": "2026-02-02T10:00:00Z",
       "homeScore": 0,
@@ -18,7 +18,7 @@
       "hasVideo": false
     },
     {
-      "slug": "bad-score",
+      "slug": "2026-02-01-bad-score",
       "displayName": "Duplicate",
       "date": "2026-02-01T10:00:00Z",
       "homeScore": 5,

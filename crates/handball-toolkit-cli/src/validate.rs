@@ -1,8 +1,10 @@
 //! 単一ファイルの検証（試合本体 / 試合 index / ハイライト index）。
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
+use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -11,7 +13,8 @@ use handball_toolkit::facts::{ControlFact, MatchFact, MatchFactPayload};
 use handball_toolkit::persistence_order::persistence_ordered;
 use handball_toolkit::projection::SummaryProjection;
 use handball_toolkit::sample_dto::{
-    SCHEMA_VERSION_CURRENT, SampleHighlightIndexDtoV2, SampleIndexDtoV2, SampleMatchDtoV2, convert,
+    SCHEMA_VERSION_CURRENT, SampleFactAnchorDtoV2, SampleHighlightIndexDtoV2, SampleIndexDtoV2,
+    SampleMatchDtoV2, convert,
 };
 use handball_toolkit::validation::DomainValidationIssue;
 use handball_toolkit::validators::{
@@ -127,6 +130,11 @@ pub fn validate_match_dto(
     dto: &SampleMatchDtoV2,
     report: &mut RunReport,
 ) -> Option<DerivedMatchInfo> {
+    // DTO を見れば分かる検査は convert より前に置く。変換に失敗するファイルでも
+    // これらの指摘は出したい（convert 失敗時はこの関数が早期 return するため）。
+    check_duplicate_fact_ids(label, dto, report);
+    check_unexpected_anchor_end(label, dto, report);
+
     // ID は表示に出ない使い捨てなので決定的な連番で供給する（コアは ID を生成しない）。
     let mut counter: u128 = 0;
     let conversion = match convert(label, dto, None, || {
@@ -203,28 +211,44 @@ pub fn validate_match_dto(
     })
 }
 
-/// `/v2/index.json` の検証（schemaVersion / slug 重複）。
+/// `/v2/index.json` の検証（schemaVersion / slug 重複 / date 降順 / slug 先頭日付）。
 pub fn validate_match_index_dto(label: &str, index: &SampleIndexDtoV2, report: &mut RunReport) {
     check_schema_version(label, index.schema_version, report);
-    check_duplicate_slugs(
+    check_index_entries(
         label,
-        index.matches.iter().map(|entry| entry.slug.as_str()),
+        &index
+            .matches
+            .iter()
+            .map(|entry| (entry.slug.as_str(), entry.date))
+            .collect::<Vec<_>>(),
         report,
     );
 }
 
-/// `/v2/highlights/index.json` の検証（schemaVersion / slug 重複）。
+/// `/v2/highlights/index.json` の検証（matches 側と同じ配列レベル検査）。
 pub fn validate_highlight_index_dto(
     label: &str,
     index: &SampleHighlightIndexDtoV2,
     report: &mut RunReport,
 ) {
     check_schema_version(label, index.schema_version, report);
-    check_duplicate_slugs(
+    check_index_entries(
         label,
-        index.highlights.iter().map(|entry| entry.slug.as_str()),
+        &index
+            .highlights
+            .iter()
+            .map(|entry| (entry.slug.as_str(), entry.date))
+            .collect::<Vec<_>>(),
         report,
     );
+}
+
+/// index 配列そのものに掛かる検査。matches / highlights は要素型が違うだけで
+/// 不変条件は同じ（SCHEMA.md）ので、`(slug, date)` に落として共有する。
+fn check_index_entries(label: &str, entries: &[(&str, DateTime<Utc>)], report: &mut RunReport) {
+    check_duplicate_slugs(label, entries.iter().map(|(slug, _)| *slug), report);
+    check_date_descending(label, entries, report);
+    check_slug_date_prefix(label, entries, report);
 }
 
 fn check_schema_version(label: &str, found: i64, report: &mut RunReport) {
@@ -245,7 +269,7 @@ fn check_duplicate_slugs<'a>(
     slugs: impl Iterator<Item = &'a str>,
     report: &mut RunReport,
 ) {
-    let mut seen = std::collections::BTreeSet::new();
+    let mut seen = BTreeSet::new();
     for slug in slugs {
         if !seen.insert(slug) {
             report.findings.push(Finding::new(
@@ -254,6 +278,147 @@ fn check_duplicate_slugs<'a>(
                 corpus_issue("duplicateSlug", json!({"slug": slug})),
             ));
         }
+    }
+}
+
+/// index 配列は `date` 降順（SCHEMA.md）。
+///
+/// アプリは配列順をそのまま表示に使う（`HighlightStoreV2` は index の順序を保持し
+/// `MatchListViewV2` はソートしない）ため、ここの退行がそのまま画面の並びの乱れに
+/// なる。handball-project#115 で実際に退行し、直った後も再発を止める検査が無かった。
+///
+/// 同日の試合が複数あるコーパスは普通なので、同値は違反としない（狭義単調ではなく
+/// 「新しい順が崩れていない」ことだけを見る）。
+fn check_date_descending(label: &str, entries: &[(&str, DateTime<Utc>)], report: &mut RunReport) {
+    for pair in entries.windows(2) {
+        let (previous_slug, previous_date) = pair[0];
+        let (slug, date) = pair[1];
+        if date > previous_date {
+            report.findings.push(Finding::new(
+                label,
+                Stage::Corpus,
+                corpus_issue(
+                    "indexNotDateDescending",
+                    json!({
+                        "previousSlug": previous_slug,
+                        "previousDate": previous_date.to_rfc3339(),
+                        "slug": slug,
+                        "date": date.to_rfc3339(),
+                    }),
+                ),
+            ));
+        }
+    }
+}
+
+/// slug 先頭 `{yyyy-MM-dd}` は `date` の日付部と一致する（SCHEMA.md の不変条件）。
+///
+/// `date` は「いつ試合が行われたか」で、記録日時（`recordedAt`）とは独立に動く。
+/// slug は人手で付けるので、両者の突合が「`date` に `recordedAt` を流し込む」種の
+/// 転記ミス（handball-project#115）を捕まえる。日付部は UTC で比較する — 配信
+/// コーパスの `date` は開始時刻不明なら `T00:00:00Z`、分かる場合も日本時間の
+/// 日中で、UTC でも同じ日に収まる。
+fn check_slug_date_prefix(label: &str, entries: &[(&str, DateTime<Utc>)], report: &mut RunReport) {
+    for (slug, date) in entries {
+        let expected = date.format("%Y-%m-%d").to_string();
+        // 先頭 10 バイト。日付以外の文字が来る / 短すぎる slug は None になり、
+        // 「先頭が日付になっていない」も同じ違反として報告する。
+        let found = slug.get(..10);
+        if found == Some(expected.as_str()) {
+            continue;
+        }
+        report.findings.push(Finding::new(
+            label,
+            Stage::Corpus,
+            corpus_issue(
+                "slugDateMismatch",
+                json!({"slug": slug, "expected": expected, "found": found}),
+            ),
+        ));
+    }
+}
+
+/// 同一試合内で `factID` が重複していないかの検査（index の `duplicateSlug` と同形）。
+///
+/// `factID` は fact の同一性そのもので、converter は与えられた値をそのまま `FactId`
+/// に採用する（`factID` が無い fact にだけシェル注入 ID を採番する）。重複したまま
+/// 取り込むと、同じ ID の fact が 2 件できて upsert で潰し合い、記録が黙って消える。
+/// コア側の validators は fact 単体しか見ないため、この隙間はどちらからも漏れる。
+///
+/// `factID` 未設定の fact は採番が衝突しない（`required_id_count` ぶんの新規 UUID を
+/// シェルが供給する）ので対象外。
+fn check_duplicate_fact_ids(label: &str, dto: &SampleMatchDtoV2, report: &mut RunReport) {
+    let mut seen = BTreeSet::new();
+    for (index, fact) in dto.facts.iter().enumerate() {
+        let Some(id) = fact.fact_id else {
+            continue;
+        };
+        if seen.insert(id) {
+            continue;
+        }
+        let mut finding = Finding::new(
+            label,
+            Stage::Corpus,
+            corpus_issue("duplicateFactID", json!({})),
+        );
+        finding.fact_index = Some(index);
+        finding.fact_id = Some(id.to_string());
+        report.findings.push(finding);
+    }
+}
+
+/// `play` / `possession` の anchor に end 系が入っていないかの検査
+/// （SCHEMA.md:「end 系は `phaseStart`（必須）/ `stoppage`（任意）で使用。
+/// `play` / `possession` では両方 null」）。
+///
+/// converter は `play` / `possession` で `decode_end_anchor` を呼ばない。つまり
+/// end が書かれていても decode は成功し、**値だけが黙って捨てられる**（逆向きの
+/// 「必須なのに無い」は `MissingPhaseStartEnd` で弾かれるので、非対称な隙間）。
+/// ポゼッションの供給源（video-analysis, handball-project#178）が誤って区間を
+/// 書いた場合にエラーにならず情報が消える経路なので、配信前に blocking で止める。
+///
+/// 検査はコアではなく CLI に置いた。`SampleMatchDecodeErrorV2` は FFI 境界の
+/// uniffi Enum で、variant 追加は ERROR_CODES.md・各シェルの網羅分岐・Android の
+/// 文言 2 ロケールへ波及する。供給経路は配信前にこの CLI を必ず通る
+/// （sample-matches の CI）ため、error（exit 1）で止めれば risk は塞げる。
+fn check_unexpected_anchor_end(label: &str, dto: &SampleMatchDtoV2, report: &mut RunReport) {
+    for (index, fact) in dto.facts.iter().enumerate() {
+        // どの sub-payload を読むかは converter と同じく `kind` で決める。
+        let (payload_kind, anchor): (&str, Option<&SampleFactAnchorDtoV2>) =
+            match fact.payload.kind.as_str() {
+                "play" => ("play", fact.payload.play.as_ref().map(|play| &play.anchor)),
+                "possession" => (
+                    "possession",
+                    fact.payload
+                        .possession
+                        .as_ref()
+                        .map(|possession| &possession.anchor),
+                ),
+                _ => continue,
+            };
+        // sub-payload 欠落は convert が `MissingPayloadBody` で弾く。
+        let Some(anchor) = anchor else {
+            continue;
+        };
+        if anchor.end_match_elapsed_seconds.is_none() && anchor.end_video_elapsed_seconds.is_none()
+        {
+            continue;
+        }
+        let mut finding = Finding::new(
+            label,
+            Stage::Corpus,
+            corpus_issue(
+                "unexpectedAnchorEnd",
+                json!({
+                    "payloadKind": payload_kind,
+                    "endMatchElapsedSeconds": anchor.end_match_elapsed_seconds,
+                    "endVideoElapsedSeconds": anchor.end_video_elapsed_seconds,
+                }),
+            ),
+        );
+        finding.fact_index = Some(index);
+        finding.fact_id = fact.fact_id.map(|id| id.to_string());
+        report.findings.push(finding);
     }
 }
 

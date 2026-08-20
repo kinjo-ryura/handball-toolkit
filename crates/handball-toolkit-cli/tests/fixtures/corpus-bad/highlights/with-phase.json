@@ -76,7 +76,7 @@
               "elapsedSeconds": 42.0
             },
             "endMatchElapsedSeconds": null,
-            "endVideoElapsedSeconds": null
+            "endVideoElapsedSeconds": 60.0
           },
           "title": null,
           "note": null

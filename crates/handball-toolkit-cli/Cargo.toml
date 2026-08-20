@@ -11,6 +11,9 @@ description = "Command-line validator for handball match data JSON, built on han
 [dependencies]
 # feature 指定なし = uniffi off。依存グラフに uniffi が入らない（コア Cargo.toml 参照）。
 handball-toolkit = { path = "../handball-toolkit" }
+# コアと同じ feature 集合（clock 機能は外す）。index の date 順序・slug 先頭日付の
+# 突合に DateTime<Utc> を直接扱うため。
+chrono = { version = "0.4", default-features = false, features = ["std", "serde"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }
 uuid = { version = "1" }

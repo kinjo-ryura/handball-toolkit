@@ -56,14 +56,26 @@ fn corpus_bad_reports_expected_findings() {
     validate_corpus(&fixture("corpus-bad"), &mut report);
     let codes = finding_codes(&report);
 
+    // corpus-bad の違反はすべて意図的に仕込んである。fixture を「直す」ときは
+    // どの検査の唯一の証拠を消すことになるかを確認すること。
     let expect = [
         ("duplicateSlug", "index.json"),
-        ("missingMatchFile", "missing-file.json"),
-        ("scoreMismatch", "bad-score.json"),
+        // matches index が date 昇順に並んでいる（handball-project#115 の退行の形）。
+        ("indexNotDateDescending", "index.json"),
+        // highlights index の slug に先頭 yyyy-MM-dd が無い。
+        ("slugDateMismatch", "index.json"),
+        ("missingMatchFile", "2026-02-02-missing-file.json"),
+        ("scoreMismatch", "2026-02-01-bad-score.json"),
+        // facts[3] の factID が facts[1] と同じ。
+        ("duplicateFactID", "2026-02-01-bad-score.json"),
+        // possession の anchor に end が入っている（convert は黙って捨てる）。
+        ("unexpectedAnchorEnd", "2026-02-01-bad-score.json"),
         ("orphanMatchFile", "orphan.json"),
         ("videoHighlightContainsPhaseStart", "with-phase.json"),
         ("factCountMismatch", "with-phase.json"),
         ("teamNameMismatch", "with-phase.json"),
+        // play 側の end。possession とは別経路なので両方を固定する。
+        ("unexpectedAnchorEnd", "with-phase.json"),
     ];
     for (code, file) in expect {
         assert!(
@@ -79,15 +91,97 @@ fn corpus_bad_reports_expected_findings() {
         .findings
         .iter()
         .find(|finding| {
-            finding.path.ends_with("bad-score.json")
+            finding.path.ends_with("2026-02-01-bad-score.json")
                 && finding.issue.get("scope").and_then(|value| value.as_str()) == Some("fact")
         })
-        .expect("bad-score.json に fact scope の指摘があるはず");
+        .expect("2026-02-01-bad-score.json に fact scope の指摘があるはず");
     assert_eq!(negative_clock.fact_index, Some(2));
     assert_eq!(
         negative_clock.fact_id.as_deref(),
         Some("44444444-4444-4444-4444-444444444444")
     );
+}
+
+/// 新しい 4 検査の params / fact 位置まで固定する。code が出ることだけを見ると、
+/// 「どの要素が違反か」を取り違えた実装が通ってしまうため。
+#[test]
+fn corpus_bad_pins_new_check_details() {
+    let mut report = RunReport::default();
+    validate_corpus(&fixture("corpus-bad"), &mut report);
+
+    let by_code = |code: &str, file: &str| {
+        report
+            .findings
+            .iter()
+            .find(|finding| {
+                finding.issue.get("code").and_then(|value| value.as_str()) == Some(code)
+                    && finding.path.ends_with(file)
+            })
+            .unwrap_or_else(|| panic!("{code} ({file}) が無い: {:#?}", report.findings))
+    };
+
+    // 降順違反は「昇順になっている隣接ペア」を名指しする。
+    let order = by_code("indexNotDateDescending", "index.json");
+    assert_eq!(
+        order.issue["params"]["previousSlug"].as_str(),
+        Some("2026-02-01-bad-score")
+    );
+    assert_eq!(
+        order.issue["params"]["slug"].as_str(),
+        Some("2026-02-02-missing-file")
+    );
+
+    // slug 先頭が日付ですらない場合も同じ code で、found に実際の先頭を載せる。
+    let slug_date = by_code("slugDateMismatch", "index.json");
+    assert_eq!(
+        slug_date.issue["params"]["slug"].as_str(),
+        Some("with-phase")
+    );
+    assert_eq!(
+        slug_date.issue["params"]["expected"].as_str(),
+        Some("2026-02-03")
+    );
+    assert_eq!(
+        slug_date.issue["params"]["found"].as_str(),
+        Some("with-phase")
+    );
+
+    // 重複 factID は 2 件目（後から現れた方）を facts[] index 付きで指す。
+    let duplicate = by_code("duplicateFactID", "2026-02-01-bad-score.json");
+    assert_eq!(duplicate.fact_index, Some(3));
+    assert_eq!(
+        duplicate.fact_id.as_deref(),
+        Some("22222222-2222-2222-2222-222222222222")
+    );
+
+    // end 系は possession / play の両方で、入っていた側の値だけを載せる。
+    let possession_end = by_code("unexpectedAnchorEnd", "2026-02-01-bad-score.json");
+    assert_eq!(
+        possession_end.issue["params"]["payloadKind"].as_str(),
+        Some("possession")
+    );
+    assert_eq!(
+        possession_end.issue["params"]["endVideoElapsedSeconds"].as_f64(),
+        Some(160.0)
+    );
+    assert!(possession_end.issue["params"]["endMatchElapsedSeconds"].is_null());
+    assert_eq!(possession_end.fact_index, Some(4));
+
+    let play_end = by_code("unexpectedAnchorEnd", "with-phase.json");
+    assert_eq!(
+        play_end.issue["params"]["payloadKind"].as_str(),
+        Some("play")
+    );
+    assert_eq!(play_end.fact_index, Some(1));
+}
+
+/// 正しく並んだ index には降順・slug 日付のどちらも出ない（偽陽性ゼロの確認）。
+/// 同日の試合が複数ある配信コーパスは普通なので、同値の並びを含めて固定する。
+#[test]
+fn descending_index_with_same_date_entries_has_no_findings() {
+    let mut report = RunReport::default();
+    validate_file(&fixture("index-order-ok.json"), &mut report);
+    assert_eq!(report.findings.len(), 0, "{:#?}", report.findings);
 }
 
 #[test]
