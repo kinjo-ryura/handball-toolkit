@@ -298,6 +298,7 @@ dependencies = [
 name = "handball-toolkit-cli"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "handball-toolkit",
  "serde",
  "serde_json",

@@ -9,6 +9,11 @@
 //!   `matches` = 試合 index / `highlights` = ハイライト index）
 //! - ディレクトリ（v2 ルート）: index ↔ ファイルの突合と SCHEMA.md 由来の
 //!   整合チェック（スコア転記 / factCount / hasVideo / date）を含む一括検証
+//!
+//! SCHEMA.md の不変条件のうち、コアの validators が見ない「配列・ファイル群と
+//! しての整合」は CLI 側で検査する（`corpus` scope）。index の slug 重複 /
+//! date 降順 / slug 先頭日付、試合内の factID 重複、play・possession の
+//! anchor end 系など。
 
 pub mod corpus;
 pub mod report;

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "matches": [
+    {
+      "slug": "2026-03-10-tigers-vs-falcons",
+      "displayName": "Tigers vs Falcons",
+      "date": "2026-03-10T10:00:00Z",
+      "homeScore": 1,
+      "awayScore": 0,
+      "hasVideo": true
+    },
+    {
+      "slug": "2026-03-08-hawks-vs-bears",
+      "displayName": "Hawks vs Bears",
+      "date": "2026-03-08T12:00:00Z",
+      "homeScore": 2,
+      "awayScore": 2,
+      "hasVideo": false
+    },
+    {
+      "slug": "2026-03-08-tigers-vs-bears",
+      "displayName": "Tigers vs Bears",
+      "date": "2026-03-08T09:00:00Z",
+      "homeScore": 0,
+      "awayScore": 3,
+      "hasVideo": false
+    },
+    {
+      "slug": "2026-03-08-hawks-vs-falcons",
+      "displayName": "Hawks vs Falcons",
+      "date": "2026-03-08T09:00:00Z",
+      "homeScore": 4,
+      "awayScore": 1,
+      "hasVideo": false
+    }
+  ]
+}
