@@ -23,11 +23,16 @@ cargo build --release -p handball-toolkit-ffi \
   --target aarch64-apple-ios --target aarch64-apple-ios-sim --target aarch64-apple-darwin
 
 echo "==> 2/3 Swift バインディング生成（library mode: .a の uniffi メタデータから）"
+# --no-format: 決定性のため。生成 Swift は HandballRecorder にコミットされ、親リポの同期 CI
+# （toolkit-generated-sync.yml）が未整形で再生成してバイト比較する。整形の有無が環境で揺れると
+# 全 push で偽 NG になるので、両側とも整形を無効化して揃える（handball-project#192）。
+# uniffi は xcrun swift-format → swift-format → swift format → swiftformat の順に試すため、
+# 「開発機に整形器が無い」に頼れない（Xcode 同梱の swift-format に xcrun で到達する）。
 rm -rf "$OUT"
 mkdir -p "$STAGING/headers"
 cargo run -q -p handball-toolkit-ffi --features bindgen --bin uniffi-bindgen -- \
   generate --library "target/aarch64-apple-ios/release/$LIB" \
-  --language swift --out-dir "$STAGING/bindings"
+  --language swift --no-format --out-dir "$STAGING/bindings"
 
 # XCFramework のヘッダディレクトリ。modulemap は module.modulemap の名前が必須
 cp "$STAGING/bindings/HandballToolkitFFI.h" "$STAGING/headers/"
