@@ -19,8 +19,8 @@ use crate::entities::{Match, Player, Team};
 use crate::facts::{ControlFact, MatchFact, PlayEventKind, PlayFact, StoppageKind};
 use crate::ids::{FactId, PlayerId, TeamId};
 use crate::projection::{
-    LiveMatchProjection, Phase, ScoreProgressionProjection, SegmentResolver, SummaryProjection,
-    TimeSegment, TimelineProjection,
+    LiveMatchProjection, Phase, PossessionProjection, ScoreProgressionProjection, SegmentResolver,
+    SummaryProjection, TimeSegment, TimelineProjection,
 };
 use crate::sample_dto::{
     self, SampleFactDtoV2, SampleHighlightIndexDtoV2, SampleIndexDtoV2,
@@ -81,6 +81,21 @@ pub fn build_score_progression_with_timeline(
     timeline: TimelineProjection,
 ) -> Option<ScoreProgressionProjection> {
     ScoreProgressionProjection::build_with_timeline(&match_, &timeline)
+}
+
+/// `PossessionProjection::build`（facts から timeline を内部構築する convenience）。
+#[uniffi::export]
+pub fn build_possessions(match_: Match, facts: Vec<MatchFact>) -> PossessionProjection {
+    PossessionProjection::build(&match_, &facts)
+}
+
+/// `PossessionProjection::build_with_timeline`（resolver を二度作らない経路）。
+#[uniffi::export]
+pub fn build_possessions_with_timeline(
+    match_: Match,
+    timeline: TimelineProjection,
+) -> PossessionProjection {
+    PossessionProjection::build_with_timeline(&match_, &timeline)
 }
 
 /// `LiveMatchProjection::build_video_mode_with_resolver`。動画モードの 2Hz tick 経路。
