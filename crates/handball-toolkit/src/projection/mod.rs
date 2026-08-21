@@ -5,6 +5,7 @@
 //! 主要型はこのモジュール直下にも re-export する。
 
 pub mod live_match;
+pub mod possession;
 pub mod score_progression;
 pub mod segment_resolver;
 pub mod summary;
@@ -12,6 +13,7 @@ pub mod time_segment;
 pub mod timeline;
 
 pub use live_match::{AvailableActions, LiveMatchProjection, MatchTimerState};
+pub use possession::{PossessionProjection, PossessionSegment};
 pub use score_progression::{
     ScoreProgressionPhaseSpan, ScoreProgressionPoint, ScoreProgressionProjection,
 };
