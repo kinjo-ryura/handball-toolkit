@@ -82,7 +82,7 @@ FFI / JSON 境界でのエラー表現（serde 形式）:
 - 代わりに **panic を残してよいのは「到達不能である根拠を、コードかテストで示せるもの」に限る**。根拠は `expect` のメッセージではなく、下表のいずれかで担保する
 - 新しい `expect` / `unwrap` / `unreachable!` を FFI から到達可能なコードへ足すときは、この表に行を追加できることを条件とする
 
-現行の全 panic 箇所と根拠（2026-07-20 時点）:
+現行の全 panic 箇所と根拠（2026-08-22 時点）:
 
 | 箇所 | 根拠 |
 |---|---|
@@ -90,7 +90,7 @@ FFI / JSON 境界でのエラー表現（serde 形式）:
 | `ffi_api.rs` `decode_sample_fact` の `fallback.take().expect` | `decode_fact` が `new_id()` を呼ぶのは `fact_id` が None の 1 回だけ（`sample_match_converter.rs`）。`Option::take` が上限を型で保証 |
 | `ffi_write.rs` `commit_sample_match_import` の `ids.next().expect` | 同上（`required_import_id_count` 検査 + `sample_import_tests.rs` の一致 assert） |
 | `ffi_support.rs` `u32::try_from(obj).expect` | 対象は phase 数とコアが数える ID 個数。いずれも u32 を越えない構造 |
-| `write.rs` `unreachable!("plays_to_convert は Play のみ")` | 直前に `MatchFactPayload::Play` で filter 済み |
+| `write.rs` `unreachable!("plays_to_convert は Play / Possession のみ")` | `plays_to_convert` へ積むのは `Play` / `Possession` の腕だけ（handball-project#154 で `Possession` を追加）。`single_anchor_mut` が `None` を返すのは `Control` のみなので、この 2 payload では常に `Some`（`facts/match_fact.rs`） |
 | `sample_match_encoder.rs` の `expect` 3 箇所 | `SampleMatchDtoV2` は derive `Serialize` の plain struct（String / f64 / Option / Vec）で `to_value` は失敗しない。**非有限 f64 も Err ではなく `null` になる**（実測）。`Value` の再 serialize も失敗せず、serde_json の出力は常に UTF-8 |
 | （wasm）`lib.rs` `build_match_view` の `ids.next().expect` | `ffi_api.rs` の同型（直前の `required_id_count` 検査で `InsufficientNewIds` に落とす）。個数一致は `wasm_binding_tests.rs` の `insufficient_ids_boundary` が required-1 / required の両側で assert |
 | （wasm）`lib.rs` `build_match_view_js` の `to_string().expect` | `MatchView` はコアの derive `Serialize` 型を束ねた plain struct。根拠は `sample_match_encoder.rs` の行と同じ |
