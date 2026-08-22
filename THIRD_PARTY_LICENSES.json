@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "toolkitVersion": "0.2.0",
+  "toolkitVersion": "0.3.0",
   "licenses": [
     {
       "id": "MIT",
@@ -237,7 +237,7 @@
     },
     {
       "name": "handball-toolkit",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "origin": "workspace",
       "sourceUrl": "https://github.com/kinjo-ryura/handball-toolkit",
       "licenseIndexes": [
@@ -246,7 +246,7 @@
     },
     {
       "name": "handball-toolkit-ffi",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "origin": "workspace",
       "sourceUrl": "https://github.com/kinjo-ryura/handball-toolkit",
       "licenseIndexes": [

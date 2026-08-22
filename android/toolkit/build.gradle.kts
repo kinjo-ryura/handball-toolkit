@@ -6,7 +6,7 @@ plugins {
 // コア crate（ワークスペース Cargo.toml の workspace.package.version）と同じ値を置く。
 // ずれると「配布された .aar がどのコアなのか」が追えなくなるため、scripts/build_aar.sh が
 // ビルド前に Cargo.toml と照合して不一致なら止める。
-val toolkitVersion = "0.2.0"
+val toolkitVersion = "0.3.0"
 
 android {
     // 生成 Kotlin の package_name（crates/handball-toolkit/uniffi.toml）と揃える。
