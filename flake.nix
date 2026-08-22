@@ -74,7 +74,7 @@
           if [ -n "''${ANDROID_NDK_ROOT:-}" ]; then
             # ホストディレクトリ名は Apple Silicon でも darwin-x86_64
             # （中身は universal binary で Rosetta は不要）。
-            # API 24 は Android シェルの minSdk 暫定値 — 確定は handball-project#133。
+            # API 24 は Android シェルの minSdk（handball-project#133 で 24 に確定。ADR 0006 実装追記）。
             _hbt_android_cc="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android24-clang"
             if [ -x "$_hbt_android_cc" ]; then
               export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$_hbt_android_cc"
