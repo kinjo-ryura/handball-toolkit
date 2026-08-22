@@ -46,7 +46,7 @@ UI は plain View、エラー表示は素の文字列、依存は最小に絞っ
 
 ```sh
 mkdir -p app/libs
-gh release download v0.2.0 --pattern '*.aar' --dir app/libs
+gh release download v0.3.0 --pattern '*.aar' --dir app/libs
 ```
 
 ```sh
@@ -59,7 +59,7 @@ adb shell am start -n com.example.handballshell/.MainActivity
 
 ```sh
 ./scripts/build_aar.sh                                              # リポジトリルートから
-cp target/aar/handball-toolkit-0.2.0.aar examples/android/app/libs/
+cp target/aar/handball-toolkit-0.3.0.aar examples/android/app/libs/
 ```
 
 `app/libs/` と `local.properties` はコミットしない。
@@ -73,7 +73,7 @@ cp target/aar/handball-toolkit-0.2.0.aar examples/android/app/libs/
 | Kotlin | 2.1.21 | KSP と組で上げること |
 | KSP | 2.1.21-2.0.1 | Kotlin と完全一致が必要 |
 | Room | 2.7.2 | |
-| handball-toolkit | 0.2.0 | `app/libs/handball-toolkit-0.2.0.aar`。コア crate の version に従う |
+| handball-toolkit | 0.3.0 | `app/libs/handball-toolkit-0.3.0.aar`。コア crate の version に従う |
 | JNA | 5.17.0（`@aar`） | 生成コードが `Native.register` で使う。**`.aar` は依存情報を運ばない**ので利用側で宣言する |
 | compileSdk / targetSdk | 36 | `buildToolsVersion = "37.0.0"` を明示（nix の SDK には 1 つしか無い） |
 | minSdk | **24** | 下記参照 |
