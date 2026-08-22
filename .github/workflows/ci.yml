@@ -56,6 +56,30 @@ jobs:
       - name: cargo test
         run: nix develop --command cargo test --workspace
 
+      # wasm ターゲットのコンパイル検査（handball-project#206）。上の fmt / clippy /
+      # test はすべて host 向けで、wasm 向けにビルドが通るかはどこでも試されていない。
+      #
+      # iOS は HandballRecorder の bootstrap.sh が回るたびに XCFramework を作り直すので
+      # 壊れが自然に露見するが、**wasm には定常的な消費ループが無い**。LP のデモ
+      # （handball-project#96）はビルド済みの成果物を配っているだけで、コアを直しても
+      # 誰も wasm を作り直さない。`./scripts/build_wasm.sh` を手で叩くまで破損に
+      # 気づけず、気づくのは「デモを更新したい時に更新できない」形になる。
+      #
+      # 生成まで回さず cargo check で足りる。狙いは「コンパイルできない wasm を main に
+      # 入れない」ことだけで、デモが正しい結果を出すかの検証はここでは扱わない。
+      #
+      # 落ちたときに疑うところ:
+      #   - **依存が getrandom を引き込んだ**。host は OS の乱数 API を勝手に使うので
+      #     通るが、wasm はバックエンドを明示しないとコンパイルが通らない。この repo は
+      #     意図的に未設定 — コアも wasm crate も UUID を生成せず、ID はシェル（JS の
+      #     `crypto.randomUUID()`）が発行する（設計不変条件 2）。バックエンド設定を
+      #     足す前に、その依存が本当に要るかを疑うこと
+      #   - **wasm-bindgen のバージョン不一致**。crate 側（Cargo.toml の `=` ピン）と
+      #     flake が入れる wasm-bindgen-cli は完全一致が必要。nixpkgs が上がったら
+      #     両方を同時に合わせる
+      - name: cargo check（wasm32）
+        run: nix develop --command cargo check --target wasm32-unknown-unknown -p handball-toolkit-wasm
+
       # 配布バイナリの OSS ライセンス一覧が依存の現況と一致するかを検査する
       # （handball-project#140）。依存を足して再生成を忘れると、シェルが表示する
       # 一覧から crate が欠けて表示義務を取りこぼすため、ここで止める。
