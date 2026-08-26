@@ -26,9 +26,15 @@ fn timer_match() -> Match {
     }
 }
 
+/// 境界越しに返るバージョンが**このパッケージング crate の版と一致する**こと。
+///
+/// リテラルを書かないのは、版を上げるたびにここを直す作業が発生し、忘れると
+/// リリース作業の最後で落ちるため（0.4.0 で実際に踏んだ）。両 crate は
+/// `[workspace.package]` の 1 つの version を共有するので、この比較は
+/// 「コアとパッケージングが同じ版でビルドされている」ことの検査になる。
 #[test]
 fn バージョン文字列を返す() {
-    assert_eq!(ffi_api::toolkit_version(), "0.3.0");
+    assert_eq!(ffi_api::toolkit_version(), env!("CARGO_PKG_VERSION"));
 }
 
 #[test]
