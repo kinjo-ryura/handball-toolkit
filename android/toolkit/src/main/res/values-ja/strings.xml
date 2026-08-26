@@ -57,6 +57,8 @@
     <string name="handball_toolkit_fact_phase_start_end_before_start_body">ピリオドの終了時刻は開始時刻より後でなければなりません。時刻を確認してください。</string>
     <string name="handball_toolkit_fact_stoppage_end_before_start_title">中断の終了が開始より前です</string>
     <string name="handball_toolkit_fact_stoppage_end_before_start_body">中断の終了時刻は開始時刻より後でなければなりません。時刻を確認してください。</string>
+    <string name="handball_toolkit_fact_possession_end_before_start_title">ポゼッションの終了が開始より前です</string>
+    <string name="handball_toolkit_fact_possession_end_before_start_body">ポゼッションの終了時刻は開始時刻より後でなければなりません。時刻を確認してください。</string>
     <string name="handball_toolkit_fact_stoppage_end_nil_in_video_mode_title">中断の終了時刻が必要です</string>
     <string name="handball_toolkit_fact_stoppage_end_nil_in_video_mode_body">動画モードでは中断の終了時刻を記録する必要があります。終了時刻を入力してください。</string>
     <string name="handball_toolkit_fact_stoppage_end_present_in_timer_mode_title">中断の終了時刻は保存されません</string>

@@ -262,14 +262,15 @@ pub fn build_stoppage_fact(
     write::build_stoppage_fact(stamp, kind, start_anchor, end_anchor, note)
 }
 
-/// `write::build_possession_fact`（handball-project#184）。
+/// `write::build_possession_fact`（handball-project#184。end は #220 で足した任意の引数）。
 #[uniffi::export]
 pub fn build_possession_fact(
     stamp: NewFactStamp,
     team_id: TeamId,
     anchor: FactAnchor,
+    end_anchor: Option<FactAnchor>,
 ) -> MatchFact {
-    write::build_possession_fact(stamp, team_id, anchor)
+    write::build_possession_fact(stamp, team_id, anchor, end_anchor)
 }
 
 /// `write::apply_play_fact_edit`（1 操作分の編集適用。trim / クランプ / anchor 場合分け込み）。

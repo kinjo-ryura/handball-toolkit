@@ -71,14 +71,20 @@ pub fn validate_match_fact(
 
 // ── PossessionFact ──
 
-/// ポゼッション開始の value + context validation（handball-project#154）。
+/// ポゼッション開始の value + context validation（handball-project#154 / #220）。
 ///
-/// 見るのは anchor の値域 / configuration 整合 / team 参照の 3 つだけ。`team_id` は型で必須なので
-/// 「欠けている」ケースは validation に来ない。end は型に無いので「end があってはならない」も不要。
+/// 見るのは anchor の値域 / configuration 整合 / end の順序 / team 参照の 4 つだけ。`team_id` は
+/// 型で必須なので「欠けている」ケースは validation に来ない。
+///
+/// **end に置く blocking は `start < end` だけ**（handball-project#220）。end 自体の有無は
+/// configuration で分岐しない — `stoppage` が Timer / Video で end の要否を分けているのとは
+/// **意図的に非対称**で、ポゼッションの end は「記録方法」ではなく「供給源が終わりを出せたか」で
+/// 決まる（CV は goal / ズームを組み合わせられた区間でだけ出せる）。
 ///
 /// **意図的に置いていないルール**（`DOMAIN_VALIDATION_RULES.md`「持たないルール」）:
-/// 同一チームの連続禁止 / phase を隙間なく覆う要求 / `.videoHighlight` での禁止。severity は一律
-/// blocking なので、これらを足すと供給源の欠測 1 件で試合まるごと import 拒否になる。
+/// 同一チームの連続禁止 / phase を隙間なく覆う要求 / `.videoHighlight` での禁止 /
+/// 「end ≤ 次のポゼッション開始」/「end が phase 範囲内」。severity は一律 blocking なので、
+/// これらを足すと供給源の欠測・順序逆転 1 件で試合まるごと import 拒否になる。
 pub fn validate_possession_fact(
     fact: &PossessionFact,
     configuration: &MatchConfiguration,
@@ -88,6 +94,21 @@ pub fn validate_possession_fact(
 
     issues.extend(validate_anchor_value(fact.anchor));
     issues.extend(validate_anchor_kind(fact.anchor.kind(), configuration));
+
+    if let Some(end_anchor) = fact.end_anchor {
+        issues.extend(validate_anchor_value(end_anchor));
+        issues.extend(validate_anchor_kind(end_anchor.kind(), configuration));
+
+        if let (Some(start_seconds), Some(end_seconds)) = (
+            progressing_ordering_seconds(fact.anchor),
+            progressing_ordering_seconds(end_anchor),
+        ) && end_seconds <= start_seconds
+        {
+            issues.push(DomainValidationIssue::Fact(
+                FactValidationError::PossessionEndBeforeStart,
+            ));
+        }
+    }
 
     if fact.team_id != roster.home_team_id && fact.team_id != roster.away_team_id {
         issues.push(DomainValidationIssue::Fact(
@@ -204,8 +225,8 @@ fn validate_stoppage(
         // Stoppage 中は matchClock が凍結する（start.match == end.match が正常）。
         // よって順序判定は進行する video clock を優先する（video があれば video、無ければ match）。
         if let (Some(start_seconds), Some(end_seconds)) = (
-            stoppage_ordering_seconds(payload.start_anchor),
-            stoppage_ordering_seconds(end_anchor),
+            progressing_ordering_seconds(payload.start_anchor),
+            progressing_ordering_seconds(end_anchor),
         ) && end_seconds <= start_seconds
         {
             issues.push(DomainValidationIssue::Fact(
@@ -444,9 +465,16 @@ fn primary_elapsed_seconds(anchor: FactAnchor) -> Option<f64> {
         .or(anchor.video_elapsed_seconds())
 }
 
-/// Stoppage の順序判定用秒（videoClock 優先、なければ matchClock）。
-/// Stoppage 中は matchClock が凍結するため、`Both` では video で start<end を判定する。
-fn stoppage_ordering_seconds(anchor: FactAnchor) -> Option<f64> {
+/// 「必ず進む時計」での順序判定用秒（videoClock 優先、なければ matchClock）。
+///
+/// matchClock は Stoppage 中に凍結するので、start / end が停止をまたぐ・停止に接する fact では
+/// `Both` anchor が同じ秒を持ちうる。videoClock は止まらないため、`start < end` を偽陽性なしで
+/// 判定できるのはこちら。Stoppage（区間が停止そのもの）と Possession（区間がタイムアウトを
+/// またぎうる）の両方が使う。
+///
+/// `PhaseStart` は `primary_elapsed_seconds`（matchClock 優先）のまま — 規定長を
+/// `end - start` で導出する定義が matchClock 側にあるため。
+fn progressing_ordering_seconds(anchor: FactAnchor) -> Option<f64> {
     anchor
         .video_elapsed_seconds()
         .or(anchor.match_elapsed_seconds())

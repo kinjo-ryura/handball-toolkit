@@ -674,17 +674,27 @@ pub fn build_stoppage_fact(
 /// 呼び出し側が `capture_play_anchor` で組む（記録オフセット + phase / stoppage 境界クランプは
 /// play fact と同じ規則。「ボールを保持した瞬間」を押し遅れ補正込みで取る）。
 ///
+/// `end_anchor` は任意（handball-project#220）。記録キー（`B`）は始まりだけを打つので None を渡し、
+/// 終わりを入れるのはフォームからの編集と、終わりを出せた供給源の import。`build_stoppage_fact` が
+/// 記録方法（Timer / Video）で end の要否を分けるのとは**非対称** — ポゼッションの end は記録方法
+/// ではなく「供給源が終わりを出せたか」で決まる。
+///
 /// 正規化対象のテキストは持たない。`start_phase` のように shell が `MatchFact` を直接組む手も
 /// あるが、新規 fact の組立はコアに寄せる（`build_play_fact` / `build_stoppage_fact` と同じ列）。
 pub fn build_possession_fact(
     stamp: NewFactStamp,
     team_id: TeamId,
     anchor: FactAnchor,
+    end_anchor: Option<FactAnchor>,
 ) -> MatchFact {
     MatchFact {
         id: stamp.id,
         recorded_at: stamp.recorded_at,
-        payload: MatchFactPayload::Possession(PossessionFact { team_id, anchor }),
+        payload: MatchFactPayload::Possession(PossessionFact {
+            team_id,
+            anchor,
+            end_anchor,
+        }),
     }
 }
 

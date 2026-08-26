@@ -367,15 +367,18 @@ fn check_duplicate_fact_ids(label: &str, dto: &SampleMatchDtoV2, report: &mut Ru
     }
 }
 
-/// `play` / `possession` の anchor に end 系が入っていないかの検査
-/// （SCHEMA.md:「end 系は `phaseStart`（必須）/ `stoppage`（任意）で使用。
-/// `play` / `possession` では両方 null」）。
+/// `play` の anchor に end 系が入っていないかの検査
+/// （SCHEMA.md:「end 系は `phaseStart`（必須）/ `stoppage`・`possession`（任意）で使用。
+/// `play` では両方 null」）。
 ///
-/// converter は `play` / `possession` で `decode_end_anchor` を呼ばない。つまり
-/// end が書かれていても decode は成功し、**値だけが黙って捨てられる**（逆向きの
-/// 「必須なのに無い」は `MissingPhaseStartEnd` で弾かれるので、非対称な隙間）。
-/// ポゼッションの供給源（video-analysis, handball-project#178）が誤って区間を
-/// 書いた場合にエラーにならず情報が消える経路なので、配信前に blocking で止める。
+/// converter は `play` で `decode_end_anchor` を呼ばない。つまり end が書かれていても
+/// decode は成功し、**値だけが黙って捨てられる**（逆向きの「必須なのに無い」は
+/// `MissingPhaseStartEnd` で弾かれるので、非対称な隙間）。誤って区間を書いた場合に
+/// エラーにならず情報が消える経路なので、配信前に blocking で止める。
+///
+/// **`possession` は対象から外した**（handball-project#220）。ポゼッションは任意の end を
+/// 持てるようになり、converter が `decode_end_anchor` を呼ぶので値は捨てられない。
+/// `start < end` はコアの `validate_possession_fact` が `possessionEndBeforeStart` で見る。
 ///
 /// 検査はコアではなく CLI に置いた。`SampleMatchDecodeErrorV2` は FFI 境界の
 /// uniffi Enum で、variant 追加は ERROR_CODES.md・各シェルの網羅分岐・Android の
@@ -387,13 +390,6 @@ fn check_unexpected_anchor_end(label: &str, dto: &SampleMatchDtoV2, report: &mut
         let (payload_kind, anchor): (&str, Option<&SampleFactAnchorDtoV2>) =
             match fact.payload.kind.as_str() {
                 "play" => ("play", fact.payload.play.as_ref().map(|play| &play.anchor)),
-                "possession" => (
-                    "possession",
-                    fact.payload
-                        .possession
-                        .as_ref()
-                        .map(|possession| &possession.anchor),
-                ),
                 _ => continue,
             };
         // sub-payload 欠落は convert が `MissingPayloadBody` で弾く。

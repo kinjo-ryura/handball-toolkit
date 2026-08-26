@@ -63,7 +63,7 @@ class DomainValidationMessagesTest {
         // docs/ERROR_CODES.md が公表している数。ここがずれたら同ドキュメントも直す。
         assertEquals(3, caseNames(MatchValidationError::class.java).size)
         assertEquals(2, caseNames(ConfigurationValidationError::class.java).size)
-        assertEquals(22, caseNames(FactValidationError::class.java).size)
+        assertEquals(23, caseNames(FactValidationError::class.java).size)
         assertEquals(12, caseNames(TimelineValidationError::class.java).size)
         assertEquals(7, caseNames(CoreWriteException::class.java).size)
     }

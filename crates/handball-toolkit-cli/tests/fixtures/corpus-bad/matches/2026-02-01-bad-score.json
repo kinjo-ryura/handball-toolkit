@@ -152,6 +152,27 @@
           }
         }
       }
+    },
+    {
+      "factID": "55555555-5555-5555-5555-555555555555",
+      "recordedAt": "2026-02-01T10:09:00Z",
+      "payload": {
+        "kind": "possession",
+        "control": null,
+        "play": null,
+        "possession": {
+          "teamKey": "away",
+          "anchor": {
+            "kind": "videoClock",
+            "matchClock": null,
+            "videoClock": {
+              "elapsedSeconds": 200.0
+            },
+            "endMatchElapsedSeconds": null,
+            "endVideoElapsedSeconds": 190.0
+          }
+        }
+      }
     }
   ]
 }

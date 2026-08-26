@@ -392,16 +392,16 @@ fn 動画モードの_stoppage_は_end_anchor_付きで組む() {
     assert_eq!(payload.note.as_deref(), Some("負傷"));
 }
 
-// ── build_possession_fact（handball-project#184）──
+// ── build_possession_fact（handball-project#184 / #220）──
 
 /// ポゼッション開始は stamp の id / recorded_at を載せ、`team_id` と anchor をそのまま持つ
-/// （正規化するテキストも end も無い）。
+/// （正規化するテキストは無い）。記録キー（`B`）は始まりだけを打つので end は None。
 #[test]
 fn ポゼッション開始_fact_は_team_id_と_anchor_をそのまま載せる() {
     let anchor = FactAnchor::VideoClock(VideoClock {
         elapsed_seconds: 1234.5,
     });
-    let fact = build_possession_fact(stamp(7), TeamId(Uuid::from_u128(2)), anchor);
+    let fact = build_possession_fact(stamp(7), TeamId(Uuid::from_u128(2)), anchor, None);
 
     assert_eq!(fact.id, FactId(Uuid::from_u128(7)));
     assert_eq!(fact.recorded_at, epoch());
@@ -410,6 +410,25 @@ fn ポゼッション開始_fact_は_team_id_と_anchor_をそのまま載せる
     };
     assert_eq!(possession.team_id, TeamId(Uuid::from_u128(2)));
     assert_eq!(possession.anchor, anchor);
+    assert_eq!(possession.end_anchor, None);
+}
+
+/// 渡した end はそのまま載る（クランプも正規化もしない — 上界との突き合わせは
+/// `PossessionProjection` の仕事で、ここは組み立てるだけ）。
+#[test]
+fn ポゼッション開始_fact_は_渡した_end_をそのまま載せる() {
+    let anchor = FactAnchor::VideoClock(VideoClock {
+        elapsed_seconds: 1234.5,
+    });
+    let end = FactAnchor::VideoClock(VideoClock {
+        elapsed_seconds: 1250.0,
+    });
+    let fact = build_possession_fact(stamp(8), TeamId(Uuid::from_u128(2)), anchor, Some(end));
+
+    let MatchFactPayload::Possession(possession) = fact.payload else {
+        panic!("possession fact のはず");
+    };
+    assert_eq!(possession.end_anchor, Some(end));
 }
 
 /// stoppage の note も play fact と同じ規則で正規化する（移植元は

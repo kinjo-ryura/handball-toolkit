@@ -299,7 +299,10 @@ fn decode_payload(
 }
 
 /// `team_key` は必須なので `Option` を剥がす手当てが要らない（play とは非対称）。
-/// anchor の end 系は読まない — ポゼッションは点で、区間は次の開始から導出する。
+///
+/// anchor の end 系は**任意**（handball-project#220）。両方 None なら end 無しで、区間の終わりは
+/// `PossessionProjection` が goal / 次の開始 / phase end から導出する。`stoppage` と同じ扱いなので
+/// `decode_end_anchor` をそのまま使う。
 fn decode_possession_fact(
     dto: &SamplePossessionFactDtoV2,
     teams_by_key: &BTreeMap<String, TeamId>,
@@ -309,7 +312,12 @@ fn decode_possession_fact(
         .copied()
         .ok_or_else(|| SampleMatchDecodeErrorV2::UnknownTeamKey(dto.team_key.clone()))?;
     let anchor = decode_start_anchor(&dto.anchor)?;
-    Ok(PossessionFact { team_id, anchor })
+    let end_anchor = decode_end_anchor(&dto.anchor, anchor)?;
+    Ok(PossessionFact {
+        team_id,
+        anchor,
+        end_anchor,
+    })
 }
 
 fn decode_play_fact(
