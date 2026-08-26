@@ -68,13 +68,16 @@ fn corpus_bad_reports_expected_findings() {
         ("scoreMismatch", "2026-02-01-bad-score.json"),
         // facts[3] の factID が facts[1] と同じ。
         ("duplicateFactID", "2026-02-01-bad-score.json"),
-        // possession の anchor に end が入っている（convert は黙って捨てる）。
-        ("unexpectedAnchorEnd", "2026-02-01-bad-score.json"),
+        // facts[5] の possession が end < start（handball-project#220）。**facts[4] は
+        // end > start の正常な possession** で、こちらは指摘されないことが
+        // `possession_with_valid_end_is_not_flagged` の証拠になっている。
+        ("possessionEndBeforeStart", "2026-02-01-bad-score.json"),
         ("orphanMatchFile", "orphan.json"),
         ("videoHighlightContainsPhaseStart", "with-phase.json"),
         ("factCountMismatch", "with-phase.json"),
         ("teamNameMismatch", "with-phase.json"),
-        // play 側の end。possession とは別経路なので両方を固定する。
+        // `unexpectedAnchorEnd` は play だけの検査になった（#220 で possession を外した）。
+        // この 1 件が唯一の証拠。
         ("unexpectedAnchorEnd", "with-phase.json"),
     ];
     for (code, file) in expect {
@@ -154,25 +157,56 @@ fn corpus_bad_pins_new_check_details() {
         Some("22222222-2222-2222-2222-222222222222")
     );
 
-    // end 系は possession / play の両方で、入っていた側の値だけを載せる。
-    let possession_end = by_code("unexpectedAnchorEnd", "2026-02-01-bad-score.json");
+    // 逆順の possession end は facts[5] を名指しする（facts[4] の正常な end ではなく）。
+    let possession_end = by_code("possessionEndBeforeStart", "2026-02-01-bad-score.json");
+    assert_eq!(possession_end.fact_index, Some(5));
     assert_eq!(
-        possession_end.issue["params"]["payloadKind"].as_str(),
-        Some("possession")
+        possession_end.fact_id.as_deref(),
+        Some("55555555-5555-5555-5555-555555555555")
     );
-    assert_eq!(
-        possession_end.issue["params"]["endVideoElapsedSeconds"].as_f64(),
-        Some(160.0)
-    );
-    assert!(possession_end.issue["params"]["endMatchElapsedSeconds"].is_null());
-    assert_eq!(possession_end.fact_index, Some(4));
 
+    // `unexpectedAnchorEnd` は play にだけ効く。end を載せた側の値だけを params に置く。
     let play_end = by_code("unexpectedAnchorEnd", "with-phase.json");
     assert_eq!(
         play_end.issue["params"]["payloadKind"].as_str(),
         Some("play")
     );
     assert_eq!(play_end.fact_index, Some(1));
+}
+
+/// **end > start の possession は指摘されない**（handball-project#220）。
+///
+/// #220 以前は possession の anchor に end があるだけで `unexpectedAnchorEnd` が出ていた。
+/// 検査を外したことが「possession の end に何の検査も無くなった」ではないこと
+/// （逆順は `possessionEndBeforeStart` が捕まえる）と対で固定する。
+#[test]
+fn possession_with_valid_end_is_not_flagged() {
+    let mut report = RunReport::default();
+    validate_corpus(&fixture("corpus-bad"), &mut report);
+
+    // facts[4] = videoClock 140 → end 160 の正常な possession。
+    assert!(
+        !report.findings.iter().any(|finding| {
+            finding.path.ends_with("2026-02-01-bad-score.json") && finding.fact_index == Some(4)
+        }),
+        "facts[4] は正常な possession なので指摘されないはず: {:#?}",
+        report.findings
+    );
+    // 検査自体が possession を素通りするようになったことも固定する。
+    assert!(
+        !report.findings.iter().any(|finding| {
+            finding.issue.get("code").and_then(|value| value.as_str())
+                == Some("unexpectedAnchorEnd")
+                && finding
+                    .issue
+                    .get("params")
+                    .and_then(|params| params.get("payloadKind"))
+                    .and_then(|value| value.as_str())
+                    == Some("possession")
+        }),
+        "possession は unexpectedAnchorEnd の対象外のはず: {:#?}",
+        report.findings
+    );
 }
 
 /// 正しく並んだ index には降順・slug 日付のどちらも出ない（偽陽性ゼロの確認）。

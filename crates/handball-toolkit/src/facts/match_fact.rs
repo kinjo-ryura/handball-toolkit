@@ -40,9 +40,13 @@ impl MatchFact {
         }
     }
 
-    /// anchor を 1 本だけ持つ fact（= range を持たない fact）の anchor。
-    /// R7 / R8 のように「点として扱う fact」を対象にする箇所で使う。
+    /// 「点として扱う fact」の代表 anchor = 始まり。R7 / R8 のように点を対象にする箇所で使う。
     /// ControlFact は start / end の range を持つので `None`。
+    ///
+    /// **`PossessionFact` は任意の end を持つが、ここでは始まりだけを返す**
+    /// （handball-project#220）。R7（phase range 内）/ R8（Stoppage range 外）を end にも掛けると
+    /// 「end が phase 範囲内」を blocking で要求することになり、意図的に置かないと決めたルールが
+    /// 裏口から復活する（`DOMAIN_VALIDATION_RULES.md`「持たないルール」）。
     pub fn single_anchor(&self) -> Option<FactAnchor> {
         match &self.payload {
             MatchFactPayload::Play(play) => Some(play.anchor),

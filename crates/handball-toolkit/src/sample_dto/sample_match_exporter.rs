@@ -200,7 +200,8 @@ fn encode_possession(
             .get(&possession.team_id)
             .map(|key| (*key).to_owned())
             .unwrap_or_default(),
-        anchor: encode_anchor(possession.anchor, None),
+        // end は任意（handball-project#220）。無ければ `encode_anchor` が end 系を両方 None にする。
+        anchor: encode_anchor(possession.anchor, possession.end_anchor),
     }
 }
 

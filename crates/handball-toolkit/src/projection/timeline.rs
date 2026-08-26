@@ -64,12 +64,24 @@ impl TimelineProjection {
     }
 }
 
-/// fact の anchor から projection 用 matchClock / videoClock を解決する。
+/// fact の代表 anchor から projection 用 matchClock / videoClock を解決する。
 fn resolve_clocks(
     fact: &MatchFact,
     resolver: &SegmentResolver,
 ) -> (Option<MatchClock>, Option<VideoClock>) {
-    match fact.anchor() {
+    resolve_anchor_clocks(fact.anchor(), resolver)
+}
+
+/// 任意の anchor を projection 用 matchClock / videoClock へ解決する。
+///
+/// `ResolvedFact` が持つのは**代表 anchor**（点の fact なら唯一の anchor、range を持つ fact なら
+/// start）だけなので、end anchor を読む projection はこちらを直接呼ぶ
+/// （`PossessionProjection` の明示 end — handball-project#220）。
+pub(crate) fn resolve_anchor_clocks(
+    anchor: FactAnchor,
+    resolver: &SegmentResolver,
+) -> (Option<MatchClock>, Option<VideoClock>) {
+    match anchor {
         FactAnchor::MatchClock(mc) => {
             // matchClock のみ → video 派生は resolver 経由
             (Some(mc), resolver.resolve_video_clock(mc))

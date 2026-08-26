@@ -257,8 +257,10 @@ pub struct SampleControlFactDtoV2 {
 pub struct SamplePossessionFactDtoV2 {
     /// `"home"` | `"away"`。**必須**（`SamplePlayFactDtoV2::team_key` と違い `Option` ではない）。
     pub team_key: String,
-    /// ボールを保持した瞬間。end 系（`end_match_elapsed_seconds` / `end_video_elapsed_seconds`）は
-    /// 両方 None（区間は次のポゼッション開始から導出する）。
+    /// そのチームのプレーが動き出した瞬間（handball-project#220 で「ボールを保持した瞬間」から
+    /// 改めた）。end 系（`end_match_elapsed_seconds` / `end_video_elapsed_seconds`）は**任意** —
+    /// 供給源が終わりを出せた区間にだけ入り、無ければ goal / 次のポゼッション開始 / phase end から
+    /// 導出する。
     pub anchor: SampleFactAnchorDtoV2,
 }
 
@@ -293,7 +295,7 @@ pub struct SampleFactAnchorDtoV2 {
     pub match_clock: Option<SampleMatchClockDtoV2>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub video_clock: Option<SampleVideoClockDtoV2>,
-    /// PhaseStart / Stoppage の end（range 末尾）。PlayFact では両方 None。
+    /// PhaseStart（必須）/ Stoppage・Possession（任意）の end（range 末尾）。PlayFact では両方 None。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end_match_elapsed_seconds: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]

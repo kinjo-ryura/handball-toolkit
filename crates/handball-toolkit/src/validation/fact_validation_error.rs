@@ -81,6 +81,16 @@ pub enum FactValidationError {
     /// `Pause` の `note` が trim 後空文字（None は valid、空文字は None 相当）。
     EmptyStoppageNote,
 
+    // ── Possession range ──
+    /// `end_anchor` の elapsedSeconds > `anchor` の elapsedSeconds でない。0 length / 逆順。
+    ///
+    /// ポゼッションに置く blocking はこれ **1 つだけ**（handball-project#220）。「end ≤ 次の
+    /// ポゼッション開始」「end が phase 範囲内」は意図的に置かない — 機械が 112〜202 件 / 試合を
+    /// 書き、goal は放送により最大 +25s 遅れる一方で次の開始は 4〜6 秒後に来るため順序の逆転が
+    /// 常態で、severity 一律 blocking では 1 件で試合まるごと import 拒否になる。関係の整合は
+    /// `PossessionProjection` のクランプが担保する。
+    PossessionEndBeforeStart,
+
     // ── team / player 参照整合 ──
     UnknownTeamReference {
         team_id: TeamId,

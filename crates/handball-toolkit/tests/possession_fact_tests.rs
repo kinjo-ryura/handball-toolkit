@@ -84,6 +84,24 @@ fn video_possession(team: TeamId, secs: f64) -> MatchFact {
             anchor: FactAnchor::VideoClock(VideoClock {
                 elapsed_seconds: secs,
             }),
+            end_anchor: None,
+        }),
+    }
+}
+
+/// 明示 end 付きのポゼッション（handball-project#220）。
+fn video_possession_with_end(team: TeamId, secs: f64, end_secs: f64) -> MatchFact {
+    MatchFact {
+        id: FactId(Uuid::new_v4()),
+        recorded_at: recorded_at(),
+        payload: MatchFactPayload::Possession(PossessionFact {
+            team_id: team,
+            anchor: FactAnchor::VideoClock(VideoClock {
+                elapsed_seconds: secs,
+            }),
+            end_anchor: Some(FactAnchor::VideoClock(VideoClock {
+                elapsed_seconds: end_secs,
+            })),
         }),
     }
 }
@@ -131,6 +149,7 @@ fn accepts_video_clock_anchor_in_video_mode() {
         anchor: FactAnchor::VideoClock(VideoClock {
             elapsed_seconds: 754.0,
         }),
+        end_anchor: None,
     };
     assert!(validate_possession_fact(&fact, &c.video_config, &roster(&c)).is_empty());
 }
@@ -143,6 +162,7 @@ fn rejects_negative_anchor() {
         anchor: FactAnchor::VideoClock(VideoClock {
             elapsed_seconds: -1.0,
         }),
+        end_anchor: None,
     };
     let issues = validate_possession_fact(&fact, &c.video_config, &roster(&c));
     assert!(issues.contains(&DomainValidationIssue::Fact(
@@ -158,6 +178,7 @@ fn rejects_non_finite_anchor() {
         anchor: FactAnchor::VideoClock(VideoClock {
             elapsed_seconds: f64::NAN,
         }),
+        end_anchor: None,
     };
     let issues = validate_possession_fact(&fact, &c.video_config, &roster(&c));
     assert!(issues.contains(&DomainValidationIssue::Fact(
@@ -175,6 +196,7 @@ fn rejects_video_clock_anchor_in_timer_mode() {
         anchor: FactAnchor::VideoClock(VideoClock {
             elapsed_seconds: 10.0,
         }),
+        end_anchor: None,
     };
     let issues = validate_possession_fact(&fact, &c.timer_config, &roster(&c));
     assert!(issues.iter().any(|issue| matches!(
@@ -191,6 +213,7 @@ fn accepts_match_clock_anchor_in_timer_mode() {
         anchor: FactAnchor::MatchClock(MatchClock {
             elapsed_seconds: 10.0,
         }),
+        end_anchor: None,
     };
     assert!(validate_possession_fact(&fact, &c.timer_config, &roster(&c)).is_empty());
 }
@@ -204,6 +227,7 @@ fn rejects_team_outside_the_match() {
         anchor: FactAnchor::VideoClock(VideoClock {
             elapsed_seconds: 100.0,
         }),
+        end_anchor: None,
     };
     let issues = validate_possession_fact(&fact, &c.video_config, &roster(&c));
     assert!(issues.contains(&DomainValidationIssue::Fact(
@@ -221,6 +245,142 @@ fn match_fact_dispatch_reaches_possession() {
     assert!(issues.contains(&DomainValidationIssue::Fact(
         FactValidationError::UnknownTeamReference { team_id: stranger }
     )));
+}
+
+// ── 任意の end（handball-project#220）──
+
+/// end が無いのは正常（従来のデータ・終わりを出せない供給源）。
+#[test]
+fn accepts_possession_without_end() {
+    let c = ctx();
+    let fact = PossessionFact {
+        team_id: c.home_id,
+        anchor: FactAnchor::VideoClock(VideoClock {
+            elapsed_seconds: 754.0,
+        }),
+        end_anchor: None,
+    };
+    assert!(validate_possession_fact(&fact, &c.video_config, &roster(&c)).is_empty());
+}
+
+#[test]
+fn accepts_possession_with_end_after_start() {
+    let c = ctx();
+    let fact = PossessionFact {
+        team_id: c.home_id,
+        anchor: FactAnchor::VideoClock(VideoClock {
+            elapsed_seconds: 754.0,
+        }),
+        end_anchor: Some(FactAnchor::VideoClock(VideoClock {
+            elapsed_seconds: 772.0,
+        })),
+    };
+    assert!(validate_possession_fact(&fact, &c.video_config, &roster(&c)).is_empty());
+}
+
+/// **ポゼッションに置く blocking はこれ 1 つだけ**。値として成立していない end を弾く。
+#[test]
+fn rejects_end_before_start() {
+    let c = ctx();
+    let fact = PossessionFact {
+        team_id: c.home_id,
+        anchor: FactAnchor::VideoClock(VideoClock {
+            elapsed_seconds: 754.0,
+        }),
+        end_anchor: Some(FactAnchor::VideoClock(VideoClock {
+            elapsed_seconds: 700.0,
+        })),
+    };
+    let issues = validate_possession_fact(&fact, &c.video_config, &roster(&c));
+    assert!(issues.contains(&DomainValidationIssue::Fact(
+        FactValidationError::PossessionEndBeforeStart
+    )));
+}
+
+/// 0 長も不正（`stoppage` / `phaseStart` と同じ「> であって >= ではない」）。
+#[test]
+fn rejects_zero_length_end() {
+    let c = ctx();
+    let fact = PossessionFact {
+        team_id: c.home_id,
+        anchor: FactAnchor::VideoClock(VideoClock {
+            elapsed_seconds: 754.0,
+        }),
+        end_anchor: Some(FactAnchor::VideoClock(VideoClock {
+            elapsed_seconds: 754.0,
+        })),
+    };
+    let issues = validate_possession_fact(&fact, &c.video_config, &roster(&c));
+    assert!(issues.contains(&DomainValidationIssue::Fact(
+        FactValidationError::PossessionEndBeforeStart
+    )));
+}
+
+/// end 側の値域・capture method 整合も start と同じルールで見る。
+#[test]
+fn rejects_non_finite_end() {
+    let c = ctx();
+    let fact = PossessionFact {
+        team_id: c.home_id,
+        anchor: FactAnchor::VideoClock(VideoClock {
+            elapsed_seconds: 754.0,
+        }),
+        end_anchor: Some(FactAnchor::VideoClock(VideoClock {
+            elapsed_seconds: f64::INFINITY,
+        })),
+    };
+    let issues = validate_possession_fact(&fact, &c.video_config, &roster(&c));
+    assert!(issues.contains(&DomainValidationIssue::Fact(
+        FactValidationError::NonFiniteVideoClock
+    )));
+}
+
+/// **end の有無は configuration で分岐しない。** `stoppage` は Timer で end 禁止 /
+/// Video で end 必須だが、ポゼッションの end は記録方法ではなく「供給源が終わりを出せたか」で
+/// 決まるので、タイマーモードでも end を持てる。
+#[test]
+fn timer_mode_possession_may_carry_an_end() {
+    let c = ctx();
+    let fact = PossessionFact {
+        team_id: c.home_id,
+        anchor: FactAnchor::MatchClock(MatchClock {
+            elapsed_seconds: 600.0,
+        }),
+        end_anchor: Some(FactAnchor::MatchClock(MatchClock {
+            elapsed_seconds: 618.0,
+        })),
+    };
+    assert!(validate_possession_fact(&fact, &c.timer_config, &roster(&c)).is_empty());
+}
+
+/// **「end ≤ 次のポゼッション開始」は置かない**（`DOMAIN_VALIDATION_RULES.md`「持たないルール」）。
+/// 次の開始より後ろの end は fact 単体としては正常で、`PossessionProjection` がクランプする。
+#[test]
+fn end_past_the_next_possession_is_not_a_validation_issue() {
+    let c = ctx();
+    let facts = vec![
+        video_phase_start(0.0, 1800.0),
+        video_possession_with_end(c.home_id, 600.0, 700.0),
+        video_possession(c.away_id, 650.0), // end より手前に次の開始がある
+    ];
+    assert!(
+        validate_fact_log(&facts, &c.video_match).is_empty(),
+        "順序の逆転は常態なので blocking にしない"
+    );
+    let issues = validate_match_fact(&facts[1], &c.video_config, &roster(&c));
+    assert!(issues.is_empty(), "{issues:#?}");
+}
+
+/// **「end が phase 範囲内」も置かない**。R7 / R8 は始まりだけを見る。
+#[test]
+fn end_outside_the_phase_range_is_not_a_validation_issue() {
+    let c = ctx();
+    let facts = vec![
+        video_phase_start(0.0, 1800.0),
+        // 始まりは phase の中、end は phase の外（ハーフタイムへはみ出す）。
+        video_possession_with_end(c.home_id, 1790.0, 1900.0),
+    ];
+    assert!(validate_fact_log(&facts, &c.video_match).is_empty());
 }
 
 // ── R7 / R8（「anchor を 1 本持つ fact」へ一般化した分） ──

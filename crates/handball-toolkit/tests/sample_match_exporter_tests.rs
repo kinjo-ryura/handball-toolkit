@@ -17,7 +17,7 @@ use handball_toolkit::configuration::{MatchConfiguration, PhaseKind, VideoProvid
 use handball_toolkit::entities::{Match, Player, RosterSelection, Team};
 use handball_toolkit::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
-    StoppageKind, StoppagePayload,
+    PossessionFact, StoppageKind, StoppagePayload,
 };
 use handball_toolkit::ids::{FactId, MatchId, PlayerId, TeamId};
 use handball_toolkit::sample_dto::{
@@ -685,4 +685,123 @@ fn encode_parse_convert_round_trip_restores_domain() {
     assert_eq!(goal.player_id, Some(conversion.players_by_key[alice_key]));
     assert_eq!(goal.anchor, mc(63.5));
     assert_eq!(goal.note.as_deref(), Some("ナイスシュート"));
+}
+
+// ── 4. ポゼッションの任意 end（handball-project#220）──
+//
+// golden の 3 fixture は Swift オラクルとの byte 一致を見る側なので、Rust 独自に足した
+// ポゼッション（#154）とその end（#220）はここで別に固定する。**export → parse → convert の
+// 往復で end が保たれること**が要点 — #220 以前は converter が `decode_end_anchor` を呼ばず
+// **値が黙って捨てられて**いた（それを CLI の `unexpectedAnchorEnd` で塞いでいた）。
+
+fn possession_fixture() -> ExportFixture {
+    let home_team = Team {
+        id: TeamId(u("77777777-7777-7777-7777-777777777777")),
+        name: "Tigers".to_owned(),
+    };
+    let away_team = Team {
+        id: TeamId(u("88888888-8888-8888-8888-888888888888")),
+        name: "Falcons".to_owned(),
+    };
+    let match_ = Match {
+        id: MatchId(u("99999999-9999-9999-9999-999999999999")),
+        title: None,
+        date: ts(1_750_000_000, 0),
+        home_team_id: home_team.id,
+        away_team_id: away_team.id,
+        configuration: MatchConfiguration::Video(VideoSource {
+            provider: VideoProvider::Youtube,
+            external_id: "VIDEO_ID".to_owned(),
+        }),
+        roster_selection: RosterSelection::default(),
+        is_home_on_left: true,
+    };
+    let facts = vec![
+        fact(
+            21,
+            1_750_000_010,
+            0,
+            MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
+                kind: PhaseKind::Regular,
+                start_anchor: vc(10.0),
+                end_anchor: vc(600.0),
+            })),
+        ),
+        // 終わりを出せた供給源（明示 end 付き）。
+        fact(
+            22,
+            1_750_000_020,
+            0,
+            MatchFactPayload::Possession(PossessionFact {
+                team_id: home_team.id,
+                anchor: vc(100.0),
+                end_anchor: Some(vc(118.5)),
+            }),
+        ),
+        // 終わりを出せなかった供給源（従来どおりの形）。
+        fact(
+            23,
+            1_750_000_030,
+            0,
+            MatchFactPayload::Possession(PossessionFact {
+                team_id: away_team.id,
+                anchor: vc(125.0),
+                end_anchor: None,
+            }),
+        ),
+    ];
+    ExportFixture {
+        match_,
+        home_team,
+        away_team,
+        home_players: Vec::new(),
+        away_players: Vec::new(),
+        facts,
+    }
+}
+
+/// end のある / ない possession が JSON 往復で両方とも復元される。
+#[test]
+fn possession_end_survives_the_export_parse_convert_round_trip() {
+    let fixture = possession_fixture();
+    let encoded = encode_sample_match(&fixture.export());
+    let parsed: SampleMatchDtoV2 = serde_json::from_str(&encoded).unwrap();
+
+    let mut counter: u128 = 0;
+    let conversion = convert("possession-round-trip", &parsed, None, || {
+        counter += 1;
+        Uuid::from_u128(counter)
+    })
+    .unwrap();
+
+    let MatchFactPayload::Possession(with_end) = &conversion.facts[1].payload else {
+        panic!("facts[1] は possession のはず");
+    };
+    assert_eq!(with_end.team_id, conversion.home_team.id);
+    assert_eq!(with_end.anchor, vc(100.0));
+    assert_eq!(with_end.end_anchor, Some(vc(118.5)));
+
+    let MatchFactPayload::Possession(without_end) = &conversion.facts[2].payload else {
+        panic!("facts[2] は possession のはず");
+    };
+    assert_eq!(without_end.anchor, vc(125.0));
+    assert_eq!(without_end.end_anchor, None);
+}
+
+/// end 無しの possession は wire に end 系のキーを**書かない**（`skip_serializing_if`）。
+/// 既存の配信 JSON に余計なキーが生えないことの釘付け。
+#[test]
+fn possession_without_end_omits_the_end_keys_on_the_wire() {
+    let fixture = possession_fixture();
+    let dto = fixture.export();
+    let value: serde_json::Value = serde_json::from_str(&encode_sample_match(&dto)).unwrap();
+    let facts = value["facts"].as_array().unwrap();
+
+    let with_end = &facts[1]["payload"]["possession"]["anchor"];
+    assert_eq!(with_end["endVideoElapsedSeconds"].as_f64(), Some(118.5));
+    assert!(with_end.get("endMatchElapsedSeconds").is_none());
+
+    let without_end = &facts[2]["payload"]["possession"]["anchor"];
+    assert!(without_end.get("endVideoElapsedSeconds").is_none());
+    assert!(without_end.get("endMatchElapsedSeconds").is_none());
 }

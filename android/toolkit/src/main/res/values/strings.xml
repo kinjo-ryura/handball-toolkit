@@ -58,6 +58,8 @@
     <string name="handball_toolkit_fact_phase_start_end_before_start_body">The phase end must be later than its start. Check the times.</string>
     <string name="handball_toolkit_fact_stoppage_end_before_start_title">The stoppage ends before it starts</string>
     <string name="handball_toolkit_fact_stoppage_end_before_start_body">The stoppage end must be later than its start. Check the times.</string>
+    <string name="handball_toolkit_fact_possession_end_before_start_title">The possession ends before it starts</string>
+    <string name="handball_toolkit_fact_possession_end_before_start_body">The possession end must be later than its start. Check the times.</string>
     <string name="handball_toolkit_fact_stoppage_end_nil_in_video_mode_title">The stoppage needs an end time</string>
     <string name="handball_toolkit_fact_stoppage_end_nil_in_video_mode_body">Video mode records a closed stoppage interval. Enter the end time.</string>
     <string name="handball_toolkit_fact_stoppage_end_present_in_timer_mode_title">The stoppage end will not be saved</string>

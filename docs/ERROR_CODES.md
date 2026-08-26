@@ -73,7 +73,7 @@ Problems with the match configuration value itself.
 | `nonPositivePhaseDuration` | `seconds: number` | Timer mode requires a phase duration greater than zero. |
 | `emptyVideoExternalID` | — | Video and video-highlight modes require a non-empty external video id. |
 
-### scope: `fact` (22)
+### scope: `fact` (23)
 
 Problems with a single fact, judged on its own (plus the roster context it references).
 
@@ -126,6 +126,12 @@ aggregation without any error. These codes move that failure to write time.
 | `timeoutHasNote` | — | Timeout stoppages must not carry a note. |
 | `emptyStoppageNote` | — | The note is present but empty after trimming (use absent instead). |
 
+**Possessions**
+
+| code | params | meaning |
+|---|---|---|
+| `possessionEndBeforeStart` | — | The optional possession end is not strictly after its start. |
+
 **Roster integrity**
 
 | code | params | meaning |
@@ -160,6 +166,8 @@ historical gaps).
 | `playRecordedInsideStoppage` | R8 | — | A single-anchor fact is anchored inside a stoppage, i.e. while the match was stopped. |
 
 > **Both codes cover play *and* possession facts** — every fact that carries exactly one anchor. The `play` prefix is historical: the codes are a stable contract (ADR 0002, decision 2) and were kept when R7 / R8 were widened to possession facts (handball-project#154). Word the user-facing message for "a record", not "a play".
+>
+> **Only the start is checked.** A possession fact may carry an optional end (handball-project#220); neither rule looks at it. Requiring the end to sit inside a phase and outside every stoppage would reinstate, through the back door, a constraint that was deliberately left out — the end is written by machines at 112–202 facts per match, and a single blocking issue rejects a whole match on import.
 
 **Ordering and overlap**
 

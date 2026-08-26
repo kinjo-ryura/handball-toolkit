@@ -183,6 +183,10 @@ private fun FactValidationError.messageRes(): MessageRes = when (this) {
         R.string.handball_toolkit_fact_stoppage_end_before_start_title,
         R.string.handball_toolkit_fact_stoppage_end_before_start_body,
     )
+    is FactValidationError.PossessionEndBeforeStart -> MessageRes(
+        R.string.handball_toolkit_fact_possession_end_before_start_title,
+        R.string.handball_toolkit_fact_possession_end_before_start_body,
+    )
     is FactValidationError.StoppageEndNilInVideoMode -> MessageRes(
         R.string.handball_toolkit_fact_stoppage_end_nil_in_video_mode_title,
         R.string.handball_toolkit_fact_stoppage_end_nil_in_video_mode_body,
