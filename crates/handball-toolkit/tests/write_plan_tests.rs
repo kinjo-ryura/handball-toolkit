@@ -8,7 +8,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use handball_toolkit::clock::{FactAnchor, MatchClock, VideoClock};
-use handball_toolkit::configuration::{MatchConfiguration, PhaseKind, VideoProvider, VideoSource};
+use handball_toolkit::configuration::{
+    MatchConfiguration, MatchConfigurationKind, PhaseKind, VideoProvider, VideoSource,
+};
 use handball_toolkit::entities::{Match, RosterSelection};
 use handball_toolkit::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
@@ -16,8 +18,9 @@ use handball_toolkit::facts::{
 };
 use handball_toolkit::ids::{FactId, MatchId, PlayerId, TeamId};
 use handball_toolkit::write::{
-    NewFactStamp, PlayerTeamRef, VideoMigrationPlanError, VideoSyncInput, phase_completion_fact,
-    phase_completion_plan, roster_context_from_players, video_migration_plan,
+    NewFactStamp, PlayerTeamRef, VideoMigrationPlanError, VideoSourceReplacementError,
+    VideoSyncInput, phase_completion_fact, phase_completion_plan, roster_context_from_players,
+    video_migration_plan, video_source_replacement_plan,
 };
 use uuid::Uuid;
 
@@ -379,4 +382,71 @@ fn 移行計画は_video_anchor_済み_play_を触らない() {
         }
         other => panic!("Play を期待したが {other:?}"),
     }
+}
+
+// ── 動画ソースの差し替え計画（handball-project#267）──
+
+fn youtube(id: &str) -> VideoSource {
+    VideoSource {
+        provider: VideoProvider::Youtube,
+        external_id: id.to_string(),
+    }
+}
+
+fn local(id: &str) -> VideoSource {
+    VideoSource {
+        provider: VideoProvider::Local,
+        external_id: id.to_string(),
+    }
+}
+
+#[test]
+fn video_試合は_variant_を保って動画ソースだけ差し替わる() {
+    let plan = video_source_replacement_plan(
+        &MatchConfiguration::Video(youtube("fgRWI6C3UZM")),
+        local("ASSET/L0/001"),
+    )
+    .expect("計画成立");
+    assert_eq!(plan, MatchConfiguration::Video(local("ASSET/L0/001")));
+}
+
+#[test]
+fn video_highlight_は_video_へ格下げされない() {
+    let plan = video_source_replacement_plan(
+        &MatchConfiguration::VideoHighlight(youtube("z5KrsvC6VAA")),
+        local("ASSET/L0/002"),
+    )
+    .expect("計画成立");
+    assert_eq!(
+        plan,
+        MatchConfiguration::VideoHighlight(local("ASSET/L0/002")),
+        "ハイライト集をフル試合へ変える操作ではない"
+    );
+}
+
+#[test]
+fn ローカルから_youtube_へも戻せる() {
+    let plan = video_source_replacement_plan(
+        &MatchConfiguration::Video(local("ASSET/L0/001")),
+        youtube("fgRWI6C3UZM"),
+    )
+    .expect("計画成立");
+    assert_eq!(plan, MatchConfiguration::Video(youtube("fgRWI6C3UZM")));
+}
+
+#[test]
+fn timer_試合の差し替えは拒否する() {
+    let result = video_source_replacement_plan(
+        &MatchConfiguration::Timer {
+            phase_duration_seconds: 1800.0,
+        },
+        youtube("fgRWI6C3UZM"),
+    );
+    assert_eq!(
+        result,
+        Err(VideoSourceReplacementError::SourceConfigurationHasNoVideo {
+            kind: MatchConfigurationKind::Timer
+        }),
+        "タイマー → 動画は同期点が要る（video_migration_plan の仕事）"
+    );
 }

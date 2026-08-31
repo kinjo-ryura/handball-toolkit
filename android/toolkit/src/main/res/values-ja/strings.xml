@@ -102,7 +102,7 @@
     <string name="handball_toolkit_timeline_stoppage_outside_phase_range_title">ピリオド外の中断記録があります</string>
     <string name="handball_toolkit_timeline_stoppage_outside_phase_range_body">中断記録がピリオドの範囲外にあります。ピリオド範囲か中断時刻を見直してください。</string>
 
-    <!-- ── write scope（CoreWriteError 7 ケース）── -->
+    <!-- ── write scope（CoreWriteError 8 ケース）── -->
     <string name="handball_toolkit_write_validation_failed_title">保存できませんでした</string>
     <string name="handball_toolkit_write_validation_failed_body">入力内容に問題があります。修正してからもう一度お試しください。</string>
     <!-- 複数 issue をまとめて出すときの前置き。%1$d は件数。 -->
@@ -119,5 +119,7 @@
     <string name="handball_toolkit_write_migration_plan_infeasible_body">試合時間と動画の対応が取れていません。同期の基準を追加してからやり直してください。</string>
     <string name="handball_toolkit_write_import_decode_failed_title">試合データを読み込めませんでした</string>
     <string name="handball_toolkit_write_import_decode_failed_body">ファイルの内容が想定と違います。別のファイルで試してください。</string>
+    <string name="handball_toolkit_write_video_source_not_replaceable_title">動画を差し替えられません</string>
+    <string name="handball_toolkit_write_video_source_not_replaceable_body">この試合にはまだ動画が紐付いていません。先に動画モードへ切り替えてください。</string>
 
 </resources>

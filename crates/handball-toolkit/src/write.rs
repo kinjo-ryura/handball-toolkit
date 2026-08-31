@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use chrono::{DateTime, Utc};
 
 use crate::clock::{FactAnchor, MatchClock, VideoClock};
-use crate::configuration::{MatchConfiguration, PhaseKind, VideoSource};
+use crate::configuration::{MatchConfiguration, MatchConfigurationKind, PhaseKind, VideoSource};
 use crate::entities::Match;
 use crate::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
@@ -308,6 +308,45 @@ pub fn video_migration_plan(
 
     updated_control.extend(updated_plays);
     Ok(updated_control)
+}
+
+// ── 動画ソースの差し替え計画（handball-project#267）──
+
+/// 動画ソースの差し替えが成立しない理由（発火層が `CoreWriteError` へ写像する）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VideoSourceReplacementError {
+    /// 差し替え元が動画ソースを持たない（`.timer`）。タイマー → 動画は同期点の指定が
+    /// 要るので、この経路ではなく `commit_video_migration`（移行ウィザード）を使う。
+    SourceConfigurationHasNoVideo { kind: MatchConfigurationKind },
+}
+
+/// 既存 configuration の **variant を保ったまま** 動画ソースだけを差し替えた
+/// configuration を返す（handball-project#267）。
+///
+/// **fact は 1 件も対象にしない。** 差し替えるのは configuration だけで、記録済み fact の
+/// `videoClock` は触らない — つまり「新しい動画は元の動画と同じ切り出し（同じ 0 秒起点・
+/// 同じ尺）である」ことは**呼び出し側の責任**であり、コアには検証手段が無い。ずれた動画へ
+/// 差し替えるとエラーは出ず全 fact の時刻だけが静かにずれるため、UI は必ずこの前提を示す。
+///
+/// `.timer` からの差し替えは拒否する。タイマーモードの fact は matchClock しか持たず、
+/// 動画へ紐付けるには phase / stoppage ごとの同期点が要る（`video_migration_plan` の仕事）。
+/// 「動画ソースを差し替えるだけ」に見えて実体は移行なので、型でも入口でも分ける。
+///
+/// `.video` / `.videoHighlight` は variant を保つ。ハイライト集をフル試合へ（あるいは逆へ）
+/// 変える操作ではないため。provider の組み合わせ（YouTube ↔ ローカル）は制限しない。
+pub fn video_source_replacement_plan(
+    configuration: &MatchConfiguration,
+    new_source: VideoSource,
+) -> Result<MatchConfiguration, VideoSourceReplacementError> {
+    match configuration {
+        MatchConfiguration::Timer { .. } => {
+            Err(VideoSourceReplacementError::SourceConfigurationHasNoVideo {
+                kind: configuration.kind(),
+            })
+        }
+        MatchConfiguration::Video(_) => Ok(MatchConfiguration::Video(new_source)),
+        MatchConfiguration::VideoHighlight(_) => Ok(MatchConfiguration::VideoHighlight(new_source)),
+    }
 }
 
 // ── 移行ウィザードの draft 事前検証（移植元: VideoModeMigrationValidator）──

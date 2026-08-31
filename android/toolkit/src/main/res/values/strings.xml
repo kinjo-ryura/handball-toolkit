@@ -103,7 +103,7 @@
     <string name="handball_toolkit_timeline_stoppage_outside_phase_range_title">A stoppage falls outside every phase</string>
     <string name="handball_toolkit_timeline_stoppage_outside_phase_range_body">A stoppage sits outside the phases. Check the phase range, or the stoppage time.</string>
 
-    <!-- scope: write (CoreWriteError, 7 codes) -->
+    <!-- scope: write (CoreWriteError, 8 codes) -->
     <string name="handball_toolkit_write_validation_failed_title">Could not save</string>
     <string name="handball_toolkit_write_validation_failed_body">Something in the input needs fixing. Correct it and try again.</string>
     <!-- Lead-in when several issues are reported at once. %1$d is the count. -->
@@ -120,5 +120,7 @@
     <string name="handball_toolkit_write_migration_plan_infeasible_body">Match time and video cannot be lined up yet. Add a sync point and try again.</string>
     <string name="handball_toolkit_write_import_decode_failed_title">Could not read the match data</string>
     <string name="handball_toolkit_write_import_decode_failed_body">The file does not have the expected contents. Try a different file.</string>
+    <string name="handball_toolkit_write_video_source_not_replaceable_title">Cannot swap the video</string>
+    <string name="handball_toolkit_write_video_source_not_replaceable_body">This match has no video attached yet. Switch it to video mode first.</string>
 
 </resources>

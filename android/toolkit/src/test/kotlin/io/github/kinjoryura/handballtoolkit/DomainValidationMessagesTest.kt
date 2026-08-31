@@ -65,7 +65,7 @@ class DomainValidationMessagesTest {
         assertEquals(2, caseNames(ConfigurationValidationError::class.java).size)
         assertEquals(23, caseNames(FactValidationError::class.java).size)
         assertEquals(12, caseNames(TimelineValidationError::class.java).size)
-        assertEquals(7, caseNames(CoreWriteException::class.java).size)
+        assertEquals(8, caseNames(CoreWriteException::class.java).size)
     }
 
     // ── helper ──

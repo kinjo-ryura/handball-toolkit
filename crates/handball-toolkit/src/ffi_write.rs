@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
-use crate::configuration::{MatchConfiguration, VideoSource};
+use crate::configuration::{MatchConfiguration, MatchConfigurationKind, VideoSource};
 use crate::entities::{Match, Player, Team};
 use crate::facts::MatchFact;
 use crate::ids::{FactId, MatchId, PlayerId, TeamId};
@@ -23,7 +23,10 @@ use crate::sample_dto::SampleMatchDtoV2;
 use crate::sample_import::{self, ImportCommitOutcome, ImportDecisions, ImportWriteBatch};
 use crate::validation::DomainValidationIssue;
 use crate::validators::{self, RosterContext};
-use crate::write::{self, NewFactStamp, PlayerTeamRef, VideoMigrationPlanError, VideoSyncInput};
+use crate::write::{
+    self, NewFactStamp, PlayerTeamRef, VideoMigrationPlanError, VideoSourceReplacementError,
+    VideoSyncInput,
+};
 
 /// write 入口の失敗（ADR 0005 決定 5。ADR 0002: 構造化 — コード + パラメータのみ）。
 ///
@@ -54,6 +57,24 @@ pub enum CoreWriteError {
     /// import commit の DTO → domain decode 失敗（未知の teamKey / playerKey・不正な
     /// configuration 等）。移植元 `MatchImporterV2.ImportError.conversionFailed` 相当。
     ImportDecodeFailed { detail: String },
+    /// 動画ソースの差し替えが適用できない試合（動画ソースを持たない `.timer`）。
+    /// タイマー → 動画は同期点の指定が要るので `commit_video_migration` を使う
+    /// （handball-project#267）。
+    VideoSourceNotReplaceable {
+        configuration: MatchConfigurationKind,
+    },
+}
+
+impl From<VideoSourceReplacementError> for CoreWriteError {
+    fn from(error: VideoSourceReplacementError) -> Self {
+        match error {
+            VideoSourceReplacementError::SourceConfigurationHasNoVideo { kind } => {
+                CoreWriteError::VideoSourceNotReplaceable {
+                    configuration: kind,
+                }
+            }
+        }
+    }
 }
 
 impl From<VideoMigrationPlanError> for CoreWriteError {
@@ -240,6 +261,35 @@ pub async fn commit_video_migration(
         }
     }
     Ok(())
+}
+
+/// 動画ソース差し替えの入口（handball-project#267）。
+///
+/// 既存 configuration の variant を保ったまま動画ソースだけを差し替える
+/// （YouTube ↔ ローカル。`.timer` は拒否 — 同期点が要るので `commit_video_migration` の仕事）。
+///
+/// **fact を 1 件も書き換えない。** この関数は `load_fact_log` も `update_fact` も呼ばず、
+/// 触るのは `Match.configuration` だけ — 契約を型と呼び出しの形で表す。したがって
+/// **記録済み `videoClock` が新しい動画でも同じ位置を指すことは呼び出し側の責任**で、
+/// 切り出しの違う動画へ差し替えるとエラーは出ず統計だけが静かにずれる。
+///
+/// 新 configuration は `validate_configuration` に掛ける（`external_id` の空文字を弾く）。
+/// `record_save_match` が passthrough なのと違い、ここは**コアが configuration を組む**ので
+/// 組んだものの正しさはコアが持つ。
+#[uniffi::export]
+pub async fn record_replace_video_source(
+    repo: Arc<dyn MatchWriteRepository>,
+    match_id: MatchId,
+    video_source: VideoSource,
+) -> Result<(), CoreWriteError> {
+    let mut match_ = repo.load_match(match_id).await?;
+    let configuration = write::video_source_replacement_plan(&match_.configuration, video_source)?;
+    let issues = validators::validate_configuration(&configuration);
+    if !issues.is_empty() {
+        return Err(CoreWriteError::ValidationFailed { issues });
+    }
+    match_.configuration = configuration;
+    repo.save_match(match_).await
 }
 
 /// import commit の atomic 発火 repository（シェルが実装して注入する foreign trait —
