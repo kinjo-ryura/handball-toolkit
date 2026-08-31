@@ -10,7 +10,9 @@ use std::future::Future;
 use std::sync::{Arc, Mutex};
 
 use handball_toolkit::clock::{FactAnchor, MatchClock, VideoClock};
-use handball_toolkit::configuration::{MatchConfiguration, PhaseKind, VideoProvider, VideoSource};
+use handball_toolkit::configuration::{
+    MatchConfiguration, MatchConfigurationKind, PhaseKind, VideoProvider, VideoSource,
+};
 use handball_toolkit::entities::{Match, RosterSelection};
 use handball_toolkit::entities::{Player, Team};
 use handball_toolkit::facts::{
@@ -24,13 +26,16 @@ use handball_toolkit::sample_dto::{
     SampleTeamDtoV2, SampleTeamsDtoV2, SampleTimerConfigurationDtoV2,
 };
 use handball_toolkit::sample_import::{ImportDecisions, ImportWriteBatch, TeamTarget};
-use handball_toolkit::validation::{DomainValidationIssue, FactValidationError};
+use handball_toolkit::validation::{
+    ConfigurationValidationError, DomainValidationIssue, FactValidationError,
+};
 use handball_toolkit::write::{NewFactStamp, PlayerTeamRef, VideoSyncInput};
 use handball_toolkit_ffi::ffi_write::{
     CoreWriteError, ImportWriteRepository, MatchWriteRepository, TeamWriteRepository,
     commit_sample_match_import, commit_video_migration, count_phase_completion_facts,
     record_append_fact, record_delete_fact, record_delete_player, record_delete_team,
-    record_fact_with_phase_completion, record_save_player, record_save_team, record_update_fact,
+    record_fact_with_phase_completion, record_replace_video_source, record_save_player,
+    record_save_team, record_update_fact,
 };
 use uuid::Uuid;
 
@@ -123,6 +128,19 @@ impl FakeRepo {
 
     fn fact_log(&self) -> Vec<MatchFact> {
         self.facts.lock().expect("テスト内で poison しない").clone()
+    }
+
+    /// 差し替え元の configuration を差し替える（動画ソース差し替えの入口テスト用）。
+    fn with_configuration(mut self, configuration: MatchConfiguration) -> Self {
+        self.match_.configuration = configuration;
+        self
+    }
+
+    fn saved_matches(&self) -> Vec<Match> {
+        self.saved_matches
+            .lock()
+            .expect("テスト内で poison しない")
+            .clone()
     }
 }
 
@@ -1028,4 +1046,133 @@ fn 検証に落ちる_import_は_commit_import_を発火しない() {
             .is_empty(),
         "検証に落ちたら 1 件も保存しない（atomic の片側の保証）"
     );
+}
+
+// ── 動画ソースの差し替え（handball-project#267）──
+
+fn local_video_source() -> VideoSource {
+    VideoSource {
+        provider: VideoProvider::Local,
+        external_id: "ASSET/L0/001".to_string(),
+    }
+}
+
+/// videoClock を持つ動画モードの fact 列（差し替えで動かないことを見る対象）。
+fn video_mode_facts() -> Vec<MatchFact> {
+    vec![
+        fact(
+            PHASE_START_ID,
+            MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
+                kind: PhaseKind::Regular,
+                start_anchor: FactAnchor::VideoClock(VideoClock {
+                    elapsed_seconds: 10.0,
+                }),
+                end_anchor: FactAnchor::VideoClock(VideoClock {
+                    elapsed_seconds: 1810.0,
+                }),
+            })),
+        ),
+        fact(
+            GOAL_ID,
+            MatchFactPayload::Play(PlayFact {
+                kind: PlayEventKind::Goal,
+                team_id: Some(TeamId(Uuid::from_u128(HOME_ID))),
+                player_id: Some(PlayerId(Uuid::from_u128(SCORER_ID))),
+                related_player_id: None,
+                anchor: FactAnchor::VideoClock(VideoClock {
+                    elapsed_seconds: 70.0,
+                }),
+                title: None,
+                note: None,
+            }),
+        ),
+    ]
+}
+
+#[test]
+fn 動画ソース差し替えは_config_だけを保存し_fact_を_1_件も書き換えない() {
+    let facts = video_mode_facts();
+    let repo = Arc::new(
+        FakeRepo::new(facts.clone())
+            .with_configuration(MatchConfiguration::Video(poc_video_source())),
+    );
+    let result = run(record_replace_video_source(
+        repo.clone(),
+        match_id(),
+        local_video_source(),
+    ));
+    assert_eq!(result, Ok(()));
+
+    let saved = repo.saved_matches();
+    assert_eq!(saved.len(), 1);
+    assert_eq!(
+        saved[0].configuration,
+        MatchConfiguration::Video(local_video_source())
+    );
+    assert_eq!(
+        repo.fact_log(),
+        facts,
+        "fact は 1 件も書き換わらない（videoClock は呼び出し側の責任）"
+    );
+}
+
+#[test]
+fn 動画ソース差し替えは_highlight_の_variant_を保つ() {
+    let repo = Arc::new(
+        FakeRepo::new(Vec::new())
+            .with_configuration(MatchConfiguration::VideoHighlight(poc_video_source())),
+    );
+    assert_eq!(
+        run(record_replace_video_source(
+            repo.clone(),
+            match_id(),
+            local_video_source()
+        )),
+        Ok(())
+    );
+    assert_eq!(
+        repo.saved_matches()[0].configuration,
+        MatchConfiguration::VideoHighlight(local_video_source())
+    );
+}
+
+#[test]
+fn timer_試合の動画ソース差し替えは発火せず拒否する() {
+    let repo = Arc::new(FakeRepo::new(vec![phase_start()]));
+    let result = run(record_replace_video_source(
+        repo.clone(),
+        match_id(),
+        local_video_source(),
+    ));
+    assert_eq!(
+        result,
+        Err(CoreWriteError::VideoSourceNotReplaceable {
+            configuration: MatchConfigurationKind::Timer
+        })
+    );
+    assert!(repo.saved_matches().is_empty(), "拒否時は発火しない");
+}
+
+#[test]
+fn 空の_external_id_への差し替えは発火せず_validation_failed() {
+    let repo = Arc::new(
+        FakeRepo::new(Vec::new()).with_configuration(MatchConfiguration::Video(poc_video_source())),
+    );
+    let result = run(record_replace_video_source(
+        repo.clone(),
+        match_id(),
+        VideoSource {
+            provider: VideoProvider::Local,
+            external_id: "   ".to_string(),
+        },
+    ));
+    match result {
+        Err(CoreWriteError::ValidationFailed { issues }) => {
+            assert!(issues.contains(&DomainValidationIssue::Configuration(
+                ConfigurationValidationError::EmptyVideoExternalId
+            )))
+        }
+        other => panic!("ValidationFailed を期待したが {other:?}"),
+    }
+    assert!(repo.saved_matches().is_empty(), "違反時は発火しない");
 }

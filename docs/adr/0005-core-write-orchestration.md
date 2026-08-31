@@ -161,6 +161,14 @@ pub struct ImportWriteBatch {
 - **cascade（チーム削除時の所属選手削除）は trait `delete_team` 実装内に残す** — 判断ではなくストレージ操作のセマンティクスであり、1 `context.save()` の原子性を保つ
 - チェックと削除が 2 FFI 呼び出しに分かれるため理論上の時間窓は広がるが、現行も context 間の直列化保証はない（fetchCount → save の同一 context 逐次実行のみ）。**保証クラスは best-effort のまま変わらない**ことを明記して受け入れる
 
+**動画ソースの差し替えは移行と別の入口にする（2026-08-31 追記 — handball-project#267）**: 既存の動画試合の動画ソースだけを差し替える経路（YouTube ↔ ローカル）を、`commit_video_migration` とは**別の入口** `record_replace_video_source` として足す。計画層は `write::video_source_replacement_plan`（configuration in → configuration out の純粋関数）。
+
+- **移行の入口を使い回せない。** 同期点を空で渡すと `video_migration_plan` が `MissingPhaseSync` で落ち、既存 `videoClock` を恒等の同期点として渡すと `start_anchor.match_clock()` が `.video` 試合では `None` → `0.0` に落ちて `Both { match_clock: 0, video_clock: ... }` を書き、**試合時計を壊す**（2026-08-31 に実装で確認）。移行は「matchClock しか無い fact に videoClock を与える」操作、差し替えは「videoClock を据え置いて所在だけ替える」操作で、入力も不変条件も別物
+- **fact を 1 件も触らない契約を、呼び出しの形で表す。** この入口は `load_fact_log` も `update_fact` も呼ばず、書き換えるのは `Match.configuration` だけ。したがって**新しい動画が元と同じ切り出し（同じ 0 秒起点・同じ尺）であることは呼び出し側の責任**で、コアに検証手段は無い。ずれた動画へ差し替えるとエラーは出ず全 fact の時刻だけが静かにずれるため、UI は必ずこの前提を示す
+- **`.timer` は拒否する**（`CoreWriteError::VideoSourceNotReplaceable`）。タイマー試合を動画へ繋ぐには同期点が要り、それは移行の仕事。「差し替えるだけ」に見えて実体が移行である経路を、入口とエラーの両方で分ける
+- **variant は保つ**（`.video` → `.video` / `.videoHighlight` → `.videoHighlight`）。ハイライト集をフル試合に変える操作ではない。provider の組み合わせは制限しない
+- **`record_save_match`（passthrough・検証なし）と違い、組んだ configuration を `validate_configuration` に掛ける** — ここは**コアが configuration を組む**ので、組んだものの正しさはコアが持つ（空 `external_id` を弾く）
+
 ### 3. 強制力 — 生 repository を core 境界の内側に隠す（ADR 0001 却下理由 1 への回答）
 
 「全書き込みが検証を通る」をシェル規約ではなく **Swift の可視性で強制**する: 書き込みメソッドを `MatchRepository` / `TeamRepository` プロトコル（RecorderApplication 公開面）から外し、素朴 CRUD の foreign trait 準拠実装は composition root（`RecorderV2Services`）だけが知る。store / view / importer はコア入口（またはそれを包む thin service）しか呼べなくなる。repository 内包方式（現行）は「実装を差し替えれば検証が消える」のに対し、この形は**コアを通らない書き込み経路が型システム上存在しない**。移管の段に合わせて段階的に外す（第 1 段で fact 書き込み、第 4 段で残り全部）。この遮断が、削除の使用中チェックを Swift 実装から外す（決定 2）ことの前提になる「最下層の防衛線」の置き換えでもある。
