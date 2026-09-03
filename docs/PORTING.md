@@ -8,7 +8,7 @@
 
 セッションをまたいで移植を進めるための「現在地と次の一手」のファイル。**各セッションの冒頭でこれを読み、進捗があったらチェックを更新する**。設計判断の正典は `docs/adr/`（このファイルには理由を書かない）。
 
-- 背景・経緯: handball-project#49 / `handball-project/docs/research/handballrecorder-rust-core.md`
+- 背景・経緯: handball-project#49
 - 設計: [ADR 0001](adr/0001-boundary-api.md)（境界 API 目録）/ [ADR 0002](adr/0002-error-model.md)（エラー体系）/ [ADR 0003](adr/0003-parity-verification.md)（パリティ検証）— すべて accepted（2026-07-12）。完走後に [ADR 0004](adr/0004-ios-full-boundary.md)（FFI 本境界）/ [ADR 0005](adr/0005-core-write-orchestration.md)（write orchestration）が accepted（2026-07-18）
 - 移植元（真実の仕様）: `../HandballRecorder/Packages/RecorderDomain/`（sibling submodule）。挙動に迷ったら Swift 実装とそのテストを読む。**「改善」しない**
 

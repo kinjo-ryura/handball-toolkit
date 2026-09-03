@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ハンドボール試合データのツールキット（Rust workspace）。[HandballRecorder](https://github.com/kinjo-ryura/HandballRecorder) のドメイン層 `RecorderDomain`（Swift・Foundation のみ依存の純粋計算 約 2,700 行）の移植であり、単一の共有コアを iOS / Android / Web (wasm) / CLI へ届けるための基盤。[handball-project](https://github.com/kinjo-ryura/handball-project) の submodule（`apps/handball-toolkit/`）として管理される。
 
-- 経緯・設計判断の一次資料: [handball-project#49](https://github.com/kinjo-ryura/handball-project/issues/49) と `handball-project/docs/research/handballrecorder-rust-core.md`
+- 経緯・設計判断の一次資料: [handball-project#49](https://github.com/kinjo-ryura/handball-project/issues/49)
 - 設計の正典: `docs/adr/`（0001 境界 API / 0002 エラー体系 / 0003 パリティ検証 — accepted 2026-07-12。0004 iOS FFI 本境界 / 0005 write orchestration — accepted 2026-07-18。0006 Android 配布境界 — accepted 2026-07-26）。**各 ADR の「実装追記」が実装の現況を持つ**
 - 境界のエラーコード一覧は [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md)（外部シェル実装者向けの英語ドキュメント）。**エラー case を追加・改名したらこの表も更新する**（code は安定契約 — ADR 0002 決定 2）
 - 移植の経緯・作業規律: [`docs/PORTING.md`](docs/PORTING.md)。**移植は完走済みで、同ファイルは完了記録**（現在地の管理台帳ではない）。進行中・未着手の作業は GitHub Issues が正
@@ -28,7 +28,7 @@ git switch main && git pull               # ローカル main を merge 後の�
 
 - **CI が落ちている PR は merge できない**。往復を減らすため push 前にローカルで `cargo fmt --all --check` / `cargo clippy --workspace --all-targets -- -D warnings` / `cargo test --workspace` を通す
 - **親リポの submodule pointer は merge 後の main を指す**（PR ブランチの commit を直接指さない）。push 順は **toolkit → 親リポ** — 逆にすると親リポがリモートに無い commit を指す
-- **この保護は toolkit だけにある**: ruleset は public repo でないと無料プランで使えず、他の submodule（すべて private）は従来どおり main へ直 push する。「toolkit は PR 必須、他は直 push」の非対称を忘れないこと
+- **保護の有無は submodule ごとに違う**: PR 必須のものと main へ直 push するものが混在する。toolkit は PR 必須。どこが PR 必須かの一覧は親リポ側が持つ（ここに写すと実態とずれる）
 - 導入の経緯と「force push がどうしても必要になったら ruleset を一時無効化する」という退避策は [`docs/PORTING.md`](docs/PORTING.md)「作業規律」
 
 ## 開発コマンド

@@ -113,4 +113,4 @@ FFI / JSON 境界でのエラー表現（serde 形式）:
 
 - ADR 0001（境界 API 目録）
 - `apps/HandballRecorder/docs/redesign/DOMAIN_VALIDATION_RULES.md` / `DOMAIN_VALIDATION_ERRORS.md` / `DOMAIN_VALIDATION_MESSAGES.md`
-- `handball-project/docs/research/handballrecorder-rust-core.md`「エラーは構造化」
+- handball-project#49「エラーは構造化」

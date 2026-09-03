@@ -243,4 +243,4 @@ pub fn validate_delete(removed_fact_id: FactId, existing_facts: &[MatchFact], ma
 - 移植元: `apps/HandballRecorder/Packages/RecorderDomain/Sources/RecorderDomain/`
 - 型仕様: `apps/HandballRecorder/docs/redesign/DOMAIN_TYPES_V1.md`
 - 語彙: `apps/HandballRecorder/CONTEXT.md`（Language セクション）
-- 背景: `handball-project/docs/research/handballrecorder-rust-core.md` / handball-project#49
+- 背景: handball-project#49
