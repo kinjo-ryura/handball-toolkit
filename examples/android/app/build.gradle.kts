@@ -74,13 +74,13 @@ dependencies {
     // .aar ファイル単体は依存情報を運ばない（運ぶのは Maven の POM で、ローカルファイル
     // 参照では POM が介在しない）。そのため利用側がこの 2 つを自分で宣言する必要がある。
     // 生成コードが Native.register で .so を dlopen するのに JNA、suspend 関数に coroutines。
-    implementation("net.java.dev.jna:jna:5.17.0@aar")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("net.java.dev.jna:jna:5.19.1@aar")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     // ── 永続化（シェルの責務。コアは DB を所有しない）──
-    implementation("androidx.room:room-runtime:2.7.2")
-    implementation("androidx.room:room-ktx:2.7.2")
-    ksp("androidx.room:room-compiler:2.7.2")
+    implementation("androidx.room:room-runtime:2.8.4")
+    implementation("androidx.room:room-ktx:2.8.4")
+    ksp("androidx.room:room-compiler:2.8.4")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
