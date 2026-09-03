@@ -203,4 +203,4 @@ object は**不変の導出スナップショットへのハンドル**であり
 - [ADR 0003](0003-parity-verification.md) — パリティ検証（export 新設のオラクル比較はこの手法の再適用）
 - handball-project#56 — go 判断と依存全数調査（2026-07-18 コメント）
 - handball-project#59 — Kotlin バインディング（本境界の流用先）
-- `handball-project/docs/research/handballrecorder-rust-core.md` — 差し替え判断の背景
+- handball-project#49 — 差し替え判断の背景

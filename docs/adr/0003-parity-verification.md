@@ -99,4 +99,4 @@ Issue #49 の「パリティ検証の完走」= 公開コーパス 8 件 + ロ�
 - ADR 0001（境界 API 目録）/ ADR 0002（構造化エラー）
 - `apps/HandballRecorder/docs/redesign/SAMPLE_DTO_V2.md` — コーパスの schema 正典
 - `apps/handball-sample-matches/`（`v2/` パス）
-- `handball-project/docs/research/handballrecorder-rust-core.md`「パリティ検証（移植の安全網）」
+- handball-project#49「パリティ検証（移植の安全網）」
