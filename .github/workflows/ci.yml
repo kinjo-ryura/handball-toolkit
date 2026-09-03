@@ -5,10 +5,25 @@ on:
     branches: [main]
   pull_request:
 
+# 既定の GITHUB_TOKEN を読み取りのみに絞る（handball-project#284）。リポジトリ設定の
+# default_workflow_permissions も read だが、設定は UI から変えられるので workflow 側にも
+# 明示して差分に残す。この CI は checkout と成果物の検査だけで、書き込みを一切しない。
+permissions:
+  contents: read
+
 # 同一ブランチで走行中のジョブは新しい push で打ち切る。
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+# Action は完全な commit SHA でピン留めする（handball-project#284）。`@v4` のような
+# 可変タグは差し替えが効くので、タグを奪われるとランナーで任意コードが走る
+# （tj-actions/changed-files 型の攻撃）。ruleset の SHA ピン留め必須も掛けてあるので、
+# タグ参照に戻すと CI が起動しない。
+#
+# 追随するときは `git ls-remote --tags <repo>` で SHA を引き直し、**末尾コメントの
+# バージョンも一緒に直す**こと。Dependabot（`.github/dependabot.yml`）が
+# github-actions エコシステムで SHA とコメントの両方を上げる PR を出す。
 
 jobs:
   check:
@@ -17,9 +32,9 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: cachix/install-nix-action@v30
+      - uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72 # v30
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
@@ -34,7 +49,7 @@ jobs:
       # --features bindgen の成果物が毎回ゼロから作り直されていた（handball-project#143
       # の実測で判明。cdylib ビルド 45 秒 + bindgen 76 秒が毎回発生していた）。
       # restore-keys は「同じ Cargo.lock の直近」→「任意の直近」の順に落とす。
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/.cargo/registry
@@ -121,14 +136,14 @@ jobs:
 
       # ランナー同梱の SDK が無い場合のみ導入する。compileSdk = 36 /
       # buildToolsVersion = "37.0.0"（android/toolkit/build.gradle.kts）に対応させる。
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
         if: steps.android_sdk.outputs.preinstalled != 'true'
         with:
           packages: 'platforms;android-36 build-tools;37.0.0'
 
       # Gradle は flake が提供する（pkgs.gradle。ADR 0006 実装追記 2026-07-28）が、
       # AGP / Kotlin プラグインと依存 jar は Maven から引くのでキャッシュする。
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/.gradle/caches

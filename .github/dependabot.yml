@@ -1,0 +1,53 @@
+# Dependabot の更新設定（handball-project#284）。
+#
+# **SHA ピン留めと対で要る。** Action を可変タグから完全な commit SHA へ固定した
+# （ci.yml）ので、放置すると上流の修正が入ってこない。手で `git ls-remote` を叩き直す
+# 運用は必ず忘れるため、機械に PR を出させる。SHA ピン留めしていても Dependabot は
+# SHA と末尾コメントのバージョンを両方書き換える。
+#
+# public リポなので Dependabot は無償。頻度は週次（開発は個人 1 人で、日次だと PR が
+# 溜まって読まれなくなる）。同一エコシステムはまとめて 1 本の PR にする。
+#
+# **PR は自動 merge しない。** main は ruleset `protect-main` で PR + CI green 必須に
+# してあり、依存の更新も人が中身を見て merge する（CI が緑でも wasm-bindgen のような
+# 環境との整合は機械に判定できない）。
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      cargo:
+        patterns: ['*']
+    ignore:
+      # wasm-bindgen crate は flake が入れる wasm-bindgen-cli と**バージョン完全一致**が
+      # 必要で（Cargo.toml 側は `=` でピン留め）、片方だけ上げると生成時の schema version
+      # mismatch で落ちる。nixpkgs が上がったときに両方同時に合わせるので、機械に上げさせない。
+      - dependency-name: wasm-bindgen
+
+  # android/ は .aar を束ねる Gradle モジュール、examples/android/ は配布 .aar を
+  # `app/libs/` から参照する参照実装。どちらもビルド設定を持つので別々に見る。
+  - package-ecosystem: gradle
+    directory: /android
+    schedule:
+      interval: weekly
+    groups:
+      gradle-android:
+        patterns: ['*']
+
+  - package-ecosystem: gradle
+    directory: /examples/android
+    schedule:
+      interval: weekly
+    groups:
+      gradle-examples:
+        patterns: ['*']
