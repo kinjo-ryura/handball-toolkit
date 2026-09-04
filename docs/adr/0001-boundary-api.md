@@ -8,7 +8,7 @@ accepted（2026-07-12 起草、同日 grill 済み。handball-project#49「境�
 
 RecorderDomain（Swift、29 ファイル / 約 2,745 行）を Rust へ移植するにあたり、コアの公開面（境界 API）を先に確定する。この目録は (a) 移植の写経対象の全量定義、(b) 各シェル（iOS / Android / wasm / CLI）との契約、(c) パリティ検証の比較対象の列挙、を兼ねる。
 
-用語は移植元の正準語彙（`apps/HandballRecorder/CONTEXT.md` の Language セクション）に従う。特に: Match clock は**試合通算累積秒**（phase 内秒ではない）、「イベント」ではなく **fact**、「アンカー」という語は型名 `FactAnchor` 以外では使わない（同期点 = sync point と区別）。
+用語は移植元 RecorderDomain の正準語彙に従う（語彙の定義は HandballRecorder 側にあり、このリポからは辿れない。要点は以下に写す）。特に: Match clock は**試合通算累積秒**（phase 内秒ではない）、「イベント」ではなく **fact**、「アンカー」という語は型名 `FactAnchor` 以外では使わない（同期点 = sync point と区別）。
 
 ## モジュール構成
 
@@ -240,7 +240,7 @@ pub fn validate_delete(removed_fact_id: FactId, existing_facts: &[MatchFact], ma
 
 ## 参照
 
-- 移植元: `apps/HandballRecorder/Packages/RecorderDomain/Sources/RecorderDomain/`
-- 型仕様: `apps/HandballRecorder/docs/redesign/DOMAIN_TYPES_V1.md`
-- 語彙: `apps/HandballRecorder/CONTEXT.md`（Language セクション）
+- 移植元: Swift 実装 `RecorderDomain`。**凍結オラクル**であり、HandballRecorder リポの tag `oracle-dump-final` からしか取り出せない（このリポには含まれない）。取り出し手順は [CLAUDE.md](../../CLAUDE.md)「移植のオラクル（Swift 実装）とパリティ検証」
+- 型仕様: 本 ADR の目録が Rust 側の正典。移植時に参照した Swift 側の型仕様書は凍結オラクルと同じく外部からは辿れない
+- 語彙: 上の「文脈」に要点を写してある。全量は移植元側にあり外部からは辿れない
 - 背景: handball-project#49

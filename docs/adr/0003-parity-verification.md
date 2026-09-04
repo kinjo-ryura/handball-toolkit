@@ -51,7 +51,7 @@ dump ツール・Rust 側テストハーネスの双方が「内部 ID → コ�
 
 ### 4. オラクル dump ツール（Swift 側）
 
-- **場所**: HandballRecorder リポに SPM executable target を新設（`Packages/RecorderDomain` に `recorder-domain-dump` executable を追加）。アプリターゲットには触れないため cycle-9 の計測凍結（アプリ本体のコア差し替え禁止）と非干渉（grill 確定 2026-07-12。既存の `MatchExporterV2` は入力側=生データの書き出しであり、projection 出力=模範解答を書き出す手段は本ツールが初）
+- **場所**: HandballRecorder リポに SPM executable target を新設（移植元 Swift package に `recorder-domain-dump` executable を追加）。アプリターゲットには触れないため cycle-9 の計測凍結（アプリ本体のコア差し替え禁止）と非干渉（grill 確定 2026-07-12。既存の `MatchExporterV2` は入力側=生データの書き出しであり、projection 出力=模範解答を書き出す手段は本ツールが初）
 - **DTO decode はツール内に自前で持つ**（アプリ層の `SampleMatchDTOsV2.swift` はアプリターゲット所属で import 不可。約 200 行の Codable struct の意図的な複製とし、複製である旨をコメントで明記）
 - **出力**: コーパス JSON 1 件につき正規化 JSON 1 件
 
@@ -92,11 +92,10 @@ Issue #49 の「パリティ検証の完走」= 公開コーパス 8 件 + ロ�
 
 - Swift 実装の挙動が「期待出力ファイル」として固定される — HandballRecorder 側で RecorderDomain を変更したらゴールデン再生成が必要（dump ツールを再実行するだけ）
 - `tests/golden/` に実試合データのコピーが入る（handball-sample-matches は public repo のため公開上の新規リスクなし。ローカル `.timer` コーパスはコミットしない）
-- dump ツールの DTO 複製は SAMPLE_DTO_V2.md への追従義務を持つ（schema 変更時に 2 箇所修正）
+- dump ツールの DTO 複製はコーパス schema への追従義務を持つ（schema 変更時に 2 箇所修正）
 
 ## 参照
 
 - ADR 0001（境界 API 目録）/ ADR 0002（構造化エラー）
-- `apps/HandballRecorder/docs/redesign/SAMPLE_DTO_V2.md` — コーパスの schema 正典
-- `apps/handball-sample-matches/`（`v2/` パス）
+- [handball-sample-matches の `v2/SCHEMA.md`](https://github.com/kinjo-ryura/handball-sample-matches/blob/main/v2/SCHEMA.md) — コーパスの schema 正典（配信 JSON の `v2/` と同じ repo）
 - handball-project#49「パリティ検証（移植の安全網）」

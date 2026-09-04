@@ -25,7 +25,7 @@ accepted（2026-07-12 起草、同日 grill 済み。handball-project#49）
 - payload（`invalidAnchorForConfiguration(configuration:actual:allowed:)` の 3 引数等）も 1:1 で写す
 - **severity は持たない**（一律 blocking、Swift 設計踏襲）。warning が必要になったら struct ラッパー化する将来判断も踏襲
 
-**実装追記（2026-07-20、handball-project#91）**: 上の「1:1 で写す」は**移植中の忠実性制約**であり、移植完走後の case 追加を禁じるものではない。移植元 `Packages/RecorderDomain` は HandballRecorder 側で削除済み（コミット `8aeffb8`、Rust コアへ差し替え）で、対応を保つべき live な Swift 実装はもう存在しない。したがって「Swift に無い case は足せない」という読み方は取らない。
+**実装追記（2026-07-20、handball-project#91）**: 上の「1:1 で写す」は**移植中の忠実性制約**であり、移植完走後の case 追加を禁じるものではない。移植元の Swift 実装 `RecorderDomain` は HandballRecorder 側で削除済み（コミット `8aeffb8`、Rust コアへ差し替え）で、対応を保つべき live な Swift 実装はもう存在しない。したがって「Swift に無い case は足せない」という読み方は取らない。
 
 初回の適用が `NonFiniteMatchClock` / `NonFiniteVideoClock` の新設（`FactValidationError` は 20 → 22 ケース）。移植元の負値検査 `< 0.0` は NaN / ±∞ を素通りさせるが、これは移植すべき仕様ではなく**移植元から引き継いだ穴**である。決定 2 の「code は安定契約」に対しては**追加のみ**で、既存 code の意味も名前も変えない。
 
@@ -56,7 +56,7 @@ FFI / JSON 境界でのエラー表現（serde 形式）:
 
 ### 3. 文言はシェルが所有する
 
-- 日本語文言の正典は引き続き `apps/HandballRecorder/docs/redesign/DOMAIN_VALIDATION_MESSAGES.md`
+- 日本語文言の正典は移植元 HandballRecorder 側の設計文書（外部からは辿れない）。**このリポが配る既定文言は [`android/toolkit/src/main/res/values-ja/strings.xml`](../../android/toolkit/src/main/res/values-ja/strings.xml)**（`.aar` 同梱の既定値。ADR 0006 実装追記 2026-08-08）
 - 各シェルが `(scope, code) → ローカライズ文言` の写像を所有する。「case 名 / 内部用語を UI に漏らさない」という Swift `userMessage` の責務は各シェルへ移る
 - コアには文言・翻訳キー・ロケール処理を一切置かない
 
@@ -112,5 +112,7 @@ FFI / JSON 境界でのエラー表現（serde 形式）:
 ## 参照
 
 - ADR 0001（境界 API 目録）
-- `apps/HandballRecorder/docs/redesign/DOMAIN_VALIDATION_RULES.md` / `DOMAIN_VALIDATION_ERRORS.md` / `DOMAIN_VALIDATION_MESSAGES.md`
+- [`docs/ERROR_CODES.md`](../ERROR_CODES.md) — 境界が出す code の全量（シェル実装者が文言表を書くための参照表）
+- validation ルールの実体は `crates/handball-toolkit/src/validators/` とそのテスト
+- 起草時に参照した Swift 側の validation 仕様書は HandballRecorder 側にあり、外部からは辿れない
 - handball-project#49「エラーは構造化」

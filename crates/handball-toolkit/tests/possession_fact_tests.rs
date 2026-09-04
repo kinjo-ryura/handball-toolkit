@@ -1,7 +1,7 @@
 //! ポゼッション開始 fact（handball-project#154）。Rust 新設のためオラクル（Swift）は無い。
 //!
-//! 語の定義は HandballRecorder の `CONTEXT.md`「ポゼッション開始 (Possession start)」、
-//! validation の仕様は `docs/redesign/DOMAIN_VALIDATION_RULES.md`。
+//! 語の定義と validation 仕様の起草元は HandballRecorder 側の設計文書で、このリポからは辿れない。
+//! 現行の仕様は下のテストと `src/validators/`、出るエラー code は `docs/ERROR_CODES.md` が持つ。
 //!
 //! **「置かないルール」も同じ重みでテストする** — 同一チームの連続 / phase の被覆 /
 //! `.videoHighlight` での禁止はいずれも意図的に許しており、後から「バグに見えるから」と
