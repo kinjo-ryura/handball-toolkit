@@ -6,7 +6,8 @@
   写像をシェル実装者が一から書かずに済ませるための既定値で、**利用側アプリが同じ名前の
   string を宣言すれば上書きされる**（Android のリソースマージはアプリ側が優先）。
 
-  文言の正典は HandballRecorder の docs/redesign/DOMAIN_VALIDATION_MESSAGES.md。
+  文言の起草元は HandballRecorder 側の設計文書で、このリポからは辿れない。
+  現在この既定値が公開されている唯一の日本語文言。code の全量は docs/ERROR_CODES.md。
   fact / timeline は iOS シム（DomainValidationMessage.swift）と同一文言。
 
   **エラー case を追加・改名したら、この 2 ロケール両方に行を足すこと。**

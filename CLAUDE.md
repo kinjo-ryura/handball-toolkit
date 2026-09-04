@@ -136,5 +136,5 @@ Room + 3 trait の 15 メソッド + 最小 UI の参照実装（handball-projec
   - サンプル試合 import の atomic 化（`0f2b90d` / handball-project#83）
   - `AvailableActions.can_record_free_note` を R7 / R8 に合わせて `Playing` のみ true に変更（handball-project#177。ゴールデン期待値も追随済み）
 
-- **移植面のセマンティクスに迷ったら**、凍結オラクルとそのテスト（約 2,500 行）を読む。型仕様・validation ルールは HandballRecorder main に残っている `docs/redesign/DOMAIN_TYPES_V1.md` / `DOMAIN_VALIDATION_RULES.md`（削除されていないので tag 不要）、ドメイン語彙は同リポの `CONTEXT.md`
+- **移植面のセマンティクスに迷ったら**、凍結オラクルとそのテスト（約 2,500 行）を読む。型仕様・validation ルール・ドメイン語彙の文書は HandballRecorder main に残っている（コードと違い削除されていないので tag 不要）。**いずれも HandballRecorder の checkout を要し、このリポ単体からは辿れない** — 外部の読み手に向けた正典は [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md)（code 全量）と `docs/adr/`（設計判断）、コーパスの schema は [handball-sample-matches の `v2/SCHEMA.md`](https://github.com/kinjo-ryura/handball-sample-matches/blob/main/v2/SCHEMA.md)
 - **パリティ検証**: [handball-sample-matches](https://github.com/kinjo-ryura/handball-sample-matches) の実試合 JSON をゴールデンコーパスに、Swift 実装をオラクルとして projection 出力の一致を検証する（`crates/handball-toolkit/tests/golden/`。期待値は dump 済みで、オラクルを再実行しなくても回る）。特に `SegmentResolver` と validation R3–R9 は移植で最も繊細な部分 — 移植面については挙動を「改善」せず一致させる
