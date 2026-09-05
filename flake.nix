@@ -55,6 +55,12 @@
           # cargo-about が収集、jq が各シェル向けの JSON へ整形する。
           pkgs.cargo-about
           pkgs.jq
+
+          # 依存の既知脆弱性（RustSec advisory-db）と取得元の検査（handball-project#285。
+          # deny.toml）。依存 96 件を手で OSV に照会した 2026-09-02 の監査以降、新しい
+          # advisory に気づく経路が無かった。ライセンスの検査は cargo-about（about.toml）が
+          # 担うので、cargo-deny では advisories / sources だけを回す。
+          pkgs.cargo-deny
         ];
 
         # Android クロスリンク（handball-project#106）。

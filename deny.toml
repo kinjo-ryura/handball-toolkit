@@ -1,0 +1,24 @@
+# cargo-deny の設定（handball-project#285）。
+#
+# 回すのは advisories / sources の 2 つだけ。ライセンスの許容集合と一覧生成は
+# cargo-about（about.toml / scripts/generate_licenses.sh）が担っており、ここで
+# `[licenses]` を二重に持つと 2 か所の許容集合がずれる。`[bans]` も使わない
+# （重複バージョンの許容は個別判断で、機械に落とす基準がまだ無い）。
+
+[advisories]
+# 既知脆弱性は error（既定）。yanked された版が Cargo.lock に残っているのも落とす —
+# yank は「使うな」の意思表示で、advisory が後から付くことが多い。
+yanked = "deny"
+# メンテ停止の告知は warn に留める（CI は落とさない）。脆弱性ではなく、uniffi 一式の
+# ように代替の無い依存で赤くなり続けると検査そのものが無視されるため。
+unmaintained = "workspace"
+# 例外を置くときは ID・理由・見直し期限を並べて書く。
+#   { id = "RUSTSEC-0000-0000", reason = "…（2026-12 に再確認）" },
+ignore = []
+
+[sources]
+# 取得元は crates.io だけ。git 依存や別レジストリが Cargo.lock に現れたら落とす
+# （2026-09-02 の監査時点で `source` は全件 crates.io-index。それを固定する）。
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
