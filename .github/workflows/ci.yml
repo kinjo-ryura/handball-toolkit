@@ -102,6 +102,22 @@ jobs:
       - name: ライセンス一覧が最新か
         run: nix develop --command ./scripts/generate_licenses.sh --check
 
+      # 依存に既知の脆弱性（RustSec advisory-db）が出ていないか、取得元が crates.io 以外に
+      # なっていないかを検査する（handball-project#285。設定は deny.toml）。
+      #
+      # ライセンスは上の cargo-about が担うので、ここでは advisories / sources だけ。
+      # 依存が変わらなくても advisory-db は日々増えるため、**PR の無い期間に赤くなる
+      # ことがない**（push / PR でしか走らない）— 週次 cron は親リポの検査 CI と同じく
+      # 別途足すか、Dependabot の security updates で補う。
+      #
+      # 落ちたときに疑うところ:
+      #   - advisory の ID が名指しで出る。直せる版があれば `cargo update -p <crate>`。
+      #     無いなら deny.toml の `[advisories] ignore` に **理由つき**で足す（期限も書く）
+      #   - `unmaintained` は warn のまま（落とさない）。メンテ停止は脆弱性ではなく、
+      #     uniffi 一式のような選択肢の無い依存で赤くなり続けると検査が無視されるため
+      - name: 依存の既知脆弱性と取得元（cargo-deny）
+        run: nix develop --command cargo deny check advisories sources
+
       # ── ここから Android 配布物（.aar）の JVM 単体テスト（handball-project#143）──
       #
       # 狙いは `values-ja` の足し忘れ検出。既定ロケールの漏れは写像の `when` が

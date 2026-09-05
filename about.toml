@@ -33,6 +33,9 @@ targets = [
     "aarch64-apple-ios-sim",
     "aarch64-apple-darwin",
     "aarch64-linux-android",
+    # Web デモ（handball-apps-site が配る .wasm）。wasm-bindgen / js-sys 等は
+    # wasm32 限定の依存なので、ここに無いと一覧から抜ける（handball-project#285）。
+    "wasm32-unknown-unknown",
 ]
 
 # build-dependencies / dev-dependencies は配布バイナリに入らないので対象外。

@@ -65,6 +65,9 @@ fn corpus_bad_reports_expected_findings() {
         // highlights index の slug に先頭 yyyy-MM-dd が無い。
         ("slugDateMismatch", "index.json"),
         ("missingMatchFile", "2026-02-02-missing-file.json"),
+        // matches index の 4 件目は slug に `..` と `/` を含む（handball-project#285）。
+        // パスに埋める前に弾かれるので missingMatchFile ではなく index の指摘として出る。
+        ("unsafeSlug", "index.json"),
         ("scoreMismatch", "2026-02-01-bad-score.json"),
         // facts[3] の factID が facts[1] と同じ。
         ("duplicateFactID", "2026-02-01-bad-score.json"),
@@ -147,6 +150,15 @@ fn corpus_bad_pins_new_check_details() {
     assert_eq!(
         slug_date.issue["params"]["found"].as_str(),
         Some("with-phase")
+    );
+
+    // 経路離脱 slug は index.json の指摘で、slug をそのまま params に載せる。
+    // 日付接頭辞は正しい（`2026-01-31`）ので slugDateMismatch とは別の違反であることも
+    // ここで固定する（上の slugDateMismatch の pin は highlights 側の 1 件目を見ている）。
+    let unsafe_slug = by_code("unsafeSlug", "index.json");
+    assert_eq!(
+        unsafe_slug.issue["params"]["slug"].as_str(),
+        Some("2026-01-31-../escape")
     );
 
     // 重複 factID は 2 件目（後から現れた方）を facts[] index 付きで指す。

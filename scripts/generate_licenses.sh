@@ -22,7 +22,17 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 readonly OUT=THIRD_PARTY_LICENSES.json
-readonly MANIFEST=crates/handball-toolkit-ffi/Cargo.toml
+# 配布物ごとの依存グラフの根。**両方を走らせて統合する**（handball-project#285）。
+#   - ffi  … iOS の staticlib / Android の .so の実体。コア crate を feature `uniffi` 込みで引く
+#   - wasm … Web デモ（handball-apps-site が配る .wasm）。wasm-bindgen 等は wasm 側にしか無い
+# 以前は ffi だけを見ていたため、about.toml の targets に wasm32 を足しても wasm 限定の
+# 依存は一覧に載らなかった（グラフの根に無いものは target を足しても現れない）。
+# workspace 全体（`--workspace`）にしないのは CLI の依存（clap 等）まで載るため — CLI は
+# CI でしか走らず、シェルの画面に出す一覧に混ぜる意味が無い。
+readonly MANIFESTS=(
+  crates/handball-toolkit-ffi/Cargo.toml
+  crates/handball-toolkit-wasm/Cargo.toml
+)
 
 check_only=0
 if [ "${1:-}" = "--check" ]; then
@@ -39,8 +49,9 @@ version=$(grep -m1 '^version = ' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
 # 読み手に crate 名を持たせないための情報で、判定はここで一度だけ行う。
 workspace_members=$(cargo metadata --no-deps --format-version 1 | jq -c '[ .packages[].name ]')
 
-# 対象は FFI パッケージング crate。これが iOS の staticlib / Android の .so の実体で、
-# コア crate を feature `uniffi` 込みで引く（= 配布バイナリの依存グラフそのもの）。
+# 対象は上の MANIFESTS（配布物の依存グラフそのもの）。manifest ごとに cargo-about を
+# 回し、licenses[] を (id, 本文) で畳んで used_by を合併してから整形する。ffi と wasm は
+# コア crate を共有するので大半は重なり、wasm 側で増えるのは wasm-bindgen 一式だけ。
 # --fail: ライセンス式を読めない / accepted に無い crate があれば止める。
 #
 # 整形方針:
@@ -55,12 +66,36 @@ workspace_members=$(cargo metadata --no-deps --format-version 1 | jq -c '[ .pack
 #                   （`.aar` を受け取った外部シェルにとって handball-toolkit は third party）。
 #                   ここには視点に依存しない事実だけを載せ、どう見せるかは各シェルに委ねる。
 #   - 並び順は全段で固定する（--check の差分が実質変更のときだけ出るように）。
-generate() {
+generate_one() {
   cargo-about generate \
     --config about.toml \
-    --manifest-path "$MANIFEST" \
+    --manifest-path "$1" \
     --format json \
-    --fail \
+    --fail
+}
+
+# 複数 manifest の出力を 1 つの cargo-about 形（licenses[].used_by[]）に統合する。
+# 同じライセンス本文は 1 件に畳み、同じ crate（name, version）は 1 回だけ数える。
+merge() {
+  jq -s '
+    { licenses: (
+        [ .[].licenses[] ]
+        | group_by([ .id, .text ])
+        | map({
+            id: .[0].id,
+            name: .[0].name,
+            text: .[0].text,
+            used_by: ([ .[].used_by[] ] | unique_by([ .crate.name, .crate.version ]))
+          })
+      )
+    }'
+}
+
+generate() {
+  for manifest in "${MANIFESTS[@]}"; do
+    generate_one "$manifest"
+  done \
+  | merge \
   | jq --arg version "$version" --argjson workspace "$workspace_members" '
       def origin:
         .name as $n

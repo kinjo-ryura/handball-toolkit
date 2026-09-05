@@ -42,6 +42,10 @@ fn validate_match_side(root: &Path, report: &mut RunReport) {
 
     let mut checked_slugs: BTreeSet<&str> = BTreeSet::new();
     for entry in &entries {
+        if !is_safe_slug(&entry.slug) {
+            report_unsafe_slug(&index_path, &entry.slug, report);
+            continue;
+        }
         let file = matches_dir.join(format!("{}.json", entry.slug));
         let label = file.display().to_string();
         if !file.is_file() {
@@ -146,6 +150,10 @@ fn validate_highlight_side(root: &Path, report: &mut RunReport) {
 
     let mut checked_slugs: BTreeSet<&str> = BTreeSet::new();
     for entry in &entries {
+        if !is_safe_slug(&entry.slug) {
+            report_unsafe_slug(&index_path, &entry.slug, report);
+            continue;
+        }
         let file = highlights_dir.join(format!("{}.json", entry.slug));
         let label = file.display().to_string();
         if !file.is_file() {
@@ -302,4 +310,35 @@ fn slug_of(path: &Path) -> &str {
     path.file_stem()
         .and_then(|stem| stem.to_str())
         .unwrap_or("")
+}
+
+/// index 由来の slug を `Path::join` に渡してよいか（handball-project#285）。
+///
+/// slug は `index.json` から無検証で来る。この CLI は handball-sample-matches の CI が
+/// **fork PR の JSON** に対して回すので、slug は攻撃者が書ける入力になる。`..` や `/` を
+/// 含む slug をそのまま `join` すると v2 ルートの外を読みに行く（絶対パスなら `join` が
+/// 丸ごと差し替える）。実害は小さい（fork PR は read-only トークン・secrets 無し・
+/// 読んだ先を JSON として decode するだけ）が、入力をパスに埋める箇所は検証してから使う。
+///
+/// 規則は配信側（apps-site の `SLUG_PATTERN`）と iOS 側（`IncomingLinkV2.isValidSlug`）と
+/// 同じ: 先頭は英数字、以降は英数字と `-`、1〜64 文字。配信中の全 slug がこの形で、
+/// SCHEMA.md の「先頭 `{yyyy-MM-dd}`」もこの部分集合。
+fn is_safe_slug(slug: &str) -> bool {
+    let mut chars = slug.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    (1..=64).contains(&slug.len())
+        && first.is_ascii_alphanumeric()
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '-')
+}
+
+/// 形式外の slug は index の指摘として出す（ファイル側の指摘にすると、存在しないパスを
+/// label に載せることになる）。
+fn report_unsafe_slug(index_path: &Path, slug: &str, report: &mut RunReport) {
+    report.findings.push(Finding::new(
+        &index_path.display().to_string(),
+        Stage::Corpus,
+        corpus_issue("unsafeSlug", json!({"slug": slug})),
+    ));
 }
