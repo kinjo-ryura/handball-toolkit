@@ -267,6 +267,7 @@ fn phase_start_fact_dto() -> SampleFactDtoV2 {
 fn import_dto(facts: Vec<SampleFactDtoV2>) -> SampleMatchDtoV2 {
     SampleMatchDtoV2 {
         schema_version: SCHEMA_VERSION_CURRENT,
+        generator: None,
         r#match: SampleMatchHeaderV2 {
             display_name: Some("テスト試合".to_owned()),
             date: epoch(0),

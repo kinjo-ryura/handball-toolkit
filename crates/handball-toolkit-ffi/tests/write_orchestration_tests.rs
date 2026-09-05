@@ -793,6 +793,7 @@ fn import_anchor(start: f64, end: Option<f64>) -> SampleFactAnchorDtoV2 {
 fn import_dto(player_key: Option<&str>) -> SampleMatchDtoV2 {
     SampleMatchDtoV2 {
         schema_version: SCHEMA_VERSION_CURRENT,
+        generator: None,
         r#match: SampleMatchHeaderV2 {
             display_name: Some("テスト試合".to_string()),
             date: chrono::DateTime::from_timestamp(0, 0).expect("epoch は有効"),
