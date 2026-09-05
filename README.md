@@ -296,6 +296,7 @@ direnv を使わない場合は `nix develop` で同じシェルに入れる。f
 | [docs/ERROR_CODES.md](docs/ERROR_CODES.md) | 全エラーコードとパラメータ・意味（**英語**。外部シェル実装者向けの参照表） |
 | [docs/adr/](docs/adr/) | 設計判断: 境界 API / エラー体系 / パリティ検証 / iOS FFI 本境界 / write orchestration |
 | [docs/PORTING.md](docs/PORTING.md) | Swift からの移植記録 |
+| [SECURITY.md](SECURITY.md) | 脆弱性の報告先（Private vulnerability reporting。公開 Issue に書かない） |
 
 ドキュメントとコードコメントは日本語で書く。例外は `docs/ERROR_CODES.md` のみで、これは外部実装者が文言表を書くための参照表なので英語に置いている。Issue / PR はどちらの言語でも歓迎。
 
