@@ -190,7 +190,7 @@ assets/handball_toolkit/third-party-licenses.json
 **この `.aar` を組み込んだアプリを配る人が、エンドユーザーへの表示義務を負う。** `.aar` は Executable Form での配布にあたるため、受け取った時点で MIT / Unicode-3.0 の「著作権表示とライセンス本文を届ける」義務と、MPL-2.0 §3.2 の「ソース入手方法を知らせる」義務が利用側へ移る。同梱しているのは**その材料**であって、履行そのものではない。
 
 - **届け方は問われない**（アプリ内画面・同梱テキスト・サポートサイトのいずれでもよい）。どのライセンスも媒体や UI を指定していない。ただしエンドユーザーが到達できる形にすること
-- **一覧から項目を間引かない**。MIT が 19 件に分かれるのは crate ごとに著作権表示が違うためで、まとめると義務を満たさなくなる
+- **一覧から項目を間引かない**。MIT が 20 件に分かれるのは crate ごとに著作権表示が違うためで、まとめると義務を満たさなくなる
 - **`sourceUrl` を表示に含める**。MPL-2.0 §3.2 の告知はこれが担っている
 - JSON の形（`schemaVersion` / `licenses[]` / `libraries[]` / `licenseIndexes`）は「ライセンス」節の「依存の OSS ライセンス表示」を参照
 
@@ -312,7 +312,7 @@ MIT。[LICENSE](LICENSE) を参照。
 
 ### 依存の OSS ライセンス表示（配布物を作る人向け）
 
-配布バイナリ（iOS の staticlib / Android の `.so`）には MIT / MPL-2.0 / Unicode-3.0 の OSS がリンクされる。**Executable Form で配る側にはライセンス本文と著作権表示を受領者へ届ける義務がある**（MPL-2.0 は加えて §3.2 の「ソース入手方法の告知」）。このリポはその一覧を [`THIRD_PARTY_LICENSES.json`](THIRD_PARTY_LICENSES.json) として持ち、**シェル側はこれを同梱して画面に出す**。
+配布バイナリ（iOS の staticlib / Android の `.so` / Web の `.wasm`）には MIT / MPL-2.0 / Unicode-3.0 の OSS がリンクされる。**Executable Form で配る側にはライセンス本文と著作権表示を受領者へ届ける義務がある**（MPL-2.0 は加えて §3.2 の「ソース入手方法の告知」）。このリポはその一覧を [`THIRD_PARTY_LICENSES.json`](THIRD_PARTY_LICENSES.json) として持ち、**シェル側はこれを同梱して画面に出す**。
 
 ```bash
 ./scripts/generate_licenses.sh           # 生成して書き出す
@@ -320,9 +320,10 @@ MIT。[LICENSE](LICENSE) を参照。
 ```
 
 - 一覧は `cargo-about` が Cargo.lock から起こす。**手で書かない・手で直さない**。依存を足したら再生成してコミットする（忘れても CI の `--check` が落ちる）
+- **配布物ごとの manifest（ffi / wasm）を両方走らせて統合する**（handball-project#285）。以前は ffi だけを見ていたため wasm-bindgen 一式が抜けていた — `about.toml` の `targets` に wasm32 を足すだけでは直らない（依存グラフの根に無いものは target を足しても現れない）。配布物を増やしたら `scripts/generate_licenses.sh` の `MANIFESTS` にも足すこと
 - 許容ライセンスは [`about.toml`](about.toml) の `accepted`。ここに無いものが混ざると生成が失敗する。**落ちたときに安易に追記して通さない** — まずその依存を入れてよいかを判断する
 - 生成物の形（`schemaVersion: 1`）:
-  - `licenses[]` — ライセンス本文。同一本文は 1 件に集約する。MIT が 19 件に分かれるのは crate ごとに著作権表示が違うため
+  - `licenses[]` — ライセンス本文。同一本文は 1 件に集約する。MIT が 20 件に分かれるのは crate ごとに著作権表示が違うため
   - `libraries[]` — crate 一覧。`licenseIndexes` で `licenses[]` を参照する。1 crate が複数ライセンスに服することがある（`unicode-ident` は MIT と Unicode-3.0 の両方）
   - `sourceUrl` — crates.io の**当該バージョン**。MPL-2.0 §3.2 の告知をこれで満たす
   - `origin` — `"workspace"`（この repo の crate）か `"registry"`（外部）か。workspace メンバの判定は `cargo metadata` が行う
@@ -330,4 +331,4 @@ MIT。[LICENSE](LICENSE) を参照。
 - **`origin` は「自作かどうか」ではない**（handball-project#145）。誰から見て自作かは配布経路で変わる — この repo の作者にとってコアは自作だが、`.aar` を受け取った外部シェル実装者にとっては third party そのもの。同じ JSON が両方へ届く以上、**生成側は視点に依存しない事実だけを載せ、どう見せるかは各シェルが決める**。HandballRecorder は `origin == "workspace"` を「このアプリのコア」として独立セクションに出している
 - **`origin` は `schemaVersion` を上げずに足した任意フィールド**。印を持たない版の一覧も読めなければならない（読み手は欠落を `"registry"` 相当として扱う）。**必須にするなら版を上げること**
 
-iOS は `HandballRecorder` の `Packages/HandballToolkit/bootstrap.sh` がこの JSON をパッケージリソースへ取り込み、生成 Swift と同じく一致検証する。Android は `scripts/build_aar.sh` が `.aar` の `assets/handball_toolkit/third-party-licenses.json` へ同梱する（handball-project#142）。**`.aar` を受け取った側に何の義務が移るか**は「Android」節の「同梱される OSS ライセンス一覧」を参照。
+iOS は `HandballRecorder` の `Packages/HandballToolkit/bootstrap.sh` がこの JSON をパッケージリソースへ取り込み、生成 Swift と同じく一致検証する。**Web デモ（handball-apps-site）はこの一覧をまだ表示していない**（wasm 側の義務は未対応。表示はサイト側の課題）。Android は `scripts/build_aar.sh` が `.aar` の `assets/handball_toolkit/third-party-licenses.json` へ同梱する（handball-project#142）。**`.aar` を受け取った側に何の義務が移るか**は「Android」節の「同梱される OSS ライセンス一覧」を参照。
