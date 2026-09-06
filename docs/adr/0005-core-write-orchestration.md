@@ -241,6 +241,11 @@ pub enum CoreWriteError {
    - **コア（Rust）→ 完了（2026-07-22）**: 純粋関数 `sample_import::import_commit_batch`（既存 roster + 新規選手で roster 構築 → in-memory の working ログにプレフィックスごと `validate_append` → `ImportWriteBatch` 組立）+ `ImportWriteBatch`（uniffi Record）+ `ffi_write::ImportWriteRepository` foreign trait を追加。`commit_sample_match_import` を「計画 → 既存 roster read → `import_commit_batch` で検証 + 組立 → `commit_import(batch)` を 1 回」へ置換し、`save_team` / `save_player` / `save_match` ループ + facts 逐次 `record_append_fact` を撤去（第 2 引数を `team_repo` → `import_repo` へ変更）。テスト: `sample_import_tests` に純粋関数（合格 → バッチ組立 / 違反 → 未組立）、`write_orchestration_tests`（fake repo）に「1 バッチ発火・ID 不足 / decode 失敗 / 検証失敗で `commit_import` 不発火」を追加。
    - **シェル（Swift）→ 完了（2026-07-22）**: `SwiftDataImportRepository`（1 `ModelContext` に全 insert → `save()` 1 回。保存後に match / team の observe を再送して Dev 一覧を更新）を新設し、`RecorderV2Services` / `RecorderMacServices` で DI。`ImportWriter` を `matchRepository`（roster read）+ `importRepository`（atomic 発火）へ組み替え、生成 Swift を `bootstrap.sh --refresh-generated` で追随。import の FFI 往復は `MatchImporterV2CommitTests`（simulator 上の実 FFI・6 件）が担保する（ios_poc は import を扱わないため追加不要）。
    - **dev 専用経路（`DevDataViewV2` / `#if DEBUG`）に限定し、record / phase 補完 / migrate の逐次・非 atomic は変えない**
+9. **import commit に試合ヘッダの検証を足す（第 8 段の欠落補修）**: handball-project#308。
+   - **なぜ欠落したか**: 第 8 段は fact 列の検証意味論を「逐次 append と同一」に保つことに集中し、**試合そのものの規則を誰も呼んでいなかった**ことを見落としていた。移植元の逐次経路も `validate_append` しか通しておらず、オラクルと一致していたため差分としても現れない。結果、通常の試合作成が UI で禁じている `SameTeamOnBothSides`（両側が同じチーム）が、取り込みからは commit まで通り抜けていた。1.6.0 から存在し、#303 の zip 対応で他人へ渡る経路が開いて踏みやすくなった
+   - **コア（Rust）→ 完了（2026-09-06）**: `import_commit_batch` の先頭で `validators::validate_match(&plan.r#match)` を回し、非空なら fact ループへ入らず `Err` を返す。**ループの前に置く**のは fact 0 件の試合ファイルも検査するため。テストは `sample_import_tests` に 3 件（両側同一で `SameTeamOnBothSides` / fact 0 件でも落ちる / 別チームなら通る対照）
+   - **enforcement 点の対称性が回復した**: fact の create / edit / delete は `MatchWriteValidator`、試合ヘッダは create（UI）と import の双方が `validate_match` を通る。**`validate_match` を呼ぶ write 経路はここが最初**（それ以前は `ffi_api::validate_match` として公開されているだけで、どのシェルからも呼ばれていなかった）
+   - 新しいエラーコードは増えないので `docs/ERROR_CODES.md` は据え置き。ただし `commit_sample_match_import` は**従来受け入れていた入力を拒否するようになる**ので、FFI 公開面の挙動変更としてリリースを積む対象
 
 各段は独立して出荷可能な状態を保つ（途中の段で止めても境界は整合する）。
 
@@ -286,3 +291,4 @@ pub enum CoreWriteError {
 - handball-project#59 — Kotlin バインディング（発火 orchestration の共有先）
 - handball-project#67 — 第 5 段（import の merge 調停 + commit のコア移管。完了）
 - handball-project#83 — import commit の atomic 化（決定 7 / 決定 1 の 2026-07-22 追記・第 8 段）
+- handball-project#308 — import commit に試合ヘッダの検証を足す（第 9 段）

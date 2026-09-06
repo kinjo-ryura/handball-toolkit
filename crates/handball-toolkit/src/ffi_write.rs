@@ -314,7 +314,8 @@ pub trait ImportWriteRepository: Send + Sync + std::fmt::Debug {
 /// 順序設計をコアが所有する:
 /// 1. 計画（純粋関数 `import_commit_plan` — 既存に統合した entity は save 対象に積まない）
 /// 2. 既存 roster（新規保存前の 2 チーム所属選手）を読む — 検証入力の最小 read（決定 1）
-/// 3. `import_commit_batch` で検証 + 組立（プレフィックス検証は現行の逐次 append と同一）
+/// 3. `import_commit_batch` で検証 + 組立（試合ヘッダの `validate_match` → fact 列のプレフィックス
+///    検証。後者は現行の逐次 append と同一）
 /// 4. `ImportWriteRepository::commit_import` へ 1 バッチを渡し、**1 `context.save()` で atomic 発火**
 ///
 /// **facts は `import_commit_plan` が永続化順へ整列する**（移植元から意図的に乖離 —
