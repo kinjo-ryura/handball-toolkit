@@ -512,7 +512,14 @@ pub struct ImportWriteBatch {
 
 /// commit 計画を検証し、atomic 発火バッチへ組む純粋関数（ADR 0005 決定 7 の 2026-07-22 追記）。
 ///
-/// **検証の意味論は現行の逐次 append と同一**にする: シェルの読み込み済みコピーではなく
+/// **検証は 2 段**。まず試合ヘッダを `validate_match` に掛け、次に fact 列を検証する。
+///
+/// 試合ヘッダの検証は 2026-09-06 に足した（handball-project#308）。それまで import 経路は
+/// fact ごとの `validate_append` しか通らず、**試合そのものの規則が 1 つも走っていなかった** —
+/// 通常の試合作成では禁じている `SameTeamOnBothSides`（両側が同じチーム）が、取り込みからは
+/// commit まで通り抜けていた。fact 0 件の試合でも走らせるため、ループの**前**に置く。
+///
+/// fact 列の**検証の意味論は現行の逐次 append と同一**にする: シェルの読み込み済みコピーではなく
 /// in-memory の working ログに対して**プレフィックスごとに** `validate_append` を回す
 /// （fact 単体 validation + roster 参照整合 + `working + fact` の whole-log 検証）。
 /// atomic 化するのは write（`commit_import` の 1 バッチ発火）だけで、検証は緩めない。
@@ -528,6 +535,11 @@ pub fn import_commit_batch(
     plan: ImportCommitPlan,
     existing_roster: &[PlayerTeamRef],
 ) -> Result<ImportWriteBatch, Vec<DomainValidationIssue>> {
+    let match_issues = validators::validate_match(&plan.r#match);
+    if !match_issues.is_empty() {
+        return Err(match_issues);
+    }
+
     let mut roster_refs: Vec<PlayerTeamRef> = existing_roster.to_vec();
     for player in &plan.players_to_save {
         roster_refs.push(PlayerTeamRef {

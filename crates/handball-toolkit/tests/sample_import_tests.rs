@@ -17,6 +17,8 @@ use handball_toolkit::sample_dto::{
     SampleMatchHeaderV2, SamplePhaseStartPayloadDtoV2, SamplePlayFactDtoV2, SamplePlayerDtoV2,
     SampleTeamDtoV2, SampleTeamsDtoV2, SampleTimerConfigurationDtoV2,
 };
+use handball_toolkit::validation::{DomainValidationIssue, MatchValidationError};
+
 use handball_toolkit::sample_import::{
     ExistingSnapshot, ImportDecisions, PlayerTarget, TeamOption, TeamTarget, default_decisions,
     find_team_options, import_commit_batch, import_commit_plan, normalize_name,
@@ -508,4 +510,90 @@ fn import_commit_batch_rejects_invalid_sequence_without_assembling() {
         "検証に落ちたらバッチを組まない（commit_import を発火しない）"
     );
     assert!(!result.unwrap_err().is_empty(), "issues は非空で返す");
+}
+
+// ── 試合ヘッダの検証（handball-project#308）──
+
+/// 両側を同じ既存チームへ紐付けた計画は `SameTeamOnBothSides` で落ちる。
+///
+/// 通常の試合作成は UI が `homeTeamId != awayTeamId` を課すが、取り込みのチーム選択には
+/// その検査が無く、両側に同じ既存チームを選んだまま commit まで通り抜けていた。fact 側の
+/// 検証（`validate_append`）は試合ヘッダを見ないので、ここで塞がないと防げない。
+#[test]
+fn import_commit_batch_rejects_same_team_on_both_sides() {
+    let existing = team("共有チーム");
+    let dto = default_import_dto();
+    let decisions = ImportDecisions {
+        home_team: TeamTarget::Existing {
+            team_id: existing.id,
+        },
+        away_team: TeamTarget::Existing {
+            team_id: existing.id,
+        },
+        players: HashMap::new(),
+    };
+    let plan = import_commit_plan(&dto, &decisions, sequential_ids()).unwrap();
+    assert_eq!(
+        plan.r#match.home_team_id, plan.r#match.away_team_id,
+        "前提: 計画の時点では両側が同じチームに解決されている"
+    );
+
+    let result = import_commit_batch(plan, &[]);
+
+    let issues = result.expect_err("両側が同じチームなら commit は落ちる");
+    assert!(
+        issues.contains(&DomainValidationIssue::Match(
+            MatchValidationError::SameTeamOnBothSides
+        )),
+        "SameTeamOnBothSides を返すべき: {issues:?}"
+    );
+}
+
+/// 試合ヘッダの検証は fact ループの**前**に走る（fact 0 件でも落ちる）。
+///
+/// ループの中や後に置くと、fact を 1 件も持たない試合ファイルが素通りする。
+#[test]
+fn import_commit_batch_validates_match_header_even_without_facts() {
+    let existing = team("共有チーム");
+    let dto = import_dto(vec![]);
+    let decisions = ImportDecisions {
+        home_team: TeamTarget::Existing {
+            team_id: existing.id,
+        },
+        away_team: TeamTarget::Existing {
+            team_id: existing.id,
+        },
+        players: HashMap::new(),
+    };
+    let plan = import_commit_plan(&dto, &decisions, sequential_ids()).unwrap();
+    assert!(plan.facts.is_empty(), "前提: fact 0 件の計画");
+
+    let result = import_commit_batch(plan, &[]);
+
+    let issues = result.expect_err("fact 0 件でも試合ヘッダの検証は走る");
+    assert!(
+        issues.contains(&DomainValidationIssue::Match(
+            MatchValidationError::SameTeamOnBothSides
+        )),
+        "SameTeamOnBothSides を返すべき: {issues:?}"
+    );
+}
+
+/// 両側が別チームなら従来どおり組める（上 2 件の対照）。
+#[test]
+fn import_commit_batch_accepts_distinct_teams_on_each_side() {
+    let home = team("ホーム");
+    let away = team("アウェイ");
+    let dto = default_import_dto();
+    let decisions = ImportDecisions {
+        home_team: TeamTarget::Existing { team_id: home.id },
+        away_team: TeamTarget::Existing { team_id: away.id },
+        players: HashMap::new(),
+    };
+    let plan = import_commit_plan(&dto, &decisions, sequential_ids()).unwrap();
+
+    let batch = import_commit_batch(plan, &[]).expect("別チームなら検証を通る");
+
+    assert_eq!(batch.match_.home_team_id, home.id);
+    assert_eq!(batch.match_.away_team_id, away.id);
 }
