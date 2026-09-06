@@ -71,6 +71,9 @@ pub fn export_match(
 
     SampleMatchDtoV2 {
         schema_version: SCHEMA_VERSION_CURRENT,
+        // コアはアプリ名 / version を知らない。試合ファイルとして出すシェルが export 後に埋める
+        // （配信サンプル / 開発用 export では空のまま）。
+        generator: None,
         r#match: header,
         teams: SampleTeamsDtoV2 {
             home: home_dto,
@@ -156,6 +159,10 @@ fn encode_video_source(source: &VideoSource) -> SampleVideoSourceDtoV2 {
             VideoProvider::Local => "local".to_owned(),
         },
         external_id: source.external_id.clone(),
+        // ドメイン型は cloud identifier / 尺を持たない（handball-project#300）。`.local` を
+        // 試合ファイルとして送るシェルが PhotoKit から取って export 後に埋める。
+        cloud_identifier: None,
+        duration_seconds: None,
     }
 }
 

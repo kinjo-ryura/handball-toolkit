@@ -6,7 +6,8 @@
 
 use chrono::{DateTime, Utc};
 use handball_toolkit::sample_dto::{
-    SampleFactDtoV2, SampleMatchConfigurationDtoV2, SampleMatchDtoV2, SampleVideoSourceDtoV2,
+    SampleFactDtoV2, SampleGeneratorDtoV2, SampleMatchConfigurationDtoV2, SampleMatchDtoV2,
+    SampleVideoSourceDtoV2, encode_sample_match,
 };
 use uuid::Uuid;
 
@@ -158,6 +159,119 @@ fn decodes_minimal_match_body() {
     assert_eq!(dto.teams.home.players[0].jersey_number, Some(7));
     assert!(dto.teams.away.players[0].jersey_number.is_none());
     assert!(dto.facts.is_empty());
+    // 1.6.0 が書いた試合ファイル / 配信サンプルには generator が無い（handball-project#300）
+    assert!(dto.generator.is_none());
+}
+
+// ── 試合ファイルの optional 拡張（generator / cloudIdentifier / durationSeconds。handball-project#300） ──
+
+/// 1.6.1 が書く試合ファイルの形。`schemaVersion` は 2 のまま（optional の追加は版を上げない —
+/// Recorder ADR 0002 規律 1）。
+const MATCH_FILE_WITH_EXTRAS: &str = r#"{
+  "schemaVersion": 2,
+  "generator": {"name": "HandballRecorder", "version": "1.6.1", "build": "29"},
+  "match": {
+    "date": "2026-09-05T03:00:00Z",
+    "configuration": {
+      "kind": "video",
+      "video": {
+        "source": {
+          "provider": "local",
+          "externalID": "7A0B4C1D-2E3F-4A5B-8C9D-0E1F2A3B4C5D/L0/001",
+          "cloudIdentifier": "AwAAAAAAAAAA/mock-cloud-identifier",
+          "durationSeconds": 3612.5
+        }
+      }
+    }
+  },
+  "teams": {
+    "home": {"key": "home", "name": "ホーム", "players": []},
+    "away": {"key": "away", "name": "アウェイ", "players": []}
+  },
+  "facts": []
+}"#;
+
+#[test]
+fn decodes_match_file_extras() {
+    let dto: SampleMatchDtoV2 = serde_json::from_str(MATCH_FILE_WITH_EXTRAS).unwrap();
+    assert_eq!(dto.schema_version, 2);
+    assert_eq!(
+        dto.generator,
+        Some(SampleGeneratorDtoV2 {
+            name: "HandballRecorder".to_owned(),
+            version: "1.6.1".to_owned(),
+            build: Some("29".to_owned()),
+        })
+    );
+    let source = &dto.r#match.configuration.video.as_ref().unwrap().source;
+    assert_eq!(source.provider, "local");
+    assert_eq!(
+        source.cloud_identifier.as_deref(),
+        Some("AwAAAAAAAAAA/mock-cloud-identifier")
+    );
+    assert_eq!(source.duration_seconds, Some(3612.5));
+}
+
+#[test]
+fn decodes_generator_without_build() {
+    let json = r#"{"name": "handball-video-analysis", "version": "0.3.0"}"#;
+    let generator: SampleGeneratorDtoV2 = serde_json::from_str(json).unwrap();
+    assert_eq!(generator.name, "handball-video-analysis");
+    assert!(generator.build.is_none());
+}
+
+/// 拡張はすべて optional で、None のときはキーごと省かれる — 1.6.0 以前のアプリが書いた
+/// ファイルと同じバイト列に戻る（`golden/export/` のバイト一致がそのまま成り立つ）。
+#[test]
+fn serializes_match_file_extras_verbatim_and_omits_when_none() {
+    let source = SampleVideoSourceDtoV2 {
+        provider: "local".to_owned(),
+        external_id: "abc".to_owned(),
+        cloud_identifier: Some("cloud".to_owned()),
+        duration_seconds: Some(120.0),
+    };
+    let value = serde_json::to_value(&source).unwrap();
+    assert_eq!(value["cloudIdentifier"], "cloud");
+    assert_eq!(value["durationSeconds"], 120.0);
+    assert!(value.get("cloud_identifier").is_none());
+
+    let none = SampleVideoSourceDtoV2 {
+        cloud_identifier: None,
+        duration_seconds: None,
+        ..source
+    };
+    let value = serde_json::to_value(&none).unwrap();
+    assert!(value.get("cloudIdentifier").is_none());
+    assert!(value.get("durationSeconds").is_none());
+
+    let generator = SampleGeneratorDtoV2 {
+        name: "HandballRecorder".to_owned(),
+        version: "1.6.1".to_owned(),
+        build: None,
+    };
+    let value = serde_json::to_value(&generator).unwrap();
+    assert_eq!(
+        value,
+        serde_json::json!({"name": "HandballRecorder", "version": "1.6.1"})
+    );
+}
+
+/// `encode_sample_match` はキーをバイト順に並べる（Swift `.sortedKeys` 互換）ので、
+/// `generator` は `facts` と `match` の間に入る。試合ファイルの実バイト列を固定する。
+#[test]
+fn encodes_generator_between_facts_and_match() {
+    let dto: SampleMatchDtoV2 = serde_json::from_str(MATCH_FILE_WITH_EXTRAS).unwrap();
+    let text = encode_sample_match(&dto);
+    let facts = text.find("\"facts\" : ").unwrap();
+    let generator = text.find("\"generator\" : {").unwrap();
+    let match_ = text.find("\"match\" : {").unwrap();
+    assert!(facts < generator && generator < match_, "{text}");
+    assert!(text.contains("\"build\" : \"29\""));
+    assert!(text.contains("\"cloudIdentifier\" : \"AwAAAAAAAAAA/mock-cloud-identifier\""));
+    assert!(text.contains("\"durationSeconds\" : 3612.5"));
+    // 再 parse で往復する
+    let back: SampleMatchDtoV2 = serde_json::from_str(&text).unwrap();
+    assert_eq!(back, dto);
 }
 
 // ── 明示 rename の表記固定（Swift 表記 externalID / factID を保存） ──
@@ -167,6 +281,8 @@ fn serializes_renamed_fields_verbatim() {
     let source = SampleVideoSourceDtoV2 {
         provider: "youtube".to_owned(),
         external_id: "abc".to_owned(),
+        cloud_identifier: None,
+        duration_seconds: None,
     };
     let value = serde_json::to_value(&source).unwrap();
     assert!(value.get("externalID").is_some());

@@ -87,9 +87,31 @@ pub struct SampleHighlightSummaryV2 {
 #[serde(rename_all = "camelCase")]
 pub struct SampleMatchDtoV2 {
     pub schema_version: i64,
+    /// このファイルを書いたアプリ（handball-project#298 / #300）。**optional** — 配信サンプル
+    /// （python 生成）と 1.6.0 が書いた試合ファイルには無い。サポートで「外部生成」と
+    /// 「自アプリ + version 差」を切り分けるためのもので、改竄防止ではない（Recorder ADR 0002）。
+    /// コアは値を入れない（アプリ名 / version を知らない）— export 後にシェルが埋める。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub generator: Option<SampleGeneratorDtoV2>,
     pub r#match: SampleMatchHeaderV2,
     pub teams: SampleTeamsDtoV2,
     pub facts: Vec<SampleFactDtoV2>,
+}
+
+/// `generator` — ファイルを書いたアプリの名前と版。
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[serde(rename_all = "camelCase")]
+pub struct SampleGeneratorDtoV2 {
+    /// アプリ名（例: `"HandballRecorder"`）。
+    pub name: String,
+    /// 利用者に見える版（例: `"1.6.1"`）。
+    pub version: String,
+    /// ビルド番号（例: `"29"`）。持たない生成元は省略する。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub build: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -172,11 +194,28 @@ pub struct SampleVideoConfigurationDtoV2 {
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct SampleVideoSourceDtoV2 {
-    /// `"youtube"` のみ。将来別 provider を追加するための文字列。
+    /// `"youtube"` | `"local"`。配信サンプルは `"youtube"` のみ、`"local"` は試合ファイル
+    /// （端末内「写真」の動画。`externalID` は PHAsset の localIdentifier で端末固有）。
     pub provider: String,
     /// Swift 表記 `externalID` を保存（camelCase 自動変換は `externalId` になるため明示 rename）。
     #[serde(rename = "externalID")]
     pub external_id: String,
+    /// `"local"` のみ。端末をまたいで安定な PhotoKit の cloud identifier
+    /// （handball-project#300）。受け取った端末は iCloud 写真が同じ Apple ID で有効なら、
+    /// これをその端末の localIdentifier へ引き直して再生を復旧する。**optional** —
+    /// 1.6.0 が書いたファイルには無く、送り側で引けなかったときも省略される。
+    /// ドメイン型（`VideoSource`）には持たせない — 参照の復旧はシェルの仕事で、
+    /// fact / projection には関与しない。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub cloud_identifier: Option<String>,
+    /// `"local"` のみ。送り側で紐付いていた動画の尺（秒）。受け取った端末で動画を選び直す
+    /// とき、別の切り出しへ差し替えて fact の時刻が静かにずれるのを止めるために比べる
+    /// （Recorder `CONTEXT.md`「動画ソースの差し替えは移行と別の操作」の条件 (b)）。
+    /// **optional** — `cloud_identifier` と同じ理由。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub duration_seconds: Option<f64>,
 }
 
 // ── Facts (tagged union) ──

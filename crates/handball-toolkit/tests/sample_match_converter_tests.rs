@@ -150,6 +150,8 @@ fn video_config_dto(provider: &str, external_id: &str) -> SampleMatchConfigurati
             source: SampleVideoSourceDtoV2 {
                 provider: provider.to_owned(),
                 external_id: external_id.to_owned(),
+                cloud_identifier: None,
+                duration_seconds: None,
             },
         }),
         video_highlight: None,
@@ -165,6 +167,8 @@ fn video_highlight_config_dto(provider: &str, external_id: &str) -> SampleMatchC
             source: SampleVideoSourceDtoV2 {
                 provider: provider.to_owned(),
                 external_id: external_id.to_owned(),
+                cloud_identifier: None,
+                duration_seconds: None,
             },
         }),
     }
@@ -189,6 +193,7 @@ fn match_dto(
     }
     SampleMatchDtoV2 {
         schema_version,
+        generator: None,
         r#match: SampleMatchHeaderV2 {
             display_name: Some("テスト試合".to_owned()),
             date: fixtures::epoch(),
@@ -272,6 +277,24 @@ fn decode_timer_with_missing_payload_throws() {
     assert_eq!(
         decode_configuration(&dto).unwrap_err(),
         SampleMatchDecodeErrorV2::MissingConfigurationPayload("timer".to_owned())
+    );
+}
+
+/// `cloudIdentifier` / `durationSeconds` は参照の復旧と差し替えの検査に使うシェルの値で、
+/// ドメイン型 `VideoSource` には持ち込まない（handball-project#300）。付いていても decode は
+/// 1.6.0 と同じ結果になる。
+#[test]
+fn decode_local_video_source_ignores_recovery_extras() {
+    let mut dto = video_config_dto("local", "asset-local-id");
+    let source = &mut dto.video.as_mut().unwrap().source;
+    source.cloud_identifier = Some("cloud-id".to_owned());
+    source.duration_seconds = Some(3600.0);
+    assert_eq!(
+        decode_configuration(&dto).unwrap(),
+        MatchConfiguration::Video(VideoSource {
+            provider: VideoProvider::Local,
+            external_id: "asset-local-id".to_owned(),
+        })
     );
 }
 
