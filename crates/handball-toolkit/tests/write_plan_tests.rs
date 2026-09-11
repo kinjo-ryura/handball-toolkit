@@ -18,9 +18,10 @@ use handball_toolkit::facts::{
 };
 use handball_toolkit::ids::{FactId, MatchId, PlayerId, TeamId};
 use handball_toolkit::write::{
-    NewFactStamp, PlayerTeamRef, VideoMigrationPlanError, VideoSourceReplacementError,
-    VideoSyncInput, phase_completion_fact, phase_completion_plan, roster_context_from_players,
-    video_migration_plan, video_source_replacement_plan,
+    NewFactStamp, PhaseDurationChangeError, PlayerTeamRef, VideoMigrationPlanError,
+    VideoSourceReplacementError, VideoSyncInput, phase_completion_fact, phase_completion_plan,
+    phase_duration_change_plan, roster_context_from_players, video_migration_plan,
+    video_source_replacement_plan,
 };
 use uuid::Uuid;
 
@@ -448,5 +449,368 @@ fn timer_試合の差し替えは拒否する() {
             kind: MatchConfigurationKind::Timer
         }),
         "タイマー → 動画は同期点が要る（video_migration_plan の仕事）"
+    );
+}
+
+// ── 可変長 phase の自動補完（handball-project#352）──
+
+#[test]
+fn 可変長の前半でも隙間なく後半を補完する() {
+    // 前半を 25 分に縮めた試合。番号 × 規定長で補完すると [30:00, 60:00] を作って
+    // 25:00〜30:00 に隙間が開き、連続性の検証で保存ごと拒否される。
+    let existing = vec![phase_start(0.0, 1500.0)];
+    let plan = phase_completion_plan(&timer_match(1800.0), &existing, &goal_at(1900.0));
+    assert_eq!(slots(&plan), vec![(1500.0, 3000.0)]);
+}
+
+#[test]
+fn 補完する_phase_の長さは直前_phase_を踏襲する() {
+    // 直前が 25 分なら補完も 25 分。明示的に phase を開始する経路（PhaseDefaults）と
+    // 同じ規則で、どちらを通ったかで長さが変わらないようにしてある。
+    let existing = vec![phase_start(0.0, 1500.0)];
+    let plan = phase_completion_plan(&timer_match(1800.0), &existing, &goal_at(4000.0));
+    assert_eq!(slots(&plan), vec![(1500.0, 3000.0), (3000.0, 4500.0)]);
+}
+
+#[test]
+fn 既存_phase_が無ければ試合設定の規定長で補完する() {
+    let plan = phase_completion_plan(&timer_match(1500.0), &[], &goal_at(1600.0));
+    assert_eq!(slots(&plan), vec![(0.0, 1500.0), (1500.0, 3000.0)]);
+}
+
+// ── phase の長さ編集（handball-project#352）──
+//
+// 規則は 3 つ。開始は動かさない / 元の終了以降はすべて同じ量だけずらす /
+// 短縮ではみ出す記録は新しい終了へ寄せて件数を返す。
+// 「後半 7:00 で記録したものは後半 7:00 のまま」を保つのが 2 番目の規則の目的。
+
+/// 前半 [0, 30:00] / 後半 [30:00, 60:00] の 2 phase を持つタイマー試合の fact 列。
+fn 二_phase_の試合() -> Vec<MatchFact> {
+    vec![phase_start(0.0, 1800.0), phase_start(1800.0, 3600.0)]
+}
+
+fn goal_with_id(id: u128, seconds: f64) -> MatchFact {
+    MatchFact {
+        id: FactId(Uuid::from_u128(id)),
+        recorded_at: chrono::DateTime::from_timestamp(10, 0).expect("固定秒は有効"),
+        payload: MatchFactPayload::Play(PlayFact {
+            kind: PlayEventKind::Goal,
+            team_id: None,
+            player_id: Some(PlayerId(Uuid::from_u128(50))),
+            related_player_id: None,
+            anchor: FactAnchor::MatchClock(MatchClock {
+                elapsed_seconds: seconds,
+            }),
+            title: None,
+            note: None,
+        }),
+    }
+}
+
+/// 計画の結果を「id → (開始秒, 終了秒 or None)」で読み出す（比較を読みやすくするため）。
+fn 書き換え後(plan: &handball_toolkit::write::PhaseDurationChangePlan) -> BTreeMap<u128, f64> {
+    plan.updated_facts
+        .iter()
+        .map(|fact| {
+            (
+                fact.id.0.as_u128(),
+                fact.anchor().match_elapsed_seconds().expect("matchClock"),
+            )
+        })
+        .collect()
+}
+
+fn 終了秒(plan: &handball_toolkit::write::PhaseDurationChangePlan, id: u128) -> f64 {
+    plan.updated_facts
+        .iter()
+        .find(|fact| fact.id.0.as_u128() == id)
+        .and_then(|fact| match &fact.payload {
+            MatchFactPayload::Control(ControlFact::PhaseStart(payload)) => {
+                payload.end_anchor.match_elapsed_seconds()
+            }
+            _ => None,
+        })
+        .expect("対象 id の PhaseStart が計画に載っている")
+}
+
+#[test]
+fn 前半を縮めると後半が同じ量だけ前へ動く() {
+    let facts = 二_phase_の試合();
+    let plan = phase_duration_change_plan(
+        &timer_match(1800.0),
+        &facts,
+        FactId(Uuid::from_u128(200)),
+        1500.0,
+    )
+    .expect("タイマーモードの regular phase なら計画できる");
+
+    // 前半は開始 0 のまま終了だけ 25:00 へ。後半は開始 25:00 / 終了 55:00（長さ 30 分を保つ）。
+    assert_eq!(終了秒(&plan, 200), 1500.0);
+    assert_eq!(書き換え後(&plan).get(&2000), Some(&1500.0));
+    assert_eq!(終了秒(&plan, 2000), 3300.0);
+    assert!(plan.clamped_fact_ids.is_empty());
+}
+
+#[test]
+fn 後半の記録は_phase_内の位置を保つ() {
+    let mut facts = 二_phase_の試合();
+    // 後半 2:00 の得点（累積 32:00 として保存されている）。
+    facts.push(goal_with_id(300, 1920.0));
+
+    let plan = phase_duration_change_plan(
+        &timer_match(1800.0),
+        &facts,
+        FactId(Uuid::from_u128(200)),
+        1500.0,
+    )
+    .expect("計画できる");
+
+    // 後半の開始が 5 分前へ動くので、得点も 5 分前へ動いて「後半 2:00」のまま。
+    assert_eq!(書き換え後(&plan).get(&300), Some(&1620.0));
+    assert!(plan.clamped_fact_ids.is_empty());
+}
+
+#[test]
+fn 前半の記録は動かない() {
+    let mut facts = 二_phase_の試合();
+    facts.push(goal_with_id(300, 600.0));
+
+    let plan = phase_duration_change_plan(
+        &timer_match(1800.0),
+        &facts,
+        FactId(Uuid::from_u128(200)),
+        1500.0,
+    )
+    .expect("計画できる");
+
+    assert_eq!(書き換え後(&plan).get(&300), None);
+}
+
+#[test]
+fn 新しい終了を超える記録は終了へ寄せて件数に載せる() {
+    let mut facts = 二_phase_の試合();
+    // 前半 27:00 と 28:30 の得点。25 分へ縮めると 2 件とも枠の外へ出る。
+    facts.push(goal_with_id(300, 1620.0));
+    facts.push(goal_with_id(301, 1710.0));
+
+    let plan = phase_duration_change_plan(
+        &timer_match(1800.0),
+        &facts,
+        FactId(Uuid::from_u128(200)),
+        1500.0,
+    )
+    .expect("計画できる");
+
+    let 結果 = 書き換え後(&plan);
+    assert_eq!(結果.get(&300), Some(&1500.0));
+    assert_eq!(結果.get(&301), Some(&1500.0));
+    assert_eq!(
+        plan.clamped_fact_ids,
+        vec![FactId(Uuid::from_u128(300)), FactId(Uuid::from_u128(301))]
+    );
+}
+
+#[test]
+fn 新しい終了ちょうどの記録は寄せない() {
+    let mut facts = 二_phase_の試合();
+    facts.push(goal_with_id(300, 1500.0));
+
+    let plan = phase_duration_change_plan(
+        &timer_match(1800.0),
+        &facts,
+        FactId(Uuid::from_u128(200)),
+        1500.0,
+    )
+    .expect("計画できる");
+
+    assert_eq!(書き換え後(&plan).get(&300), None);
+    assert!(plan.clamped_fact_ids.is_empty());
+}
+
+#[test]
+fn 伸ばす場合は寄せる記録が出ない() {
+    let mut facts = 二_phase_の試合();
+    facts.push(goal_with_id(300, 1620.0));
+    facts.push(goal_with_id(301, 1920.0));
+
+    let plan = phase_duration_change_plan(
+        &timer_match(1800.0),
+        &facts,
+        FactId(Uuid::from_u128(200)),
+        2100.0,
+    )
+    .expect("計画できる");
+
+    let 結果 = 書き換え後(&plan);
+    // 前半 27:00 は前半のまま動かない。後半 2:00 は後半 2:00 のまま 5 分後ろへ。
+    assert_eq!(結果.get(&300), None);
+    assert_eq!(結果.get(&301), Some(&2220.0));
+    assert_eq!(結果.get(&2000), Some(&2100.0));
+    assert!(plan.clamped_fact_ids.is_empty());
+}
+
+#[test]
+fn 最後の_phase_より後ろの記録も同じ量だけ動く() {
+    let mut facts = 二_phase_の試合();
+    // どの phase にも属さない記録（タイマーモードでは枠外の記録も保存できる）。
+    facts.push(goal_with_id(300, 3700.0));
+
+    let plan = phase_duration_change_plan(
+        &timer_match(1800.0),
+        &facts,
+        FactId(Uuid::from_u128(200)),
+        1500.0,
+    )
+    .expect("計画できる");
+
+    assert_eq!(書き換え後(&plan).get(&300), Some(&3400.0));
+}
+
+#[test]
+fn 中断の_marker_も同じ規則で動く() {
+    let mut facts = 二_phase_の試合();
+    facts.push(MatchFact {
+        id: FactId(Uuid::from_u128(400)),
+        recorded_at: chrono::DateTime::from_timestamp(11, 0).expect("固定秒は有効"),
+        payload: MatchFactPayload::Control(ControlFact::Stoppage(StoppagePayload {
+            kind: StoppageKind::Timeout,
+            start_anchor: FactAnchor::MatchClock(MatchClock {
+                elapsed_seconds: 2000.0,
+            }),
+            end_anchor: None,
+            note: None,
+        })),
+    });
+
+    let plan = phase_duration_change_plan(
+        &timer_match(1800.0),
+        &facts,
+        FactId(Uuid::from_u128(200)),
+        1500.0,
+    )
+    .expect("計画できる");
+
+    assert_eq!(書き換え後(&plan).get(&400), Some(&1700.0));
+}
+
+#[test]
+fn 計画は_phase_の鎖を先に記録を後に並べる() {
+    // 発火は逐次・非 atomic。鎖が半分だけ書き換わると連続性違反でその試合へ何も
+    // 保存できなくなるので、危険な窓を先頭の数件へ寄せてある。
+    let mut facts = 二_phase_の試合();
+    facts.push(goal_with_id(300, 600.0));
+    facts.push(goal_with_id(301, 1920.0));
+
+    let plan = phase_duration_change_plan(
+        &timer_match(1800.0),
+        &facts,
+        FactId(Uuid::from_u128(200)),
+        1500.0,
+    )
+    .expect("計画できる");
+
+    let ids: Vec<u128> = plan
+        .updated_facts
+        .iter()
+        .map(|fact| fact.id.0.as_u128())
+        .collect();
+    // 前半 (200) → 後半 (2000) → 後半の得点 (301)。前半の得点 (300) は動かないので載らない。
+    assert_eq!(ids, vec![200, 2000, 301]);
+}
+
+#[test]
+fn 長さが変わらなければ書き換えない() {
+    let mut facts = 二_phase_の試合();
+    facts.push(goal_with_id(300, 1920.0));
+
+    let plan = phase_duration_change_plan(
+        &timer_match(1800.0),
+        &facts,
+        FactId(Uuid::from_u128(200)),
+        1800.0,
+    )
+    .expect("計画できる");
+
+    assert!(plan.updated_facts.is_empty());
+    assert!(plan.clamped_fact_ids.is_empty());
+}
+
+#[test]
+fn 動画モードの_phase_は長さ編集の対象外() {
+    let match_ = Match {
+        configuration: MatchConfiguration::Video(VideoSource {
+            provider: VideoProvider::Youtube,
+            external_id: "abc".to_string(),
+        }),
+        ..timer_match(1800.0)
+    };
+    let error = phase_duration_change_plan(
+        &match_,
+        &二_phase_の試合(),
+        FactId(Uuid::from_u128(200)),
+        1500.0,
+    )
+    .expect_err("動画モードは拒否される");
+
+    assert_eq!(
+        error,
+        PhaseDurationChangeError::NotTimerConfiguration {
+            kind: MatchConfigurationKind::Video
+        }
+    );
+}
+
+#[test]
+fn 長さが_0_以下なら拒否する() {
+    let error = phase_duration_change_plan(
+        &timer_match(1800.0),
+        &二_phase_の試合(),
+        FactId(Uuid::from_u128(200)),
+        0.0,
+    )
+    .expect_err("0 秒の phase は作れない");
+
+    assert_eq!(
+        error,
+        PhaseDurationChangeError::InvalidDuration { seconds: 0.0 }
+    );
+}
+
+#[test]
+fn 対象が_phase_start_でなければ拒否する() {
+    let mut facts = 二_phase_の試合();
+    facts.push(goal_with_id(300, 600.0));
+
+    let error = phase_duration_change_plan(
+        &timer_match(1800.0),
+        &facts,
+        FactId(Uuid::from_u128(300)),
+        1500.0,
+    )
+    .expect_err("play fact に長さは無い");
+
+    assert_eq!(
+        error,
+        PhaseDurationChangeError::NotPhaseStartFact {
+            fact_id: FactId(Uuid::from_u128(300))
+        }
+    );
+}
+
+#[test]
+fn 対象_id_が無ければ拒否する() {
+    let error = phase_duration_change_plan(
+        &timer_match(1800.0),
+        &二_phase_の試合(),
+        FactId(Uuid::from_u128(999)),
+        1500.0,
+    )
+    .expect_err("存在しない id");
+
+    assert_eq!(
+        error,
+        PhaseDurationChangeError::PhaseFactNotFound {
+            fact_id: FactId(Uuid::from_u128(999))
+        }
     );
 }

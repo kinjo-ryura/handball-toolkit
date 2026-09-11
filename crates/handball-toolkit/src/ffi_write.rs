@@ -24,8 +24,8 @@ use crate::sample_import::{self, ImportCommitOutcome, ImportDecisions, ImportWri
 use crate::validation::DomainValidationIssue;
 use crate::validators::{self, RosterContext};
 use crate::write::{
-    self, NewFactStamp, PlayerTeamRef, VideoMigrationPlanError, VideoSourceReplacementError,
-    VideoSyncInput,
+    self, NewFactStamp, PhaseDurationChangeError, PlayerTeamRef, VideoMigrationPlanError,
+    VideoSourceReplacementError, VideoSyncInput,
 };
 
 /// write 入口の失敗（ADR 0005 決定 5。ADR 0002: 構造化 — コード + パラメータのみ）。
@@ -63,6 +63,21 @@ pub enum CoreWriteError {
     VideoSourceNotReplaceable {
         configuration: MatchConfigurationKind,
     },
+    /// phase の長さ編集の計画不成立（タイマーモード以外 / 対象 fact 不在 / 長さが 0 以下）。
+    /// UI が phase fact を選んで長さを渡していれば到達しない安全網（handball-project#352）。
+    PhaseDurationChangeInfeasible { detail: String },
+    /// phase を短縮すると新しい終了の外へ出る記録があるのに、寄せる承認が無い
+    /// （handball-project#352）。シェルは件数を見せて承認を取り、`allow_clamp` を立てて
+    /// 呼び直す。**承認なしに寄せない** — 記録の時刻が実際と変わるため。
+    PhaseDurationClampNotPermitted { clamped_fact_count: u32 },
+}
+
+impl From<PhaseDurationChangeError> for CoreWriteError {
+    fn from(error: PhaseDurationChangeError) -> Self {
+        CoreWriteError::PhaseDurationChangeInfeasible {
+            detail: format!("{error:?}"),
+        }
+    }
 }
 
 impl From<VideoSourceReplacementError> for CoreWriteError {
@@ -218,6 +233,93 @@ pub async fn record_fact_with_phase_completion(
         return Err(CoreWriteError::ValidationFailed { issues });
     }
     repo.append_fact(match_id, fact).await
+}
+
+/// タイマーモードの phase の長さを変える入口（handball-project#352）。
+///
+/// 読む → 計画（`phase_duration_change_plan`）→ 結果 log を 1 回で検証 → 計画順に発火。
+///
+/// **1 件ずつの逐次検証は使えない。** phase の連続性は隣接ペアの一致を要求するので、
+/// 鎖を途中まで書き換えた状態は必ず違反になる。どの順に並べても中間状態を通れないこと
+/// 自体が #352 で報告された詰みの原因なので、ここでは「計画を丸ごと適用した log」を
+/// 1 回だけ検証する。既存の `record_update_fact`（1 件の update）とはそこが違う。
+///
+/// `allow_clamp` は「短縮で phase の外へ出る記録を新しい終了へ寄せてよい」という承認。
+/// 寄せる記録があるのに承認が無ければ `PhaseDurationClampNotPermitted` で拒否し、
+/// **1 件も発火しない**。
+///
+/// **発火は逐次・非 atomic で、途中失敗からの再実行も安全ではない**（他の write 入口と
+/// 違う点なのでここに書いておく）。記録の移動量は「保存されている累積秒と phase の枠の
+/// 差」から毎回引き直すので、一部だけ動いた状態でもう一度通すと**動いたぶんがもう一度動く**。
+/// 計画は phase の鎖（数件）を先に、記録（数百件ありうる）を後に並べてあるので、
+/// 失敗しやすい後半で落ちても鎖は保たれる。鎖の途中で落ちた場合は連続性違反が残り、
+/// **その試合へは何も保存できなくなる** — 復旧は phase の手編集が要る。
+#[uniffi::export]
+pub async fn record_update_phase_duration(
+    repo: Arc<dyn MatchWriteRepository>,
+    match_id: MatchId,
+    phase_fact_id: FactId,
+    new_duration_seconds: f64,
+    allow_clamp: bool,
+) -> Result<(), CoreWriteError> {
+    let (match_, existing, roster) = load_validation_inputs(repo.as_ref(), match_id).await?;
+    let plan =
+        write::phase_duration_change_plan(&match_, &existing, phase_fact_id, new_duration_seconds)?;
+
+    if !plan.clamped_fact_ids.is_empty() && !allow_clamp {
+        return Err(CoreWriteError::PhaseDurationClampNotPermitted {
+            clamped_fact_count: plan.clamped_fact_ids.len() as u32,
+        });
+    }
+    if plan.updated_facts.is_empty() {
+        return Ok(());
+    }
+
+    let default_roster;
+    let effective_roster = match roster.as_ref() {
+        Some(roster) => roster,
+        None => {
+            default_roster = RosterContext::empty(match_.home_team_id, match_.away_team_id);
+            &default_roster
+        }
+    };
+
+    let resulting = apply_fact_updates(&existing, &plan.updated_facts);
+    let mut issues: Vec<DomainValidationIssue> = Vec::new();
+    for fact in &plan.updated_facts {
+        issues.extend(validators::validate_match_fact(
+            fact,
+            &match_.configuration,
+            effective_roster,
+        ));
+    }
+    issues.extend(validators::validate_fact_log(&resulting, &match_));
+    if !issues.is_empty() {
+        return Err(CoreWriteError::ValidationFailed { issues });
+    }
+
+    for fact in plan.updated_facts {
+        repo.update_fact(match_id, fact).await?;
+    }
+    Ok(())
+}
+
+/// `updates` で同 id の既存 fact を置き換えた log を永続化順で返す。
+///
+/// 長さ編集は累積秒を動かすので、置き換えただけでは並びが崩れる。`validators` の入力契約
+/// （「facts は永続化順でソート済み」— ADR 0001）を満たすため、ここで並べ直す。
+fn apply_fact_updates(existing: &[MatchFact], updates: &[MatchFact]) -> Vec<MatchFact> {
+    let replaced: Vec<MatchFact> = existing
+        .iter()
+        .map(|fact| {
+            updates
+                .iter()
+                .find(|updated| updated.id == fact.id)
+                .cloned()
+                .unwrap_or_else(|| fact.clone())
+        })
+        .collect();
+    crate::persistence_order::persistence_ordered(&replaced)
 }
 
 /// タイマー → 動画移行 commit の入口（ADR 0005 実装順序 4 —
