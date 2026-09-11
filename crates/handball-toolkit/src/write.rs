@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{DateTime, Utc};
 
-use crate::clock::{FactAnchor, MatchClock, VideoClock};
+use crate::clock::{FactAnchor, FactAnchorKind, MatchClock, VideoClock};
 use crate::configuration::{MatchConfiguration, MatchConfigurationKind, PhaseKind, VideoSource};
 use crate::entities::Match;
 use crate::facts::{
@@ -70,7 +70,7 @@ pub struct NewFactStamp {
     pub recorded_at: DateTime<Utc>,
 }
 
-/// 補完すべき D-snap 区間 `[(k-1)·D, k·D]`（1-based k、昇順）。
+/// 補完すべき regular phase 区間（昇順）。
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PhaseCompletionSlot {
     pub start_seconds: f64,
@@ -79,11 +79,21 @@ pub struct PhaseCompletionSlot {
 
 /// `fact` をタイマーモードで永続化する直前に auto-create すべき regular phase 区間を返す。
 ///
-/// - D = `phase_duration_seconds`、phase N = `[(N-1)·D, N·D]`。記録時刻を含む D-snap phase と
-///   その手前の欠け phase を昇順で列挙する（出現順導出とクロック位置導出を一致させる連鎖作成）
+/// **起点は「直前までの長さの累計」**（handball-project#352）。既存の regular phase の
+/// 終端から鎖を伸ばし、記録時刻を含むところまで phase を並べる。
+///
+/// かつては `[(N-1)·D, N·D]` という「番号 × 規定長」で区間を作っていたが、phase の長さを
+/// 編集できるようになると破綻する — 前半を 25 分に縮めた試合で後半の記録を積むと、補完が
+/// `[30:00, 60:00]` を作って 25:00〜30:00 に隙間が開き、`PhaseStartNotContinuousFromPrevious`
+/// で保存そのものが拒否される。起点を累計にすれば隙間は表現できない。
+///
+/// **新しく作る phase の長さは「直前 regular phase の長さ、無ければ試合設定の規定長」**。
+/// 明示的に phase を開始する経路（シェルの `PhaseDefaults.duration`）と同じ規則にしてある —
+/// 同じ場面でどちらの経路を通ったかによって phase の長さが変わらないようにするため。
+///
 /// - `.video` / `.videoHighlight`・D <= 0 は空（動画は videoClock 基準で明示 phase 開始）
 /// - PhaseStart fact 自身は補完しない（明示 phase 管理はユーザーダイアログ経由 — `startPhase`）
-/// - 記録時刻は `fact` の matchClock anchor から取る（無ければ 0 = phase 1 のみ確保）
+/// - 記録時刻は `fact` の matchClock anchor から取る（無ければ 0 = 先頭 phase のみ確保）
 pub fn phase_completion_plan(
     match_: &Match,
     existing_facts: &[MatchFact],
@@ -109,33 +119,43 @@ pub fn phase_completion_plan(
         .anchor()
         .match_clock()
         .map(|clock| clock.elapsed_seconds)
-        .unwrap_or(0.0);
-    let target_index = (seconds.max(0.0) / duration).floor() as i64 + 1;
-    if target_index < 1 {
+        .unwrap_or(0.0)
+        .max(0.0);
+
+    // 既存 regular phase を開始順に取り出す。鎖の先端 = 終端の最大値（continuity が
+    // 保たれていれば最後の phase の終端と同じ。崩れていても前へ戻さない安全側）。
+    let resolver = SegmentResolver::build(existing_facts);
+    let mut regular: Vec<(f64, f64)> = resolver
+        .phases
+        .iter()
+        .filter(|phase| phase.kind == PhaseKind::Regular)
+        .filter_map(|phase| Some((phase.match_elapsed_start?, phase.match_elapsed_end?)))
+        .collect();
+    regular.sort_by(|lhs, rhs| lhs.0.total_cmp(&rhs.0));
+
+    let chain_end = regular
+        .iter()
+        .map(|(_, end)| *end)
+        .fold(0.0_f64, |acc, end| acc.max(end));
+    if seconds < chain_end {
         return Vec::new();
     }
 
-    // 既存 regular phase が満たす D-snap interval index (1-based) を集める。
-    let resolver = SegmentResolver::build(existing_facts);
-    let mut covered = BTreeSet::new();
-    for phase in &resolver.phases {
-        if phase.kind != PhaseKind::Regular {
-            continue;
-        }
-        let Some(start) = phase.match_elapsed_start else {
-            continue;
-        };
-        let index = (start / duration).round() as i64 + 1;
-        if index >= 1 {
-            covered.insert(index);
-        }
-    }
+    // 新しく作る phase の長さ。直前 regular phase の長さを踏襲し、無ければ試合設定の規定長。
+    let slot_duration = regular
+        .last()
+        .map(|(start, end)| end - start)
+        .filter(|length| length.is_finite() && *length > 0.0)
+        .unwrap_or(duration);
 
-    (1..=target_index)
-        .filter(|k| !covered.contains(k))
-        .map(|k| PhaseCompletionSlot {
-            start_seconds: (k - 1) as f64 * duration,
-            end_seconds: k as f64 * duration,
+    let missing = ((seconds - chain_end) / slot_duration).floor() as i64 + 1;
+    (0..missing.max(0))
+        .map(|k| {
+            let start = chain_end + k as f64 * slot_duration;
+            PhaseCompletionSlot {
+                start_seconds: start,
+                end_seconds: start + slot_duration,
+            }
         })
         .collect()
 }
@@ -154,6 +174,243 @@ pub fn phase_completion_fact(slot: PhaseCompletionSlot, stamp: NewFactStamp) -> 
                 elapsed_seconds: slot.end_seconds,
             }),
         })),
+    }
+}
+
+// ── タイマーモードの phase 長さ編集（handball-project#352）──
+
+/// phase の長さを変えたときに書き換える fact の計画。
+///
+/// タイマーモードの phase は開始と終了の 2 つを持つが、**編集の入力は長さ 1 つ**にする。
+/// 開始は直前までの長さの累計で決まるので、隙間も重なりも表現できない — つまり
+/// `PhaseStartNotContinuousFromPrevious` を踏む余地が構造的に消える。開始と終了を
+/// 別々に編集していた頃は、後続 phase ができた後だとどちらの順で直しても隣接ペアが
+/// 一致せず、1 回の保存で 2 つの phase を動かす導線も無いので詰んでいた。
+///
+/// **保存形式は変えない**。v2 試合 JSON は配信サンプル・Android・サイトが読んでおり、
+/// phase の表現を変えると全部が動く。変えるのは入力と、保存時に鎖を書き直す処理だけ。
+#[derive(Debug, Clone, PartialEq)]
+pub struct PhaseDurationChangePlan {
+    /// 書き換え後の fact（同 id の既存 fact を置き換える）。変化しない fact は載らない。
+    ///
+    /// **並びは発火順**: phase の鎖を開始順に並べ、そのあとに記録を置く。発火は逐次・
+    /// 非 atomic なので、鎖が半分だけ書き換わった状態は連続性違反で以降その試合へ
+    /// 何も保存できなくなる。phase は数件・記録は数百件ありうるため、危険な窓を
+    /// 先頭の数件へ寄せてある。
+    pub updated_facts: Vec<MatchFact>,
+    /// 新しい終了へ寄せる記録の id。短縮によって phase の外へ出るぶんがここに載る。
+    /// 空でないまま発火すると記録の時刻が変わるので、シェルは必ず件数を見せて承認を取る。
+    pub clamped_fact_ids: Vec<FactId>,
+}
+
+/// 長さ編集の計画が成立しない理由（発火層が `CoreWriteError` へ写像する）。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PhaseDurationChangeError {
+    /// タイマーモード以外。動画モードの phase は人が動画を見ながら開始と終了を打つので、
+    /// 長さは結果であって入力ではない（#352 の方針 — 動画モードの編集は現状のまま）。
+    NotTimerConfiguration { kind: MatchConfigurationKind },
+    /// 指定 id の fact が無い。
+    PhaseFactNotFound { fact_id: FactId },
+    /// 指定 id が PhaseStart fact ではない。
+    NotPhaseStartFact { fact_id: FactId },
+    /// PhaseStart の anchor が matchClock を持たない（タイマーモードでは到達しない安全網）。
+    PhaseAnchorHasNoMatchClock { fact_id: FactId },
+    /// 長さが 0 以下 / 非有限。
+    InvalidDuration { seconds: f64 },
+}
+
+/// `phase_fact_id` の phase を長さ `new_duration_seconds` にしたときの書き換え計画を返す。
+///
+/// 規則は 3 つだけで、すべて matchClock 累積秒に対して働く:
+///
+/// 1. 対象 phase の**開始は動かさない**。終了を `開始 + 長さ` に置き直す
+/// 2. 対象 phase の元の終了**以降にあるものはすべて差分だけずらす** — 後続 phase も、
+///    その中の記録も、phase の外にある記録も同じ量だけ動く。これにより
+///    「後半 7:00 で記録したものは後半 7:00 のまま」が保たれる（記録した位置を保つ）
+/// 3. 短縮して新しい終了を**超えてしまう記録**は新しい終了へ寄せ、`clamped_fact_ids`
+///    に載せる。寄せると時刻が実際と変わるので、承認なしに発火してはいけない
+///
+/// 伸ばす場合（差分が正）は 3 が起きない — 新しい終了は元の終了より後なので、
+/// 対象 phase の中の記録がはみ出しようがない。
+pub fn phase_duration_change_plan(
+    match_: &Match,
+    facts: &[MatchFact],
+    phase_fact_id: FactId,
+    new_duration_seconds: f64,
+) -> Result<PhaseDurationChangePlan, PhaseDurationChangeError> {
+    if !matches!(match_.configuration, MatchConfiguration::Timer { .. }) {
+        return Err(PhaseDurationChangeError::NotTimerConfiguration {
+            kind: match_.configuration.kind(),
+        });
+    }
+    if !new_duration_seconds.is_finite() || new_duration_seconds <= 0.0 {
+        return Err(PhaseDurationChangeError::InvalidDuration {
+            seconds: new_duration_seconds,
+        });
+    }
+
+    let target = facts.iter().find(|fact| fact.id == phase_fact_id).ok_or(
+        PhaseDurationChangeError::PhaseFactNotFound {
+            fact_id: phase_fact_id,
+        },
+    )?;
+    let MatchFactPayload::Control(ControlFact::PhaseStart(target_payload)) = &target.payload else {
+        return Err(PhaseDurationChangeError::NotPhaseStartFact {
+            fact_id: phase_fact_id,
+        });
+    };
+    let (Some(old_start), Some(old_end)) = (
+        target_payload.start_anchor.match_elapsed_seconds(),
+        target_payload.end_anchor.match_elapsed_seconds(),
+    ) else {
+        return Err(PhaseDurationChangeError::PhaseAnchorHasNoMatchClock {
+            fact_id: phase_fact_id,
+        });
+    };
+
+    let new_end = old_start + new_duration_seconds;
+    let delta = new_end - old_end;
+
+    // phase の鎖を先に、記録を後に発火する。発火は逐次・非 atomic なので、途中で
+    // repository が失敗したときにどこまで書けているかが結果を分ける — 鎖が半分だけ
+    // 書き換わった状態は連続性違反で、**以降その試合へは何も保存できなくなる**。
+    // phase は多くても数件、記録は数百件ありうるので、危険な窓を先頭の数件へ寄せる。
+    let mut updated_phases: Vec<MatchFact> = Vec::new();
+    let mut updated_records: Vec<MatchFact> = Vec::new();
+    let mut clamped_fact_ids: Vec<FactId> = Vec::new();
+
+    for fact in facts {
+        if fact.id == phase_fact_id {
+            if delta != 0.0 {
+                let mut updated = fact.clone();
+                if let MatchFactPayload::Control(ControlFact::PhaseStart(payload)) =
+                    &mut updated.payload
+                {
+                    payload.end_anchor = payload
+                        .end_anchor
+                        .with_elapsed_seconds(FactAnchorKind::MatchClock, new_end);
+                }
+                updated_phases.push(updated);
+            }
+            continue;
+        }
+        if delta == 0.0 {
+            continue;
+        }
+
+        let moved = match &fact.payload {
+            // 対象より後ろの phase は鎖ごとずらす（各 phase 自身の長さは保つ）。
+            // 対象の中に開始が入り込んでいる phase は触らない — 既に重なっている異常な
+            // 状態で、寄せると異常を上書きしてしまう。結果の log 検証が拾う。
+            MatchFactPayload::Control(ControlFact::PhaseStart(payload)) => {
+                if let Some(start) = payload.start_anchor.match_elapsed_seconds()
+                    && start >= old_end
+                {
+                    let mut updated = fact.clone();
+                    if let MatchFactPayload::Control(ControlFact::PhaseStart(next)) =
+                        &mut updated.payload
+                    {
+                        shift_anchor(&mut next.start_anchor, delta);
+                        shift_anchor(&mut next.end_anchor, delta);
+                    }
+                    updated_phases.push(updated);
+                }
+                None
+            }
+            MatchFactPayload::Control(ControlFact::Stoppage(payload)) => {
+                let Some(start) = payload.start_anchor.match_elapsed_seconds() else {
+                    continue;
+                };
+                let Some(new_start) = relocated_seconds(start, old_end, new_end, delta) else {
+                    continue;
+                };
+                if new_start == new_end && start < old_end {
+                    clamped_fact_ids.push(fact.id);
+                }
+                let mut updated = fact.clone();
+                if let MatchFactPayload::Control(ControlFact::Stoppage(stoppage)) =
+                    &mut updated.payload
+                {
+                    stoppage.start_anchor = stoppage
+                        .start_anchor
+                        .with_elapsed_seconds(FactAnchorKind::MatchClock, new_start);
+                    // タイマーモードの Stoppage は end を持たない（開始のみの marker）。
+                    // 動画モード由来の end が残っていても同じ規則で動かす。
+                    if let Some(end_anchor) = stoppage.end_anchor
+                        && let Some(end_seconds) = end_anchor.match_elapsed_seconds()
+                        && let Some(relocated) =
+                            relocated_seconds(end_seconds, old_end, new_end, delta)
+                    {
+                        stoppage.end_anchor = Some(
+                            end_anchor.with_elapsed_seconds(FactAnchorKind::MatchClock, relocated),
+                        );
+                    }
+                }
+                Some(updated)
+            }
+            MatchFactPayload::Play(_) | MatchFactPayload::Possession(_) => {
+                let Some(anchor) = fact.single_anchor() else {
+                    continue;
+                };
+                let Some(seconds) = anchor.match_elapsed_seconds() else {
+                    continue;
+                };
+                let Some(new_seconds) = relocated_seconds(seconds, old_end, new_end, delta) else {
+                    continue;
+                };
+                if new_seconds == new_end && seconds < old_end {
+                    clamped_fact_ids.push(fact.id);
+                }
+                let relocated_anchor =
+                    anchor.with_elapsed_seconds(FactAnchorKind::MatchClock, new_seconds);
+                let mut updated = fact.clone();
+                if let Some(target_anchor) = updated.single_anchor_mut() {
+                    *target_anchor = relocated_anchor;
+                }
+                Some(updated)
+            }
+        };
+
+        if let Some(updated) = moved {
+            updated_records.push(updated);
+        }
+    }
+
+    // 鎖は開始順に並べる（発火順がそのまま鎖の順になり、途中で止まっても前から埋まる）。
+    updated_phases.sort_by(|lhs, rhs| {
+        lhs.anchor()
+            .match_elapsed_seconds()
+            .unwrap_or(0.0)
+            .total_cmp(&rhs.anchor().match_elapsed_seconds().unwrap_or(0.0))
+    });
+    updated_phases.extend(updated_records);
+
+    Ok(PhaseDurationChangePlan {
+        updated_facts: updated_phases,
+        clamped_fact_ids,
+    })
+}
+
+/// 累積秒 1 つの移動先を返す。動かさないなら `None`。
+///
+/// - 対象 phase の元の終了以降 → 差分だけずらす（後続すべてが同じ量だけ動く）
+/// - 短縮で新しい終了を超えたぶん → 新しい終了へ寄せる
+/// - それ以外（対象 phase の手前 / 新しい終了までに収まっている）→ 動かさない
+fn relocated_seconds(seconds: f64, old_end: f64, new_end: f64, delta: f64) -> Option<f64> {
+    if seconds >= old_end {
+        Some(seconds + delta)
+    } else if seconds > new_end {
+        Some(new_end)
+    } else {
+        None
+    }
+}
+
+/// matchClock 側だけを `delta` だけずらす（`Both` anchor の動画側は保つ）。
+fn shift_anchor(anchor: &mut FactAnchor, delta: f64) {
+    if let Some(seconds) = anchor.match_elapsed_seconds() {
+        let shifted = anchor.with_elapsed_seconds(FactAnchorKind::MatchClock, seconds + delta);
+        *anchor = shifted;
     }
 }
 

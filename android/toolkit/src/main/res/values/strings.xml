@@ -122,5 +122,9 @@
     <string name="handball_toolkit_write_import_decode_failed_body">The file does not have the expected contents. Try a different file.</string>
     <string name="handball_toolkit_write_video_source_not_replaceable_title">Cannot swap the video</string>
     <string name="handball_toolkit_write_video_source_not_replaceable_body">This match has no video attached yet. Switch it to video mode first.</string>
+    <string name="handball_toolkit_write_phase_duration_change_infeasible_title">Cannot change the length</string>
+    <string name="handball_toolkit_write_phase_duration_change_infeasible_body">This phase\'s length cannot be changed. Pick a phase from a timer match and try again.</string>
+    <string name="handball_toolkit_write_phase_duration_clamp_not_permitted_title">Shortening would push records out</string>
+    <string name="handball_toolkit_write_phase_duration_clamp_not_permitted_body">Some records sit past the new end. Confirm that they may be moved to the end time, then try again.</string>
 
 </resources>

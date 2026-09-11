@@ -64,6 +64,14 @@ fun CoreWriteException.userMessage(context: Context): DomainValidationMessage = 
         R.string.handball_toolkit_write_video_source_not_replaceable_title,
         R.string.handball_toolkit_write_video_source_not_replaceable_body,
     ).resolve(context)
+    is CoreWriteException.PhaseDurationChangeInfeasible -> MessageRes(
+        R.string.handball_toolkit_write_phase_duration_change_infeasible_title,
+        R.string.handball_toolkit_write_phase_duration_change_infeasible_body,
+    ).resolve(context)
+    is CoreWriteException.PhaseDurationClampNotPermitted -> MessageRes(
+        R.string.handball_toolkit_write_phase_duration_clamp_not_permitted_title,
+        R.string.handball_toolkit_write_phase_duration_clamp_not_permitted_body,
+    ).resolve(context)
 }
 
 private fun validationFailedMessage(

@@ -122,5 +122,9 @@
     <string name="handball_toolkit_write_import_decode_failed_body">ファイルの内容が想定と違います。別のファイルで試してください。</string>
     <string name="handball_toolkit_write_video_source_not_replaceable_title">動画を差し替えられません</string>
     <string name="handball_toolkit_write_video_source_not_replaceable_body">この試合にはまだ動画が紐付いていません。先に動画モードへ切り替えてください。</string>
+    <string name="handball_toolkit_write_phase_duration_change_infeasible_title">長さを変えられません</string>
+    <string name="handball_toolkit_write_phase_duration_change_infeasible_body">この phase の長さは変更できません。タイマーモードの phase を選んでからやり直してください。</string>
+    <string name="handball_toolkit_write_phase_duration_clamp_not_permitted_title">短縮すると記録がはみ出します</string>
+    <string name="handball_toolkit_write_phase_duration_clamp_not_permitted_body">新しい終了より後ろにある記録を終了時刻へ寄せてよいか確認してから、もう一度お試しください。</string>
 
 </resources>
