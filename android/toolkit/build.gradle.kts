@@ -77,8 +77,8 @@ dependencies {
     // 介在しないため。README の Android 節に利用者向けのコピペ用として載せてある。
     // ここでの api 宣言はライブラリ自身のコンパイルに効き、将来 Maven publish へ
     // 格上げしたときはそのまま POM の compile scope に出る。
-    api("net.java.dev.jna:jna:5.17.0@aar")
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    api("net.java.dev.jna:jna:5.19.1@aar")
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 
