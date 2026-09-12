@@ -176,7 +176,9 @@ jobs:
             generate --library target/release/libhandball_toolkit_ffi.dylib \
             --language kotlin --out-dir android/toolkit/src/generated/kotlin --no-format
 
-      # 25 件（DomainValidationMessagesTest 5 / ShimAccessorsTest 20）。
+      # 文言リソースの網羅性と docs/ERROR_CODES.md の追随もここで検査する
+      # （DomainValidationMessagesTest。handball-project#358）。件数は書かない —
+      # 書き写した値はテストを足すたびにずれ、機械が見ていないので気付けない。
       - name: Kotlin シムの単体テスト
         run: nix develop --command gradle -p android :toolkit:testDebugUnitTest --console=plain
 

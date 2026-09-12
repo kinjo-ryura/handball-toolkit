@@ -52,7 +52,7 @@ this core was ported from, and the contract fixes them as-is.
 
 ## Validation issues
 
-39 codes across four scopes.
+Codes are grouped into four scopes. Each scope heading states how many codes it lists.
 
 ### scope: `match` (3)
 
