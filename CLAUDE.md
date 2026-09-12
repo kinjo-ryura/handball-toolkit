@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - 経緯・設計判断の一次資料: [handball-project#49](https://github.com/kinjo-ryura/handball-project/issues/49)
 - 設計の正典: `docs/adr/`（0001 境界 API / 0002 エラー体系 / 0003 パリティ検証 — accepted 2026-07-12。0004 iOS FFI 本境界 / 0005 write orchestration — accepted 2026-07-18。0006 Android 配布境界 — accepted 2026-07-26）。**各 ADR の「実装追記」が実装の現況を持つ**
-- 境界のエラーコード一覧は [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md)（外部シェル実装者向けの英語ドキュメント）。**エラー case を追加・改名したらこの表も更新する**（code は安定契約 — ADR 0002 決定 2）
+- 境界のエラーコード一覧は [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md)（外部シェル実装者向けの英語ドキュメント）。**エラー case を追加・改名したらこの表も更新する**（code は安定契約 — ADR 0002 決定 2）。**表の行が正で、テストは数を持たない** — `DomainValidationMessagesTest` が表の 1 列目を読んで sealed 型の case 名と集合比較するので、足し忘れ・改名漏れはこの表を直すまで赤いまま（handball-project#358）。**期待する件数をテストへ書き写さないこと**（表と 2 箇所が同じ数を持ち、#352 で実際に CI を落とした）。裏返しに、テストは表の書式に依存する — 1 列目の `` `code` `` と見出し末尾の `(N)` を崩さない
 - 移植の経緯・作業規律: [`docs/PORTING.md`](docs/PORTING.md)。**移植は完走済みで、同ファイルは完了記録**（現在地の管理台帳ではない）。進行中・未着手の作業は GitHub Issues が正
 - ドキュメント・コードコメントは日本語で書く。**例外は [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md) の 1 本のみ**（handball-project#134）— 外部シェル実装者が文言表を書くための参照表なので英語で保つ。README も含め他はすべて日本語（翻訳の二重管理を作らないため）
 
@@ -99,7 +99,7 @@ NDK / SDK は**この repo の flake ではなくホスト環境**が提供す�
 - **エラー型のフィールドに `message` という名前を使わないこと**: Kotlin backend は error 型を `sealed class … : kotlin.Exception()` として生成するため `Throwable.message` と衝突し、生成コードがコンパイルできない（Swift では露見しない。診断文字列は `detail` に統一 — ADR 0006 実装追記）
 - **consumer ProGuard ルールを消さないこと**（`android/toolkit/consumer-rules.pro`）: JNA は reflection で引くため、消費側が R8 で minify すると壊れる。サンプルは `isMinifyEnabled = false` なので**サンプルでは絶対に露見しない**
 - **`.aar` ファイル単体は依存情報を運ばない**: 運ぶのは Maven の POM で、Release 配布（`implementation(files(...))`）では POM が介在しない。JNA と kotlinx-coroutines は**利用側が自分で宣言する必要がある** — README とサンプルの両方に明記してあるので、依存を増減したら 3 箇所（`android/toolkit/build.gradle.kts` / README / `examples/android/app/build.gradle.kts`）を揃えること
-- **validation / write の case を増やしたら文言を 2 ロケール分足すこと**（`src/main/res/values/` と `values-ja/`）。既定ロケールの漏れは写像の `when` が非網羅になってコンパイルが落ちるが、**`values-ja` の漏れはコンパイラに見えない**（実行時に既定ロケールへ黙って落ちる）。`gradle -p android :toolkit:testDebugUnitTest` の `DomainValidationMessagesTest` が検出する（handball-project#143 で CI にも載せたので、叩き忘れても push すれば CI が止める）
+- **validation / write の case を増やしたら文言を 2 ロケール分足すこと**（`src/main/res/values/` と `values-ja/`）。既定ロケールの漏れは写像の `when` が非網羅になってコンパイルが落ちるが、**`values-ja` の漏れはコンパイラに見えない**（実行時に既定ロケールへ黙って落ちる）。`gradle -p android :toolkit:testDebugUnitTest` の `DomainValidationMessagesTest` が検出する（handball-project#143 で CI にも載せたので、叩き忘れても push すれば CI が止める）。**同じテストが `docs/ERROR_CODES.md` の表への追随も見る**ので、case を足したら文言 2 ロケールと表の 3 箇所が揃うまで緑にならない
 - **リソース名には `handball_toolkit_` 接頭辞を付けること**（`resourcePrefix` が lint で見張る）: ライブラリのリソースは利用側アプリの名前空間へマージされるため、接頭辞なしは衝突事故になる
 - **シムに探索やドメイン規則を書かないこと**: 許可されるのは「self のみ / ループ・再帰・探索なし / ドメイン規則を含まない」の 3 条件を満たすものだけ（ADR 0004 決定 4）。半開区間・優先順位・丸め・閾値に触れる計算はコアに置く
 

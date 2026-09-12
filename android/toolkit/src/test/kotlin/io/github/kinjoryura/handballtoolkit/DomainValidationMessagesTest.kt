@@ -6,16 +6,23 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * 文言リソースの網羅性（handball-project#136）。
+ * 文言リソースの網羅性と、docs/ERROR_CODES.md の表の追随（handball-project#136 / #358）。
  *
  * DomainValidationMessages.kt の `when` は sealed 型に対して網羅なので、コアに case が
  * 増えると**既定ロケール側はコンパイルエラーで検出される**。コンパイラが見ないのは
- * 次の 2 つで、それをここで押さえる:
+ * 次の 3 つで、それをここで押さえる:
  *
  *  1. 追加ロケール（values-ja）への行の足し忘れ — 実行時に既定ロケールへ黙って落ちる
  *  2. 分岐が別 case の resource を指してしまう写経ミス — 型は合うので気付けない
+ *  3. docs/ERROR_CODES.md の表への行の足し忘れ・改名漏れ — 外部シェル実装者向けの
+ *     正典（ADR 0002 で code は安定契約）なので、黙って古びると公開契約がずれる
  *
- * リソース XML を直接読むため Context も端末も要らない（JVM 単体テスト）。
+ * **3 は件数ではなく code 名の集合で突き合わせる。** 期待する件数をテストへ書き写すと
+ * 表と 2 箇所が同じ数を持ち、case を足すたびに両方を直すことになる（handball-project#358。
+ * 実際に #352 で CI を 1 回落としている）。表の行そのものを読めば書き写す値は無くなり、
+ * 件数の一致より強く改名・写経ミス・表への追加漏れまで捕まる。
+ *
+ * リソース XML と Markdown を直接読むため Context も端末も要らない（JVM 単体テスト）。
  */
 class DomainValidationMessagesTest {
 
@@ -59,16 +66,74 @@ class DomainValidationMessagesTest {
     }
 
     @Test
-    fun `ケース数が ERROR_CODES 表と一致する`() {
-        // docs/ERROR_CODES.md が公表している数。ここがずれたら同ドキュメントも直す。
-        assertEquals(3, caseNames(MatchValidationError::class.java).size)
-        assertEquals(2, caseNames(ConfigurationValidationError::class.java).size)
-        assertEquals(23, caseNames(FactValidationError::class.java).size)
-        assertEquals(12, caseNames(TimelineValidationError::class.java).size)
-        assertEquals(10, caseNames(CoreWriteException::class.java).size)
+    fun `ERROR_CODES 表の code と sealed 型の case が一致する`() {
+        assertCodesMatchDocument("scope: `match`", MatchValidationError::class.java)
+        assertCodesMatchDocument("scope: `configuration`", ConfigurationValidationError::class.java)
+        assertCodesMatchDocument("scope: `fact`", FactValidationError::class.java)
+        assertCodesMatchDocument("scope: `timeline`", TimelineValidationError::class.java)
+        assertCodesMatchDocument("`CoreWriteError`", CoreWriteException::class.java)
+    }
+
+    /**
+     * 見出しが名乗る件数を、その見出しの表の行数だけで検算する。ここは Kotlin の型を
+     * 見ないので、シムが扱わない `SampleDtoError` / `SampleMatchDecodeErrorV2` も含む
+     * ドキュメント全体が対象になる。
+     */
+    @Test
+    fun `ERROR_CODES 見出しの件数が自分の表の行数と一致する`() {
+        val mismatches = sections.mapNotNull { (heading, body) ->
+            val declared = Regex("""\((\d+)\)\s*$""").find(heading)?.groupValues?.get(1)?.toInt()
+            val actual = tableCodes(body).size
+            if (declared == null || declared == actual) null else "$heading → 表は $actual 行"
+        }
+
+        assertEquals(emptyList(), mismatches, "見出しの件数が表の行数と合っていない")
     }
 
     // ── helper ──
+
+    /**
+     * 表の code と case 名を集合として突き合わせる。
+     *
+     * 比較前に小文字化するのは、表が搬送される wire code を載せているのに対し case 名は
+     * Rust の variant 名で、1 箇所だけ大小がずれるため（`emptyVideoExternalID` は Swift 期の
+     * 綴りを `#[serde(rename)]` で保っており、variant は `EmptyVideoExternalId`）。
+     * 大小しか違わない別 code は作れないので、これで取りこぼしは出ない。
+     */
+    private fun assertCodesMatchDocument(heading: String, type: Class<*>) {
+        val body = sections.firstOrNull { it.first.contains(heading) }?.second
+            ?: error("docs/ERROR_CODES.md に見出し「$heading」がありません")
+        val documented = tableCodes(body).associateBy { it.lowercase() }
+        val declared = caseNames(type).associateBy { it.lowercase() }
+
+        assertEquals(
+            emptyList(),
+            (declared - documented.keys).values.sorted(),
+            "${type.simpleName}: 表に無い case がある（docs/ERROR_CODES.md へ行を足す）",
+        )
+        assertEquals(
+            emptyList(),
+            (documented - declared.keys).values.sorted(),
+            "${type.simpleName}: 表にあるが実在しない code がある（docs/ERROR_CODES.md から行を消す）",
+        )
+    }
+
+    /** `##` / `###` 見出しごとに (見出し行, 次の見出しまでの本文) を返す。 */
+    private val sections: List<Pair<String, String>> by lazy {
+        val text = errorCodesDocument()
+        val headings = Regex("""^#{2,3} .*$""", RegexOption.MULTILINE).findAll(text).toList()
+        headings.mapIndexed { index, heading ->
+            val end = headings.getOrNull(index + 1)?.range?.first ?: text.length
+            heading.value.trim() to text.substring(heading.range.last + 1, end)
+        }
+    }
+
+    /** 表の 1 列目に置かれた `code`。見出し行と区切り行は backtick が無いので素通りする。 */
+    private fun tableCodes(body: String): List<String> =
+        Regex("""^\|\s*`([^`]+)`""", RegexOption.MULTILINE)
+            .findAll(body)
+            .map { it.groupValues[1] }
+            .toList()
 
     private fun assertEveryCaseHasMessage(type: Class<*>, scope: String) {
         val names = stringNames("values")
@@ -98,14 +163,22 @@ class DomainValidationMessagesTest {
             .map { it.groupValues[1] }
             .toSet()
 
-    /** 単体テストの作業ディレクトリはビルド構成で変わるため、res を持つ親を探し当てる。 */
-    private fun resDir(): File {
+    private fun resDir(): File = File(ancestorHolding("src/main/res/values/strings.xml"), "src/main/res")
+
+    private fun errorCodesDocument(): String =
+        File(ancestorHolding("docs/ERROR_CODES.md"), "docs/ERROR_CODES.md").readText()
+
+    /**
+     * 単体テストの作業ディレクトリはビルド構成で変わるため、目的のファイルを持つ親
+     * ディレクトリを探し当てる。res は toolkit モジュール直下、ERROR_CODES.md は
+     * リポジトリ直下にあり深さが違うので、固定の相対パスでは両方に届かない。
+     */
+    private fun ancestorHolding(relativePath: String): File {
         var dir: File? = File(System.getProperty("user.dir") ?: ".").absoluteFile
         while (dir != null) {
-            val candidate = File(dir, "src/main/res")
-            if (File(candidate, "values/strings.xml").isFile) return candidate
+            if (File(dir, relativePath).isFile) return dir
             dir = dir.parentFile
         }
-        error("src/main/res が見つかりません (user.dir=${System.getProperty("user.dir")})")
+        error("$relativePath が見つかりません (user.dir=${System.getProperty("user.dir")})")
     }
 }
