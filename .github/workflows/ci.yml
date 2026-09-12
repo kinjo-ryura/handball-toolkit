@@ -32,9 +32,9 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72 # v30
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
@@ -55,7 +55,7 @@ jobs:
       # ツリー全体を走査する。ビルド後の post（キャッシュ保存）でだけ走査が失敗し、
       # `hashFiles(...) failed. Fail to hash files under directory` で job が落ちていた
       # （復元時は target/ がまだ無いので通る）。2026-09-12 に main でも再発。
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -158,14 +158,14 @@ jobs:
 
       # ランナー同梱の SDK が無い場合のみ導入する。compileSdk = 36 /
       # buildToolsVersion = "37.0.0"（android/toolkit/build.gradle.kts）に対応させる。
-      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+      - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
         if: steps.android_sdk.outputs.preinstalled != 'true'
         with:
           packages: 'platforms;android-36 build-tools;37.0.0'
 
       # Gradle は flake が提供する（pkgs.gradle。ADR 0006 実装追記 2026-07-28）が、
       # AGP / Kotlin プラグインと依存 jar は Maven から引くのでキャッシュする。
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.gradle/caches
