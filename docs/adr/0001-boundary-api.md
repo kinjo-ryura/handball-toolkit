@@ -139,6 +139,8 @@ impl LiveMatchProjection {
 }
 ```
 
+- `.timer` / `.videoHighlight` の build は移植期間の目録に無い（オラクルが持たない）。完走後の追加は下の「移植完了後に意図的に変えた挙動」を参照。
+
 - Swift の「facts 版 / timeline 版」二系統オーバーロード（resolver を二度作らないための API パターン）は、Rust ではオーバーロード不可のため `build` / `build_with_timeline` の命名で維持する。
 
 ### validators
@@ -208,6 +210,7 @@ pub fn validate_delete(removed_fact_id: FactId, existing_facts: &[MatchFact], ma
 
 - **記録オフセットの境界クランプ（2026-07-20、handball-project#101）** — 移植元 Swift は `max(0, base - offset)` だけで、phase / stoppage の文脈を見ていなかった。現在は `capture_play_anchor(base, offset, clock_kind, facts)` が「押した位置が属する phase の開始」「押した位置より手前で閉じた stoppage の終了」でも下限クランプする。理由は、越えさせると動画モードで R7 / R8 により保存が拒否されて記録そのものが失われ、タイマーモードでは前 phase の得点として静かに集計されるため。**影響は capture 時の anchor 生成のみ**で、既存 fact の projection は不変 → ADR 0003 のゴールデンコーパス（保存済み fact 列 → projection）には影響しない。
 - **`AvailableActions.can_record_free_note` を validation に合わせた（2026-08-18、handball-project#177）** — 移植元 Swift は `Timeout` / `Paused` / `BetweenPhases` / `Ended` でも freeNote だけ true を返していた（R7 / R8 導入前の設計の取り残し）。しかし R7（phase range 外）/ R8（Stoppage 区間内）は kind を問わず全単一 anchor fact に掛かるため、コアが「記録できる」と返した操作をコア自身の validation が blocking で拒否する自己矛盾だった。現在は goal / shotMissed / freeNote の 3 フラグが**全状態で同値（`Playing` でのみ true）**。「フラグを UI ヒントと再定義して可否には使わない」案は採らなかった — 間違った値を残して読むなと言う規約より、値を直す方が消費者（Android / 別シェル）に安全なため。**ゴールデンコーパスの期待値（`liveSamples[].availableActions.canRecordFreeNote`）は手で追随させた**（凍結オラクルは旧値を返すので再 dump では作れない。`tests/golden/README.md`「出所」）
+- **`build_timer_mode` / `build_highlight_mode` を追加（2026-09-12、handball-project#354）** — 上の関数目録は `build_video_mode` しか持たず、`.timer` / `.videoHighlight` の記録可否は HandballRecorder の UI パッケージ（`RecorderUIShared.RecordPolicy`）が `AvailableActions` を Swift のリテラルで組み立てて埋めていた。**R6 / R7 / R8 / R9 の適用範囲というドメイン知識が 3 構成中 2 構成ぶんシェル側にあった**ことになり、コアの規則を変えてもコアのテストは緑のままシェルだけが古い規則で動く（handball-project#202 が実際にその形で出た）。**どちらも入力を取らない** — `.timer` は matchClock 座標で停止区間が幅ゼロの点になり R8 が構造上適用されず phase は D-snap で auto-create されるため、`.videoHighlight` は R6 で phase を持てず R7 / R8 が適用対象外のため、いずれも再生位置で可否が変わらない。記録系のフラグは `available_actions_for(Playing)` から派生させてあり、#177 のような `Playing` 行の変更が取り残されない。**凍結オラクルには存在しない関数**なので、ゴールデンの照合（video mode のみ）には影響しない（**追加であって変更ではない**）。「導線として出すか」は各シェルの判断として残す — `.videoHighlight` の `can_record_possession` は true（保存は通る。`DOMAIN_VALIDATION_RULES.md`「持たないルール」も禁止をコアへ置いていない）で、HandballRecorder が #202 で「出さない」を選んでいる
 - **`AvailableActions.can_record_possession` と `build_possession_fact` を追加（2026-08-19、handball-project#184）** — #154 で足した第 3 の fact 種別（ポゼッション開始）を Mac の Match Window から記録できるようにするための追加。フラグは play 3 種と**常に同値（`Playing` でのみ true）** — R7 / R8 は「anchor を 1 本持つ fact」全部に掛かるので、別の値を返す状態は存在しない。別フラグにしてあるのは、消費側が `can_record_goal` を「単一 anchor fact 全部の代表」として読む暗黙の約束を増やさないため。凍結オラクルには存在しないフィールドなので、ゴールデンの照合（`GoldenAvailableActions`）には含めない（**追加であって変更ではない** — 期待値は不変）
 
 ## 将来の境界拡張候補（移植完了後）

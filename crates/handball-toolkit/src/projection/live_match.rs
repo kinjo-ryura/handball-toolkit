@@ -62,6 +62,51 @@ pub struct AvailableActions {
 }
 
 impl LiveMatchProjection {
+    /// timer mode の build（handball-project#354）。
+    ///
+    /// **入力を取らない。** `.timer` の可否は再生位置に依らないため — matchClock は Stoppage 中に
+    /// 進まない（`clock/match_clock.rs`）ので matchClock 座標では停止区間が幅ゼロの点になり、
+    /// R8（Stoppage 区間内の単一 anchor fact 禁止）が構造上適用されない。phase も記録した瞬間に
+    /// D-snap で auto-create される（ADR 0001 / handball-project#44）ので、anchor が phase range の
+    /// 外に落ちる状態も作れず R7 も当たらない。**「今どこを指しているか」で可否が変わらない**のが
+    /// video mode との本質的な違いで、引数を足す余地があるように見せないためここで受け取らない。
+    ///
+    /// `current_match_clock` は返さない。試合時計の現在値はシェルが自分のタイマーで持っており
+    /// （fact 列からは導けない）、ここで `Some` を返すと表示がそちらへ切り替わってしまう。
+    ///
+    /// **`can_start_next_phase` は true**。timer mode でも直前 phase の end と連続する PhaseStart を
+    /// 足すこと自体は validation を通る。導線として出すかどうかは各シェルが決める
+    /// （このアプリは #44 で「記録時 auto-create に一本化」して出していない）。
+    pub fn build_timer_mode() -> LiveMatchProjection {
+        LiveMatchProjection {
+            current_phase_kind: None,
+            current_phase_index: None,
+            timer_state: MatchTimerState::Playing,
+            current_match_clock: None,
+            available_actions: available_actions_for_timer(),
+        }
+    }
+
+    /// videoHighlight mode の build（handball-project#354）。
+    ///
+    /// **入力を取らない。** ハイライト集は phase を持てない（R6 で PhaseStart 禁止）ので
+    /// 「phase の内 / 外」という状態が存在せず、R7 / R8 はどちらも適用対象外
+    /// （handball-project#138）。したがって再生位置がどこでも可否は同じになる。
+    ///
+    /// `timer_state` は `BeforeMatch`。ハイライト集には時計の状態というものが無く
+    /// `MatchTimerState` に「時計なし」の case も無いが、**phase が 1 つも無い log に
+    /// `build_video_mode` を当てると `BeforeMatch` が返る**ので、その値をそのまま引き継ぐ
+    /// （消費側の表示がこの移行で変わらないようにするため）。
+    pub fn build_highlight_mode() -> LiveMatchProjection {
+        LiveMatchProjection {
+            current_phase_kind: None,
+            current_phase_index: None,
+            timer_state: MatchTimerState::BeforeMatch,
+            current_match_clock: None,
+            available_actions: available_actions_for_highlight(),
+        }
+    }
+
     /// video mode の build。現在 videoClock を segment 上で lookup し、timerState / phase を決定する。
     /// Swift 版同様 `match` は未使用だが API 対称性のため引数に保持する（ADR 0001 関数目録）。
     ///
@@ -221,5 +266,42 @@ fn available_actions_for(state: MatchTimerState) -> AvailableActions {
             can_start_next_phase: true,
             ..AvailableActions::default()
         },
+    }
+}
+
+/// timer mode で「今どの操作ができるか」を返す（handball-project#354）。
+///
+/// **`Playing` の行から派生させる**。R7 / R8 が構造上適用されない（`build_timer_mode` の doc）ため
+/// 記録系は `Playing` と同じで、違いは `can_start_next_phase` だけ。派生にしてあるのは、
+/// handball-project#177 のように `Playing` 行の可否を変えたときこちらが取り残されないようにするため
+/// （それを Swift 側で起こしていたのが #354 の起点）。
+fn available_actions_for_timer() -> AvailableActions {
+    AvailableActions {
+        // 直前 phase の end と連続する PhaseStart は timer mode でも valid。
+        // 導線として出すかは各シェルの判断（このアプリは #44 で出していない）。
+        can_start_next_phase: true,
+        ..available_actions_for(MatchTimerState::Playing)
+    }
+}
+
+/// videoHighlight mode で「今どの操作ができるか」を返す（handball-project#354）。
+///
+/// **`Playing` の行から派生させる**（理由は `available_actions_for_timer` と同じ）。
+/// R7 / R8 が適用対象外なので記録系は `Playing` と同じで、**R9 が Stoppage を、R6 が PhaseStart を
+/// 禁止する**ぶんだけ落とす。
+///
+/// `can_record_possession` は **true のまま**。R7 / R8 の対象外なので保存は通り、
+/// `DOMAIN_VALIDATION_RULES.md`「持たないルール」も `.videoHighlight` での PossessionFact 禁止を
+/// **意図的にコアへ置いていない**（取り込み済み fact を拒否しないため）。記録の導線を出すかどうかは
+/// 各シェルの判断で、HandballRecorder は handball-project#202 で「出さない」を選んでいる
+/// （phase が無いと区間を導出できず表示先が無いため）。
+fn available_actions_for_highlight() -> AvailableActions {
+    AvailableActions {
+        // R9: `.videoHighlight` に Stoppage fact は置けない。
+        can_start_timeout: false,
+        can_resume: false,
+        // R6: `.videoHighlight` に PhaseStart fact は置けない。
+        can_start_next_phase: false,
+        ..available_actions_for(MatchTimerState::Playing)
     }
 }

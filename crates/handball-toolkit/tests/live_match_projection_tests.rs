@@ -373,3 +373,149 @@ fn resolver_entry_point_matches_timeline_entry_point() {
         );
     }
 }
+
+// ── timer / videoHighlight（handball-project#354）──
+
+/// 3 構成の `AvailableActions` を 1 枚の表で固定する。
+///
+/// **この表が `RecordPolicy`（HandballRecorder の `RecorderUIShared`）の移管元**。
+/// #354 以前は `.timer` / `.videoHighlight` の可否が Swift のリテラルとして UI パッケージに
+/// あり、コア側で R6 / R7 / R8 / R9 の適用範囲が変わっても**コアのテストは緑のまま UI だけが
+/// 古い規則で動いた**（handball-project#202 が同じ形で表面化した）。ここで表にしておくと、
+/// `available_actions_for` を触ったときに 3 構成ぶんが同時に落ちる。
+///
+/// 凍結オラクル（Swift `RecorderDomain`）には timer / highlight の `AvailableActions` が無く
+/// （`build_video_mode` しか持たない）、golden コーパス経由のパリティ検証は掛けられない。
+/// **一致を見る相手は移管前の `RecordPolicyTests` の期待値**で、それをこの表へ写してある。
+#[test]
+fn available_actions_table_for_three_configurations() {
+    // (can_record_goal, can_record_shot_missed, can_record_free_note,
+    //  can_record_possession, can_start_timeout, can_resume, can_start_next_phase)
+    let video_playing = {
+        let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
+        let timeline = TimelineProjection::build(
+            &make_video_match(home, away),
+            &[video_only_phase(0.0, 1800.0)],
+        );
+        LiveMatchProjection::build_video_mode(
+            &make_video_match(home, away),
+            &timeline,
+            Some(VideoClock {
+                elapsed_seconds: 30.0,
+            }),
+        )
+        .available_actions
+    };
+
+    let timer = LiveMatchProjection::build_timer_mode().available_actions;
+    let highlight = LiveMatchProjection::build_highlight_mode().available_actions;
+
+    // 記録系（単一 anchor fact）は 3 構成とも同じ。`.timer` は matchClock 座標で停止区間が
+    // 幅ゼロになり R8 が、phase が D-snap で auto-create されるので R7 が構造上当たらない。
+    // `.videoHighlight` は R7 / R8 がそもそも適用対象外（handball-project#138）。
+    for (label, actions) in [("timer", timer), ("highlight", highlight)] {
+        assert!(actions.can_record_goal, "{label}");
+        assert!(actions.can_record_shot_missed, "{label}");
+        assert!(actions.can_record_free_note, "{label}");
+        // 記録の導線を出すかは各シェルの判断。コアは「保存が通るか」を返す
+        // （`.videoHighlight` で導線を出さない判断は handball-project#202 のシェル側）。
+        assert!(actions.can_record_possession, "{label}");
+    }
+    assert!(video_playing.can_record_goal);
+    assert!(video_playing.can_record_possession);
+
+    // 停止区間: `.timer` は可（endAnchor nil で進行中を表す）、`.videoHighlight` は R9 で禁止。
+    assert!(timer.can_start_timeout);
+    assert!(!highlight.can_start_timeout);
+    assert!(video_playing.can_start_timeout);
+
+    // phase 開始: `.timer` は直前 phase の end と連続する PhaseStart が valid なので可。
+    // `.videoHighlight` は R6 で禁止。`.video` は phase の内側なので不可。
+    assert!(timer.can_start_next_phase);
+    assert!(!highlight.can_start_next_phase);
+    assert!(!video_playing.can_start_next_phase);
+
+    // 再開は video mode の停止区間でのみ立つフラグ。
+    assert!(!timer.can_resume);
+    assert!(!highlight.can_resume);
+    assert!(!video_playing.can_resume);
+}
+
+/// `Playing` 行から派生していること。`available_actions_for(Playing)` の記録系を変えたら
+/// timer / highlight も一緒に動く（取り残されない）ことを固定する。
+///
+/// handball-project#177 は `Playing` 行だけを直して Swift のリテラルが取り残された事例で、
+/// #354 はその取り残しを構造的に起こせなくするのが目的。
+#[test]
+fn timer_and_highlight_derive_recording_flags_from_playing() {
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
+    let timeline = TimelineProjection::build(
+        &make_video_match(home, away),
+        &[video_only_phase(0.0, 1800.0)],
+    );
+    let playing = LiveMatchProjection::build_video_mode(
+        &make_video_match(home, away),
+        &timeline,
+        Some(VideoClock {
+            elapsed_seconds: 30.0,
+        }),
+    )
+    .available_actions;
+
+    for actions in [
+        LiveMatchProjection::build_timer_mode().available_actions,
+        LiveMatchProjection::build_highlight_mode().available_actions,
+    ] {
+        assert_eq!(actions.can_record_goal, playing.can_record_goal);
+        assert_eq!(
+            actions.can_record_shot_missed,
+            playing.can_record_shot_missed
+        );
+        assert_eq!(actions.can_record_free_note, playing.can_record_free_note);
+        assert_eq!(actions.can_record_possession, playing.can_record_possession);
+    }
+}
+
+/// 位置を入力に取らないので、呼ぶたびに同じ値を返す。
+///
+/// **`current_match_clock` は返さない**（試合時計の現在値はシェルが自分のタイマーで持っており
+/// fact 列からは導けない）。ここを `Some` にすると、消費側の時刻表示が自前のタイマーから
+/// コアの値へ黙って切り替わる。
+#[test]
+fn timer_and_highlight_projections_are_position_independent() {
+    assert_eq!(
+        LiveMatchProjection::build_timer_mode(),
+        LiveMatchProjection::build_timer_mode()
+    );
+    assert_eq!(
+        LiveMatchProjection::build_highlight_mode(),
+        LiveMatchProjection::build_highlight_mode()
+    );
+
+    let timer = LiveMatchProjection::build_timer_mode();
+    assert_eq!(timer.timer_state, MatchTimerState::Playing);
+    assert_eq!(timer.current_match_clock, None);
+    assert_eq!(timer.current_phase_kind, None);
+    assert_eq!(timer.current_phase_index, None);
+
+    // ハイライト集には時計の状態が無い。`MatchTimerState` に「時計なし」の case は無いので、
+    // phase が 1 つも無い log に `build_video_mode` を当てたときと同じ `BeforeMatch` を返す
+    // （移管で消費側の表示を変えないため）。
+    let highlight = LiveMatchProjection::build_highlight_mode();
+    assert_eq!(highlight.timer_state, MatchTimerState::BeforeMatch);
+    assert_eq!(highlight.current_match_clock, None);
+    assert_eq!(highlight.current_phase_kind, None);
+    assert_eq!(highlight.current_phase_index, None);
+
+    let empty = LiveMatchProjection::build_video_mode_with_resolver(
+        &std::sync::Arc::new(SegmentResolver {
+            segments: vec![],
+            phases: vec![],
+        }),
+        Some(VideoClock {
+            elapsed_seconds: 42.0,
+        }),
+    );
+    assert_eq!(highlight.timer_state, empty.timer_state);
+    assert_eq!(highlight.current_match_clock, empty.current_match_clock);
+}

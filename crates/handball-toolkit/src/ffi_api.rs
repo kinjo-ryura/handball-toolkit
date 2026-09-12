@@ -118,6 +118,26 @@ pub fn build_live_match_video_mode(
     LiveMatchProjection::build_video_mode_with_resolver(&resolver, current_video_clock)
 }
 
+/// `LiveMatchProjection::build_timer_mode`。タイマーモードの記録可否（handball-project#354）。
+///
+/// **引数が無いのは仕様**。`.timer` の可否は再生位置に依らない（matchClock 座標では停止区間が
+/// 幅ゼロの点になり R8 が構造上適用されず、phase は記録時に D-snap で auto-create されるので
+/// R7 も当たらない）。resolver を渡す形に変えないこと — 入力で結果が変わるように見せると、
+/// 消費側が「位置に応じて変わるはず」と読んで tick ごとに呼ぶ理由を作ってしまう。
+#[uniffi::export]
+pub fn build_live_match_timer_mode() -> LiveMatchProjection {
+    LiveMatchProjection::build_timer_mode()
+}
+
+/// `LiveMatchProjection::build_highlight_mode`。ハイライト集の記録可否（handball-project#354）。
+///
+/// **引数が無いのは仕様**（理由は上と同じ）。ハイライト集は R6 で phase を持てないので
+/// 「phase の内 / 外」が存在せず、R7 / R8 はどちらも適用対象外になる。
+#[uniffi::export]
+pub fn build_live_match_highlight_mode() -> LiveMatchProjection {
+    LiveMatchProjection::build_highlight_mode()
+}
+
 // ── validators（ADR 0002: 非空 = blocking。文言はシェル所有）──
 
 /// `validators::validate_match`。
