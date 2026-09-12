@@ -360,6 +360,48 @@ fn allowed_anchor_kinds(config: &MatchConfiguration) -> BTreeSet<FactAnchorKind>
     }
 }
 
+/// fact が configuration に許されない anchor を 1 つでも持つか
+/// （移行が途中で止まった試合の判定材料 — handball-project#351）。
+///
+/// **`validate_match_fact` の anchor 整合と同じ材料 `allowed_anchor_kinds` を共有する。**
+/// 「どの anchor がどの configuration で許されるか」をこのファイルの外へ書き写さないために
+/// 公開する（呼び出し側が kind を並べ直すと、許可集合が 2 箇所に分かれる）。
+///
+/// roster を取らないので参照整合は見ない。anchor と configuration の整合だけを見る。
+pub fn has_anchor_mismatched_with_configuration(
+    fact: &MatchFact,
+    configuration: &MatchConfiguration,
+) -> bool {
+    let allowed = allowed_anchor_kinds(configuration);
+    anchor_kinds(fact)
+        .into_iter()
+        .any(|kind| !allowed.contains(&kind))
+}
+
+/// fact が持つ anchor の kind を**全部**（range を持つものは start / end とも）返す。
+fn anchor_kinds(fact: &MatchFact) -> Vec<FactAnchorKind> {
+    match &fact.payload {
+        MatchFactPayload::Play(play) => vec![play.anchor.kind()],
+        MatchFactPayload::Possession(possession) => {
+            let mut kinds = vec![possession.anchor.kind()];
+            if let Some(end_anchor) = possession.end_anchor {
+                kinds.push(end_anchor.kind());
+            }
+            kinds
+        }
+        MatchFactPayload::Control(ControlFact::PhaseStart(payload)) => {
+            vec![payload.start_anchor.kind(), payload.end_anchor.kind()]
+        }
+        MatchFactPayload::Control(ControlFact::Stoppage(payload)) => {
+            let mut kinds = vec![payload.start_anchor.kind()];
+            if let Some(end_anchor) = payload.end_anchor {
+                kinds.push(end_anchor.kind());
+            }
+            kinds
+        }
+    }
+}
+
 // ── PlayFact kind ごとの必須項目 ──
 
 fn validate_play_kind_requirements(fact: &PlayFact) -> Vec<DomainValidationIssue> {

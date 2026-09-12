@@ -17,7 +17,7 @@ use crate::facts::{
 };
 use crate::ids::{FactId, PlayerId, TeamId};
 use crate::projection::SegmentResolver;
-use crate::validators::RosterContext;
+use crate::validators::{self, RosterContext};
 
 /// home / away 所属選手 1 件の (player, team) 参照。
 /// `MatchWriteRepository::load_roster_players` が返す roster 構築材料。
@@ -652,28 +652,93 @@ pub enum VideoMigrationDraftIssue {
     },
 }
 
+/// 移行ウィザードを開いてよいか（= 移行元として妥当か）と、再開に要る件数
+/// （handball-project#351）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct VideoMigrationSourceState {
+    /// 移行元として使えない理由。`None` ならウィザードを開ける。
+    pub issue: Option<VideoMigrationDraftIssue>,
+    /// configuration に合わない anchor を持つ記録の件数（= 移行が終わっていない件数）。
+    /// `.video` でこれが 1 件以上なら「途中で止まった移行の再開」。
+    pub unsynced_fact_count: u32,
+    /// **既に動画上の位置を持つ点の記録**の件数（play / possession）。
+    ///
+    /// この記録は `video_migration_plan` の変換対象にならない（matchClock を持たないので
+    /// 引き直す材料が無く、動画モードで新規に記録したものとも区別が付かない）。
+    /// **再開で同期点を変えるとこの件数ぶんだけ古い動画位置のまま取り残される**ので、
+    /// シェルはこれを警告に使う。
+    pub video_anchored_fact_count: u32,
+}
+
+/// 移行ウィザードの移行元として妥当かを判定する（handball-project#351）。
+///
+/// **fact 列が要るので draft 検証とは別の入口にする。** draft 検証は「次へ」の活性判定のため
+/// 入力のたびに走るが、ここは試合を読み込んだ 1 回だけでよい。1 本にまとめると記録全量が
+/// 毎キーストローク FFI を渡る（境界は粗い粒度 — 設計不変条件 4）。
+///
+/// 判定:
+/// - `.timer` — 通常の移行。常に開ける
+/// - `.video` で未同期の記録が残る — **途中で止まった移行の再開**として開ける。移行 commit は
+///   非 atomic（ADR 0005 決定 7）なので、configuration だけ `.video` になって記録が matchClock の
+///   まま残る試合が実在する
+/// - `.video` で未同期が無い / `.videoHighlight` — 移行済み。`SourceConfigurationNotTimer`
+pub fn video_migration_source_state(
+    configuration: &MatchConfiguration,
+    facts: &[MatchFact],
+) -> VideoMigrationSourceState {
+    let unsynced_fact_count = facts
+        .iter()
+        .filter(|fact| validators::has_anchor_mismatched_with_configuration(fact, configuration))
+        .count() as u32;
+    let video_anchored_fact_count = facts
+        .iter()
+        .filter(|fact| {
+            fact.single_anchor().is_some_and(|anchor| {
+                matches!(
+                    anchor.kind(),
+                    FactAnchorKind::VideoClock | FactAnchorKind::Both
+                )
+            })
+        })
+        .count() as u32;
+
+    let resumable =
+        matches!(configuration, MatchConfiguration::Video(_)) && unsynced_fact_count > 0;
+    let issue = if matches!(configuration, MatchConfiguration::Timer { .. }) || resumable {
+        None
+    } else {
+        Some(VideoMigrationDraftIssue::SourceConfigurationNotTimer)
+    };
+
+    VideoMigrationSourceState {
+        issue,
+        unsynced_fact_count,
+        video_anchored_fact_count,
+    }
+}
+
 /// 移行ウィザードの draft 全体を検証する（移植元: `VideoModeMigrationValidator.validate`。
 /// 放出順まで同セマンティクス）。
 ///
 /// 検証ルール:
-/// 1. 移行対象が `.timer` 試合であること
-/// 2. video source が確定していること（有無のみ。URL 解析はシェル）
-/// 3. PhaseSync: videoStart / videoEnd 入力済み・end > start・2 phase の範囲が overlap しない
-/// 4. StoppageSync: 同上 + 範囲がいずれかの phase 範囲内に収まること
+/// 1. video source が確定していること（有無のみ。URL 解析はシェル）
+/// 2. PhaseSync: videoStart / videoEnd 入力済み・end > start・2 phase の範囲が overlap しない
+/// 3. StoppageSync: 同上 + 範囲がいずれかの phase 範囲内に収まること
+///
+/// **移行元が妥当か（`SourceConfigurationNotTimer`）はここでは見ない** —
+/// 判定に fact 列が要るので `video_migration_source_state` が持つ（handball-project#351）。
+/// シェルは両方の結果を合わせて wizard の「次へ」活性を決める。
 ///
 /// commit 時の安全網は `video_migration_plan`（存在・導出可否）と逐次 validation が担い、
-/// 本関数は wizard の「次へ」活性・フィールド hint のための事前検証を一手に持つ。
+/// 本関数は wizard の「次へ」活性・フィールド hint のための事前検証を持つ。
 pub fn validate_video_migration_draft(
-    source_configuration: &MatchConfiguration,
     video_source: Option<&VideoSource>,
     phase_syncs: &[VideoSyncDraftInput],
     stoppage_syncs: &[VideoSyncDraftInput],
 ) -> Vec<VideoMigrationDraftIssue> {
     let mut issues: Vec<VideoMigrationDraftIssue> = Vec::new();
 
-    if !matches!(source_configuration, MatchConfiguration::Timer { .. }) {
-        issues.push(VideoMigrationDraftIssue::SourceConfigurationNotTimer);
-    }
     if video_source.is_none() {
         issues.push(VideoMigrationDraftIssue::MissingVideoSource);
     }
