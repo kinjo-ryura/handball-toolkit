@@ -33,7 +33,7 @@ use crate::validators;
 use crate::validators::RosterContext;
 use crate::write::{
     self, CaptureClockKind, NewFactStamp, PlayFactEdit, VideoMigrationDraftIssue,
-    VideoSyncDraftInput,
+    VideoMigrationSourceState, VideoSyncDraftInput,
 };
 
 /// コアのバージョン文字列。FFI 疎通確認の最小関数。
@@ -199,21 +199,27 @@ pub fn validate_delete(
     validators::validate_delete(removed_fact_id, &existing_facts, &match_)
 }
 
+/// `write::video_migration_source_state`（移行ウィザードを開いてよいかの判定）。
+///
+/// **試合を読み込んだ 1 回だけ呼ぶ。** draft 検証と違い fact 列が要るので、入力のたびに
+/// 呼ぶと記録全量が毎回 FFI を渡る（handball-project#351）。
+#[uniffi::export]
+pub fn video_migration_source_state(
+    configuration: MatchConfiguration,
+    facts: Vec<MatchFact>,
+) -> VideoMigrationSourceState {
+    write::video_migration_source_state(&configuration, &facts)
+}
+
 /// `write::validate_video_migration_draft`（移行ウィザードの draft 事前検証）。
 /// 文言と wizard step への写像はシェル所有。
 #[uniffi::export]
 pub fn validate_video_migration_draft(
-    source_configuration: MatchConfiguration,
     video_source: Option<VideoSource>,
     phase_syncs: Vec<VideoSyncDraftInput>,
     stoppage_syncs: Vec<VideoSyncDraftInput>,
 ) -> Vec<VideoMigrationDraftIssue> {
-    write::validate_video_migration_draft(
-        &source_configuration,
-        video_source.as_ref(),
-        &phase_syncs,
-        &stoppage_syncs,
-    )
+    write::validate_video_migration_draft(video_source.as_ref(), &phase_syncs, &stoppage_syncs)
 }
 
 // ── 記録入口（記録操作 in → fact / anchor out — handball-project#69）──
