@@ -510,11 +510,32 @@ pub trait TeamWriteRepository: Send + Sync + std::fmt::Debug {
 
 /// match ヘッダ save の write 入口（passthrough — 現行 saveMatch は検証なし。パリティ維持）。
 /// 意義は目録の単一化と可視性遮断: 全書き込みがコア入口を通ることを型で保証する（決定 2・3）。
+///
+/// **新規作成に使う。** 既存の試合を書き換えるなら `record_update_match` を使う — こちらは
+/// `save_match` の upsert をそのまま通すので、削除済みの試合を渡すと空の試合が作り直される。
 #[uniffi::export]
 pub async fn record_save_match(
     repo: Arc<dyn MatchWriteRepository>,
     match_: Match,
 ) -> Result<(), CoreWriteError> {
+    repo.save_match(match_).await
+}
+
+/// 既存の match ヘッダを書き換える write 入口（handball-project#381）。
+///
+/// 保存の前に `load_match` で試合が在ることを確かめ、読めなければ**発火せず**その失敗を
+/// そのまま返す。`save_match` は upsert なので、確かめずに通すと「別のウィンドウ（Mac）で
+/// 削除した試合を、開いたままの画面で編集する」だけで fact 0 件の試合が作り直される。
+///
+/// 検証は `record_save_match` と同じく掛けない（ヘッダの規則はフォームと import が持つ）。
+/// 読んでから保存するまでの間に削除されると窓は残る — context をまたぐ排他は無く、
+/// `append_fact` の試合確認（#330）と同じ best-effort。
+#[uniffi::export]
+pub async fn record_update_match(
+    repo: Arc<dyn MatchWriteRepository>,
+    match_: Match,
+) -> Result<(), CoreWriteError> {
+    repo.load_match(match_.id).await?;
     repo.save_match(match_).await
 }
 

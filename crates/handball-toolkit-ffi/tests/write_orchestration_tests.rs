@@ -35,7 +35,7 @@ use handball_toolkit_ffi::ffi_write::{
     commit_sample_match_import, commit_video_migration, count_phase_completion_facts,
     record_append_fact, record_delete_fact, record_delete_player, record_delete_team,
     record_fact_with_phase_completion, record_replace_video_source, record_save_player,
-    record_save_team, record_update_fact,
+    record_save_team, record_update_fact, record_update_match,
 };
 use uuid::Uuid;
 
@@ -579,6 +579,38 @@ fn repository_の失敗はそのまま伝播する() {
         })
     );
     assert_eq!(repo.fact_log().len(), 1, "読み取り失敗時は発火しない");
+}
+
+// ── match ヘッダの更新（handball-project#381）──
+
+#[test]
+fn 在る試合の更新は発火する() {
+    let repo = Arc::new(FakeRepo::new(vec![phase_start()]));
+    let mut updated = timer_match();
+    updated.is_home_on_left = false;
+
+    let result = run(record_update_match(repo.clone(), updated.clone()));
+
+    assert_eq!(result, Ok(()));
+    assert_eq!(repo.saved_matches(), vec![updated]);
+}
+
+/// 削除済みの試合を開いたままの画面で編集しても、upsert で作り直さない。
+#[test]
+fn 読めない試合の更新は発火せず_load_の失敗を返す() {
+    let mut repo = FakeRepo::new(Vec::new());
+    repo.fail_load_match = true;
+    let repo = Arc::new(repo);
+
+    let result = run(record_update_match(repo.clone(), timer_match()));
+
+    assert_eq!(
+        result,
+        Err(CoreWriteError::Repository {
+            detail: "load_match 失敗".to_string()
+        })
+    );
+    assert!(repo.saved_matches().is_empty(), "読めなければ発火しない");
 }
 
 // ── entity CRUD 入口（実装順序 5）──

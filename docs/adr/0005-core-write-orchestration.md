@@ -161,6 +161,13 @@ pub struct ImportWriteBatch {
 - **cascade（チーム削除時の所属選手削除）は trait `delete_team` 実装内に残す** — 判断ではなくストレージ操作のセマンティクスであり、1 `context.save()` の原子性を保つ
 - チェックと削除が 2 FFI 呼び出しに分かれるため理論上の時間窓は広がるが、現行も context 間の直列化保証はない（fetchCount → save の同一 context 逐次実行のみ）。**保証クラスは best-effort のまま変わらない**ことを明記して受け入れる
 
+**match ヘッダの更新は作成と別の入口にする（2026-09-13 追記 — handball-project#381）**: 既存の試合を書き換える経路（左右配置・日付 / タイトル・動画 URL・roster 選択・iOS の試合編集）を、`record_save_match` から**別の入口** `record_update_match` へ移す。
+
+- **なぜ分けるか**: `save_match` は upsert なので、passthrough のままだと「Mac で Match Window を開いたまま Main Window から試合を削除 → その Inspector で編集」だけで fact 0 件の試合が作り直される。**窓を閉じるだけでは塞がらない** — Match Info の Inspector は閉じる瞬間に未保存のタイトルを保存する（`onDisappear`）
+- **形**: `load_match` → 読めなければ発火せずその失敗を返す → `save_match`。**trait は変えない**（既存の read を使う）ので、各シェルの repository 実装は追随不要。エラーは `load_match` の失敗をそのまま運び、新しいエラーコードは足さない
+- **`record_save_match` は新規作成用として残す**（試合作成フォーム・UI テストの seed）。検証を掛けないのは両入口とも同じ
+- 読んでから保存するまでの窓は残る（context をまたぐ排他は無い）。保証クラスは `append_fact` の試合確認（#330）と同じ best-effort
+
 **動画ソースの差し替えは移行と別の入口にする（2026-08-31 追記 — handball-project#267）**: 既存の動画試合の動画ソースだけを差し替える経路（YouTube ↔ ローカル）を、`commit_video_migration` とは**別の入口** `record_replace_video_source` として足す。計画層は `write::video_source_replacement_plan`（configuration in → configuration out の純粋関数）。
 
 - **移行の入口を使い回せない。** 同期点を空で渡すと `video_migration_plan` が `MissingPhaseSync` で落ち、既存 `videoClock` を恒等の同期点として渡すと `start_anchor.match_clock()` が `.video` 試合では `None` → `0.0` に落ちて `Both { match_clock: 0, video_clock: ... }` を書き、**試合時計を壊す**（2026-08-31 に実装で確認）。移行は「matchClock しか無い fact に videoClock を与える」操作、差し替えは「videoClock を据え置いて所在だけ替える」操作で、入力も不変条件も別物
