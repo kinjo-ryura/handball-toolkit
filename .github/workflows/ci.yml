@@ -31,24 +31,111 @@ jobs:
     # （macos-14 以降の macos-latest が arm64）。ローカル開発と同一の経路を検証する。
     runs-on: macos-latest
 
+    # ── 所要時間の内訳と、速さのために取っている手（handball-project#386）──
+    #
+    # 2026-09-13 の実測で 1 run 5〜12 分のうち、ビルドとテストの本体は 1.5〜2 分しか
+    # なかった。残りは (a) 最初の `nix develop` = ツールチェーン一式の取得と展開（2〜3.5 分）、
+    # (b) cargo キャッシュの復元と保存（run_id 付きキーで毎回書き戻し、target/ が 5 GB まで
+    # 肥大して 2〜3.5 分掛かる回があった）。docs 1 行の PR でも同じだけ待っていた。
+    #
+    #   手 1: Nix store を GitHub Actions のキャッシュに置く（nix-quick-install-action +
+    #         cache-nix-action。無償・secret 不要）。flake.lock / flake.nix /
+    #         rust-toolchain.toml が動かない限り保存し直さない
+    #   手 2: cargo キャッシュも「キーが無いときだけ保存」に戻し、run_id を外す
+    #   手 3: PR の変更が docs だけなら、ビルドと検査を全部飛ばして成功で抜ける（`scope`）
+    #
+    # 変更前後の実測は handball-project#386 に書いてある。
+
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-
-      - uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72 # v30
         with:
-          extra_nix_config: |
-            experimental-features = nix-command flakes
+          # 下の `scope` が HEAD^1（PR の base）との差分を取るので、merge commit の両親まで要る。
+          fetch-depth: 2
 
-      # ツールチェーンは rust-toolchain.toml 経由で rust-overlay が供給する（rustup 不使用）。
-      # cargo のレジストリと target/ だけをキャッシュする。
+      # PR の変更が「読み物」だけなら、以降のビルドと検査を全部飛ばす。required check は
+      # `check` ジョブの成功なので、**ジョブではなくステップを skip する**（workflow を
+      # paths で走らせないと check が Pending のまま merge できない）。
       #
-      # キーに run_id を足して**毎回書き戻す**。Cargo.lock のハッシュだけを主キーに
-      # すると完全一致してしまい、actions/cache は「Cache hit occurred on the primary
-      # key, not saving cache」で新しい成果物を一切保存しない。その結果 target/ は
-      # 最初に保存された時点の内容（debug のみ）で凍結され、release プロファイルや
-      # --features bindgen の成果物が毎回ゼロから作り直されていた（handball-project#143
-      # の実測で判明。cdylib ビルド 45 秒 + bindgen 76 秒が毎回発生していた）。
-      # restore-keys は「同じ Cargo.lock の直近」→「任意の直近」の順に落とす。
+      # pull_request の checkout は「base へ merge した仮の commit」なので、HEAD^1（base の
+      # 先端）との差分が、その PR が main に持ち込む変更そのもの。main への push では常に
+      # 全部走らせる — merge 後の main を検証し、PR が使うキャッシュを main の ref で作る
+      # 役目がある（PR ブランチで保存したキャッシュは他の ref から見えない）。
+      #
+      # **飛ばしてよいのは、ビルドにもテストにも検査にも読まれないファイルだけ。**
+      # 次の 2 つは .md だが検査が読むので飛ばさない:
+      #   - docs/ERROR_CODES.md … Android の DomainValidationMessagesTest が表を突合する
+      #   - THIRD_PARTY_LICENSES.md … generate_licenses.sh --check が再生成して比較する
+      # 検査が読むファイルを docs/ や .md に新しく足したら、ここの除外にも足すこと。
+      - name: 変更の範囲を見る（docs だけなら以降を飛ばす）
+        id: scope
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            echo "push なので全部走らせる"
+            exit 0
+          fi
+          changed="$(git diff --name-only HEAD^1 HEAD)"
+          echo "--- 変更ファイル ---"
+          echo "$changed"
+          docs_only=true
+          [ -n "$changed" ] || docs_only=false
+          while IFS= read -r f; do
+            case "$f" in
+              docs/ERROR_CODES.md|THIRD_PARTY_LICENSES.md) docs_only=false ;;
+              *.md|LICENSE|docs/*) ;;
+              *) docs_only=false ;;
+            esac
+          done <<< "$changed"
+          echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
+          echo "--- docs_only=$docs_only ---"
+
+      - name: docs だけの変更なのでビルドと検査を飛ばして成功にする
+        if: steps.scope.outputs.docs_only == 'true'
+        run: echo "変更は .md / LICENSE / docs/ だけ。以降のステップは skip（判定は上の scope）"
+
+      # Nix を単一ユーザーモードで /nix に直接入れる（約 5 秒）。cachix/install-nix-action の
+      # マルチユーザー（daemon）方式より速く、下の cache-nix-action が /nix を丸ごと復元
+      # できる形になる。flakes は既定で有効。GitHub からの取得には GITHUB_TOKEN を使う。
+      - uses: nixbuild/nix-quick-install-action@9f63be77f412a248c9d9a65a4c82cf066cdf8f0c # v35
+        if: steps.scope.outputs.docs_only != 'true'
+
+      # /nix（store と DB）と Nix のフェッチャキャッシュを GitHub Actions のキャッシュに置く。
+      # キーが完全一致したら保存し直さないので、flake.lock / flake.nix / rust-toolchain.toml
+      # が動かない限り書き戻しは起きない。
+      #
+      # **前方一致の fallback（restore-prefixes-first-match）は付けない。** 古い store の上に
+      # 新しいツールチェーンを重ねて保存すると、キーが変わるたびに肥大する（cargo キャッシュが
+      # 5 GB になったのと同じ経路）。miss のときはゼロから取り直す（2〜3 分。flake.lock を
+      # 動かすのは稀）。
+      #
+      # ガベージコレクションも掛けない（gc-max-store-size 未設定）。この job が使ったパスは
+      # 全部要るし、`nix develop` は GC root を作らないので、GC するとツールチェーンごと消える。
+      - uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7.0.2
+        if: steps.scope.outputs.docs_only != 'true'
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', 'flake.nix', 'rust-toolchain.toml') }}
+          paths: |
+            /nix
+            ~/.cache/nix
+
+      # cargo のレジストリと target/ をキャッシュする（ツールチェーンは上の Nix store 側）。
+      #
+      # キーは Cargo.lock / rust-toolchain.toml / この workflow のハッシュで、**完全一致したら
+      # 保存しない**。restore-keys（前方一致の fallback）も置かない。経緯:
+      #
+      #   - handball-project#143 では Cargo.lock のハッシュだけをキーにしていて、最初に
+      #     保存された時点の target/（debug のみ）で凍結し、release と --features bindgen の
+      #     成果物が毎回作り直されていた。そこで run_id を足して毎回書き戻す設計にした
+      #   - その代償が handball-project#386 で出た。毎回 0.8 GB を書き戻し、restore-keys で
+      #     前回の target/ を継ぎ足すので古い成果物が消えず 5 GB まで肥大（復元 216 秒 +
+      #     保存 127 秒）。10 GB の上限で main のキャッシュが evict され、PR がゼロから
+      #     ビルドする回も出ていた
+      #
+      # いまは job の最後（release と bindgen も済んだ後）に一度だけ保存するので、#143 の
+      # 「debug で凍結」は起きない。ビルドの構成を変える（ステップを足す）ときは、この
+      # workflow 自体がキーに入っているので保存し直される。miss（依存やツールチェーンの更新）
+      # のときはゼロから作る — 2026-09-13 の実測で +90 秒程度。週次の Dependabot で PR と
+      # main の 2 回だけ。
       #
       # **Cargo.lock は `**` を付けず直下だけを指す。** ワークスペースなので Cargo.lock は
       # root の 1 本しかなく、`**/Cargo.lock` にするとハッシュ値は同じまま target/ を含む
@@ -56,25 +143,26 @@ jobs:
       # `hashFiles(...) failed. Fail to hash files under directory` で job が落ちていた
       # （復元時は target/ がまだ無いので通る）。2026-09-12 に main でも再発。
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        if: steps.scope.outputs.docs_only != 'true'
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-${{ github.run_id }}
-          restore-keys: |
-            cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-
-            cargo-${{ runner.os }}-
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', '.github/workflows/ci.yml') }}
 
       - name: cargo fmt
+        if: steps.scope.outputs.docs_only != 'true'
         run: nix develop --command cargo fmt --all --check
 
       - name: cargo clippy
+        if: steps.scope.outputs.docs_only != 'true'
         run: nix develop --command cargo clippy --workspace --all-targets -- -D warnings
 
       # tests/golden/local/ は gitignore 済み（ローカル専用の拡張コーパス — ADR 0003 §1）。
       # 不在時は該当テストが自動でスキップされるので CI でも green になる。
       - name: cargo test
+        if: steps.scope.outputs.docs_only != 'true'
         run: nix develop --command cargo test --workspace
 
       # wasm ターゲットのコンパイル検査（handball-project#206）。上の fmt / clippy /
@@ -99,6 +187,7 @@ jobs:
       #     flake が入れる wasm-bindgen-cli は完全一致が必要。nixpkgs が上がったら
       #     両方を同時に合わせる
       - name: cargo check（wasm32）
+        if: steps.scope.outputs.docs_only != 'true'
         run: nix develop --command cargo check --target wasm32-unknown-unknown -p handball-toolkit-wasm
 
       # 配布バイナリの OSS ライセンス一覧が依存の現況と一致するかを検査する
@@ -106,6 +195,7 @@ jobs:
       # 一覧から crate が欠けて表示義務を取りこぼすため、ここで止める。
       # accepted に無いライセンスの混入もこのステップが検出する（about.toml）。
       - name: ライセンス一覧が最新か
+        if: steps.scope.outputs.docs_only != 'true'
         run: nix develop --command ./scripts/generate_licenses.sh --check
 
       # 依存に既知の脆弱性（RustSec advisory-db）が出ていないか、取得元が crates.io 以外に
@@ -122,6 +212,7 @@ jobs:
       #   - `unmaintained` は warn のまま（落とさない）。メンテ停止は脆弱性ではなく、
       #     uniffi 一式のような選択肢の無い依存で赤くなり続けると検査が無視されるため
       - name: 依存の既知脆弱性と取得元（cargo-deny）
+        if: steps.scope.outputs.docs_only != 'true'
         run: nix develop --command cargo deny check advisories sources
 
       # ── ここから Android 配布物（.aar）の JVM 単体テスト（handball-project#143）──
@@ -140,6 +231,7 @@ jobs:
 
       - name: Android SDK の状態を確認
         id: android_sdk
+        if: steps.scope.outputs.docs_only != 'true'
         run: |
           root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
           echo "ANDROID_HOME=${ANDROID_HOME:-(unset)}"
@@ -158,14 +250,16 @@ jobs:
 
       # ランナー同梱の SDK が無い場合のみ導入する。compileSdk = 36 /
       # buildToolsVersion = "37.0.0"（android/toolkit/build.gradle.kts）に対応させる。
+      # 上のステップが skip されると outputs は空（!= 'true'）なので、docs_only も見る。
       - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
-        if: steps.android_sdk.outputs.preinstalled != 'true'
+        if: steps.scope.outputs.docs_only != 'true' && steps.android_sdk.outputs.preinstalled != 'true'
         with:
           packages: 'platforms;android-36 build-tools;37.0.0'
 
       # Gradle は flake が提供する（pkgs.gradle。ADR 0006 実装追記 2026-07-28）が、
       # AGP / Kotlin プラグインと依存 jar は Maven から引くのでキャッシュする。
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        if: steps.scope.outputs.docs_only != 'true'
         with:
           path: |
             ~/.gradle/caches
@@ -174,9 +268,11 @@ jobs:
           restore-keys: gradle-${{ runner.os }}-
 
       - name: host 向け cdylib をビルド（NDK 不要）
+        if: steps.scope.outputs.docs_only != 'true'
         run: nix develop --command cargo build --release -p handball-toolkit-ffi
 
       - name: Kotlin バインディングを生成（host の .dylib から）
+        if: steps.scope.outputs.docs_only != 'true'
         run: |
           nix develop --command cargo run -q -p handball-toolkit-ffi --features bindgen --bin uniffi-bindgen -- \
             generate --library target/release/libhandball_toolkit_ffi.dylib \
@@ -186,6 +282,7 @@ jobs:
       # （DomainValidationMessagesTest。handball-project#358）。件数は書かない —
       # 書き写した値はテストを足すたびにずれ、機械が見ていないので気付けない。
       - name: Kotlin シムの単体テスト
+        if: steps.scope.outputs.docs_only != 'true'
         run: nix develop --command gradle -p android :toolkit:testDebugUnitTest --console=plain
 
       # 依存 OSS のライセンス一覧が .aar に入るか（handball-project#142）。同梱が
@@ -198,6 +295,7 @@ jobs:
       # 直すこと。** gradle 側へ寄せて単一化する案は見送った — .aar を作る経路は
       # build_aar.sh 1 本で、二重管理の実害がまだ無いため。
       - name: ライセンス一覧が .aar に入るか
+        if: steps.scope.outputs.docs_only != 'true'
         run: |
           asset_dir=android/toolkit/src/main/assets/handball_toolkit
           rm -rf android/toolkit/src/main/assets
