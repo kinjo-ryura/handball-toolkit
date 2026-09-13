@@ -5,7 +5,9 @@
 # 各シェル（iOS / Android）がそのまま表示できる JSON に整形する。
 #
 # 成果物（**コミットする**）:
-#   - THIRD_PARTY_LICENSES.json
+#   - THIRD_PARTY_LICENSES.json … 正。シェルが同梱して画面に出す
+#   - THIRD_PARTY_LICENSES.md   … 同じ内容を人が読める形にしたもの。JSON から機械的に作る
+#                                 （リンクで表示を届ける配布経路のため。下の render_markdown）
 #
 # バイナリ非コミット方針（ADR 0004 決定 8）の例外ではない — これはテキストの生成物で、
 # 生成 Swift バインディングと同じ「ソースはコミットする」側に属する。コミットするのは
@@ -22,6 +24,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 readonly OUT=THIRD_PARTY_LICENSES.json
+readonly MD_OUT=THIRD_PARTY_LICENSES.md
 # 配布物ごとの依存グラフの根。**両方を走らせて統合する**（handball-project#285）。
 #   - ffi  … iOS の staticlib / Android の .so の実体。コア crate を feature `uniffi` 込みで引く
 #   - wasm … Web デモ（handball-apps-site が配る .wasm）。wasm-bindgen 等は wasm 側にしか無い
@@ -138,30 +141,97 @@ generate() {
     '
 }
 
+# 標準入力の JSON（generate の出力）を、人が読める Markdown に写す。
+#
+# **なぜ要るか**: 表示義務は「受領者に届ける」ことで、画面に出せないシェルはリンクで届ける
+# （handball-apps-site の Web デモは自前で一覧を持たず、このファイルを指す — 写しを持つと
+# リリースのたびに古くなるため。handball-project#384）。生の JSON は本文が 1 行の
+# エスケープ文字列で、読める形とは言いにくい。
+#
+# - **JSON だけから作る**。cargo も cargo-about も呼ばないので、JSON と食い違う余地が無い
+# - 本文はコードフェンスに入れる（Markdown として解釈させない）。フェンスは本文中の
+#   最長のバッククォート列より 1 本長くする。改行は LF に揃える（CRLF の本文がある）
+# - アンカーは `license-<licenses[] の index>`。見出しの自動アンカーは同名（MIT が 20 件）で
+#   連番になり、並びが変わると別の本文を指すため使わない
+render_markdown() {
+  jq -r '
+    . as $root
+    | $root.licenses as $ls
+    | def fence($text):
+        ([ $text | scan("`+") | length ] | max // 0) as $m
+        | "`" * ([ 3, $m + 1 ] | max);
+      def license_links:
+        [ .licenseIndexes[] as $i | "[\($ls[$i].id)](#license-\($i))" ] | join("・");
+      [
+        "# OSS ライセンス一覧",
+        "",
+        "<!-- scripts/generate_licenses.sh が THIRD_PARTY_LICENSES.json から生成する。直接編集しない。 -->",
+        "",
+        "handball-toolkit \($root.toolkitVersion) の配布物（iOS / macOS の staticlib・Android の `.so`・Web の `.wasm`）にリンクされるオープンソースソフトウェアと、そのライセンス本文。",
+        "",
+        "- 配布物ごとの依存を統合した一覧のため、配布物によっては含まれないライブラリも載っている",
+        "- 各ライブラリのソースコードは「入手先」から入手できる",
+        "- 同じ内容の機械可読版は [`THIRD_PARTY_LICENSES.json`](THIRD_PARTY_LICENSES.json)",
+        "",
+        "## ライブラリ（\($root.libraries | length) 件）",
+        "",
+        "| ライブラリ | バージョン | ライセンス | 入手先 |",
+        "| --- | --- | --- | --- |",
+        ( $root.libraries[]
+          | "| \(.name) | \(.version) | \(license_links) | [ソース](\(.sourceUrl)) |" ),
+        "",
+        "## ライセンス本文（\($ls | length) 件）",
+        ( range(0; $ls | length) as $i
+          | $ls[$i] as $lic
+          | ($lic.text | gsub("\r\n"; "\n") | gsub("\r"; "\n") | sub("\n+$"; "")) as $text
+          | fence($text) as $f
+          | [ $root.libraries[] | select(any(.licenseIndexes[]; . == $i)) | "\(.name) \(.version)" ]
+            | join("、") as $users
+          | "",
+            "### <a id=\"license-\($i)\"></a>\($lic.name)（\($lic.id)）",
+            "",
+            "適用: \($users)",
+            "",
+            $f,
+            $text,
+            $f )
+      ]
+      | join("\n")
+  '
+}
+
 if [ "$check_only" = 1 ]; then
-  if [ ! -f "$OUT" ]; then
-    echo "error: $OUT がありません。./scripts/generate_licenses.sh で生成してコミットしてください。" >&2
-    exit 1
-  fi
+  for f in "$OUT" "$MD_OUT"; do
+    if [ ! -f "$f" ]; then
+      echo "error: $f がありません。./scripts/generate_licenses.sh で生成してコミットしてください。" >&2
+      exit 1
+    fi
+  done
   tmp=$(mktemp)
-  trap 'rm -f "$tmp"' EXIT
+  tmp_md=$(mktemp)
+  trap 'rm -f "$tmp" "$tmp_md"' EXIT
   generate > "$tmp"
-  if ! diff -u "$OUT" "$tmp"; then
+  render_markdown < "$tmp" > "$tmp_md"
+  stale=()
+  diff -u "$OUT" "$tmp" || stale+=("$OUT")
+  diff -u "$MD_OUT" "$tmp_md" || stale+=("$MD_OUT")
+  if [ ${#stale[@]} -gt 0 ]; then
     cat >&2 <<MSG
 
-error: $OUT が依存の現況と一致しません。
+error: ${stale[*]} が依存の現況と一致しません。
 
   依存を追加・更新したら ./scripts/generate_licenses.sh を実行して
   生成結果をコミットしてください（一覧を手で直さないこと）。
 MSG
     exit 1
   fi
-  echo "OK: $OUT は最新です"
+  echo "OK: $OUT / $MD_OUT は最新です"
   exit 0
 fi
 
 generate > "$OUT"
-echo "完了: $OUT"
+render_markdown < "$OUT" > "$MD_OUT"
+echo "完了: $OUT / $MD_OUT"
 jq -r '"  ライブラリ \(.libraries | length) 件 / ライセンス本文 \(.licenses | length) 件"' "$OUT"
 jq -r '.libraries | group_by(.origin) | .[] | "  - origin=\(.[0].origin): \(length) 件"' "$OUT"
 jq -r '.licenses | group_by(.id) | .[] | "  - \(.[0].id): 本文 \(length) 件"' "$OUT"
