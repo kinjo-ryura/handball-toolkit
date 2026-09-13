@@ -17,7 +17,7 @@
 git switch -c docs/xxx                    # prefix は feat/ fix/ ci/ docs/ + 内容
 git push -u origin HEAD
 gh pr create --title "..." --body "..."   # 本文に関連 Issue（handball-project#NN）を書く
-gh pr checks --watch                      # required = `check` ジョブのみ。macOS + Nix で 5〜7 分
+gh pr checks --watch                      # required = `check` ジョブのみ。約 3 分（依存やツールチェーンを動かすと約 8 分、docs だけの PR は 1 分未満）
 gh pr merge --merge --delete-branch       # required approvals は 0 なので自分の PR を自分で merge できる
 git switch main && git pull               # ローカル main を merge 後の状態へ追従させる
 ```
