@@ -223,9 +223,17 @@ pub enum CoreWriteError {
 - **対象は開発者専用経路に限る**: import to DB の唯一の導線は HandballRecorder の `DevDataViewV2`（アプリエントリで丸ごと `#if DEBUG`。App Store リリースビルドには存在しない）。エンドユーザーは踏まないため「ユーザー向けの失敗表示・復旧導線」は不要で、論点は純粋に「開発者が再 import で復旧するか / そもそも中途半端を残さないか」に絞れる
 - **失敗時に「facts 0 件の試合行 + 孤児チーム」が残る問題**（#72 で実測、#83）を構造的に消す。現状の「途中失敗は再実行復旧前提」は孤児の後始末を開発者の手作業にし、再 import は重複 Match も生む（`doubleImportCreatesDuplicateMatch` で固定）
 - **import はバッチだから自然に atomic 化できる**: record / phase 補完 / migrate と違い、import は commit 時点で全 fact を保有し、かつ `import_commit_plan` → `sort_by_persistence_order` で永続化順に整列済み。全 entity/fact を 1 `context.save()` に束ねられる。副産物として N-1 回の冗長な whole-log 検証と save が消える
-- **record / phase 補完 / migrate commit の逐次・非 atomic は不変**（対話的・逐次で、全書き込みを事前に持たないため）。トランザクション化は import に限る
+- **record / phase 補完 / migrate commit の逐次・非 atomic は不変**（対話的・逐次で、全書き込みを事前に持たないため）。トランザクション化は import に限る（migrate commit は後に、検証を保存より前へ移した — 下記 2026-09-14 追記）
 
 **検証はプレフィックスごとに in-memory で回し、パリティを完全に保つ（実装で確定 — 起草時案から改善）**: 起草時は「バッチは最終形の log を 1 回検証するので逐次 append よりわずかに緩い」と想定したが、実装（`sample_import::import_commit_batch`）では**シェルの読み込み済みコピーではなく in-memory の working ログに対して `validate_append` を fact ごとに回す**（fact 単体 validation + roster 参照整合 + `working + fact` の whole-log 検証）。これは現行の「逐次 append で各プレフィックスを検証」と**同一の意味論**で、atomic 化しても検証は 1 mm も緩めない。「最終形だけ検証」は不要と判明したので採らなかった。import は新規 Match への投入で fact log が空スタートのため、roster 以外の検証入力は「保存瞬間の DB 真実 = バッチそのもの」で決定 1 を満たす。roster は**既存所属選手（新規保存前の DB read = 最小 read）+ 新規選手**で構築し、現行の「entity を save してから `load_roster_players` で読む」のと同じ集合を save 前に組み直す（参照整合の結果は不変）。facts の整列は引き続きコアが行う（`sort_by_persistence_order`。読み出し規約 `SwiftDataMatchRepository.factRecordOrder` と一致させ、プレフィックス検証が通るため）。
+
+**migrate commit は全件を検証してから保存する（2026-09-14 追記 — handball-project#388）**: `commit_video_migration` を「configuration を先に `.video` で save → fact を 1 件ずつ validate → update」から、「計画した fact を全件検証 → 全部通ったときだけ configuration を save → fact を update」へ改める。**検証に落ちたら 1 件も保存しない。**
+
+- **なぜ直すか**: 旧順序では途中の fact が検証に落ちると configuration だけ `.video` で残り、残りの fact が matchClock しか持たない試合（半移行）ができた。シェルは検出バナー（#320）と再開の導線（#351）で救っていた
+- **上の「全書き込みを事前に持たないので非 atomic」は migrate には当てはまらない。** `video_migration_plan` が commit の時点で書き換える fact を全件組む。全件を先に持つ `record_update_phase_duration`（#352）と import（#83）は、すでに検証を済ませてから保存している
+- **検証の意味論は変わらない**: 旧実装も保存済みの configuration を読み直しておらず、メモリ上の `.video` の試合と working ログ（計画を順に適用したプレフィックス）に対して `validate_update` を回していた。保存を検証ループの後ろへ移すだけで、通る入力・落ちる入力は同じ
+- **保存は逐次・非 atomic のまま。** 保存の途中で repository が失敗した（DB エラー / アプリ終了）ときは半移行が残る。1 トランザクションにするにはシェルに保存口（`ImportWriteRepository` と同型）を足す必要があり、別の判断とする。シェルの半移行の検出と再開は、この経路と配布済みのビルドで作られた試合のために残す
+- trait とエラーコードは変えないので、各シェルの repository 実装と `docs/ERROR_CODES.md` は追随不要。ただし失敗時に保存するものが変わる FFI の挙動変更なので、版を積む対象
 
 ### 8. wasm / CLI / Kotlin への影響
 
@@ -253,6 +261,9 @@ pub enum CoreWriteError {
    - **コア（Rust）→ 完了（2026-09-06）**: `import_commit_batch` の先頭で `validators::validate_match(&plan.r#match)` を回し、非空なら fact ループへ入らず `Err` を返す。**ループの前に置く**のは fact 0 件の試合ファイルも検査するため。テストは `sample_import_tests` に 3 件（両側同一で `SameTeamOnBothSides` / fact 0 件でも落ちる / 別チームなら通る対照）
    - **enforcement 点の対称性が回復した**: fact の create / edit / delete は `MatchWriteValidator`、試合ヘッダは create（UI）と import の双方が `validate_match` を通る。**`validate_match` を呼ぶ write 経路はここが最初**（それ以前は `ffi_api::validate_match` として公開されているだけで、どのシェルからも呼ばれていなかった）
    - 新しいエラーコードは増えないので `docs/ERROR_CODES.md` は据え置き。ただし `commit_sample_match_import` は**従来受け入れていた入力を拒否するようになる**ので、FFI 公開面の挙動変更としてリリースを積む対象
+10. **migrate commit の検証を保存より前へ（第 4 段の順序の改め）**: 決定 7 の 2026-09-14 追記に基づく — handball-project#388。
+   - **コア（Rust）**: `commit_video_migration` のループを検証だけにし（`validate_update` → working ログへ反映）、`save_match` → 計画順の `update_fact` をループの後ろへ移す。テストは `write_orchestration_tests` に 1 件（phase は通り、後ろの goal が roster の参照整合で落ちる入力で、`save_match` を呼ばず fact も書き換わらない）
+   - **シェル**: 呼び出しの形は変わらない。doc の「途中失敗は再実行で復旧」を直す
 
 各段は独立して出荷可能な状態を保つ（途中の段で止めても境界は整合する）。
 
@@ -299,3 +310,4 @@ pub enum CoreWriteError {
 - handball-project#67 — 第 5 段（import の merge 調停 + commit のコア移管。完了）
 - handball-project#83 — import commit の atomic 化（決定 7 / 決定 1 の 2026-07-22 追記・第 8 段）
 - handball-project#308 — import commit に試合ヘッダの検証を足す（第 9 段）
+- handball-project#388 — migrate commit の検証を保存より前へ（決定 7 の 2026-09-14 追記・実装順序 10）
