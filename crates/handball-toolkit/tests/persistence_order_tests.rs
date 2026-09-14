@@ -1,4 +1,4 @@
-//! 永続化順（累積秒 → recordedAt → id）の規約そのものを固定する（handball-project#87）。
+//! 永続化順（動画秒を持つか → 時刻 → recordedAt → id）の規約そのものを固定する（handball-project#87）。
 //!
 //! これまでこの規約は import 経路の `commit_plan_sorts_facts_into_persistence_order` からしか
 //! 触れられておらず、規約単体の回帰ロックが無かった。オラクルは読み出し側の
@@ -80,14 +80,45 @@ fn match_clock_が無い_fact_は_video_clock_がキーになる() {
 }
 
 #[test]
-fn both_anchor_は_match_clock_を優先する() {
-    // video 秒だけ見ると 5 → 100 の順になるが、match 秒（100 → 200）が優先されるべき。
+fn both_anchor_は_video_clock_を優先する() {
+    // match 秒だけ見ると 100 → 200 の順になるが、video 秒（5 → 100）が優先されるべき
+    // （handball-project#380）。
     let mut facts = vec![
-        fact(2, 0, both_anchor(200.0, 5.0)),
         fact(1, 0, both_anchor(100.0, 100.0)),
+        fact(2, 0, both_anchor(200.0, 5.0)),
     ];
     sort_by_persistence_order(&mut facts);
-    assert_eq!(ids(&facts), vec![1, 2]);
+    assert_eq!(ids(&facts), vec![2, 1]);
+}
+
+#[test]
+fn 動画へ移行した試合は区間が交互にならず動画秒の順で並ぶ() {
+    // 移行後の形: phaseStart は Both、play は VideoClock だけ。match 秒を優先すると
+    // 後半の phaseStart（match 1800）が前半終盤の play（video 1850）より前に来ていた
+    // （handball-project#380）。
+    // 並べ方は anchor だけで決まるので、phaseStart も play fact の形で代用する。
+    // 1: 前半の phaseStart / 2: 前半終盤の play / 3: 後半の phaseStart / 4: 後半の play
+    let mut facts = vec![
+        fact(4, 0, video_anchor(2200.0)),
+        fact(3, 0, both_anchor(1800.0, 2100.0)),
+        fact(2, 0, video_anchor(1850.0)),
+        fact(1, 0, both_anchor(0.0, 120.0)),
+    ];
+    sort_by_persistence_order(&mut facts);
+    assert_eq!(ids(&facts), vec![1, 2, 3, 4]);
+}
+
+#[test]
+fn 動画秒を持たない_fact_は後ろにまとまり累積秒で並ぶ() {
+    // 移行が途中で止まった試合（handball-project#320）: 未同期の fact は match 秒だけを持つ。
+    // match 秒 100 は video 秒 2000 より小さいが、別の時計どうしを比べず後ろへ寄せる。
+    let mut facts = vec![
+        fact(3, 0, match_anchor(200.0)),
+        fact(1, 0, video_anchor(2000.0)),
+        fact(2, 0, match_anchor(100.0)),
+    ];
+    sort_by_persistence_order(&mut facts);
+    assert_eq!(ids(&facts), vec![1, 2, 3]);
 }
 
 #[test]
@@ -114,16 +145,18 @@ fn 秒と_recorded_at_が同一なら_fact_id_で_tie_break_する() {
 }
 
 #[test]
-fn キーは_3_段で優先順位どおりに効く() {
-    // 秒が最優先。秒が同じものの中でだけ recordedAt、さらに同じものの中でだけ id。
+fn キーは_4_段で優先順位どおりに効く() {
+    // 動画秒を持つかが最優先（秒・recordedAt が大きくても前へ）。その中で秒、
+    // 秒が同じものの中でだけ recordedAt、さらに同じものの中でだけ id。
     let mut facts = vec![
         fact(2, 500, match_anchor(600.0)),
         fact(9, 100, match_anchor(1800.0)),
+        fact(7, 900, video_anchor(3000.0)),
         fact(1, 500, match_anchor(600.0)),
         fact(5, 100, match_anchor(600.0)),
     ];
     sort_by_persistence_order(&mut facts);
-    assert_eq!(ids(&facts), vec![5, 1, 2, 9]);
+    assert_eq!(ids(&facts), vec![7, 5, 1, 2, 9]);
 }
 
 #[test]

@@ -78,19 +78,26 @@ interface ShellDao {
     suspend fun deleteFactsOfMatch(matchId: String)
 
     /**
-     * **永続化順**で返す（コアの `persistence_order` と同じ規約 — 累積秒 → recordedAt → id）。
+     * **永続化順**で返す（コアの `persistence_order` と同じ規約 — 時刻 → recordedAt → id）。
      * validators の入力契約が「facts は永続化順でソート済み」を要求するため、
      * 読み出し順を合わせるのはシェルの責務。
      *
-     * 累積秒は「matchClock があればそれ、無ければ videoClock、どちらも無ければ末尾」。
-     * 第 1 キーで NULL 群を後ろへ寄せてから COALESCE で比較する（`?? .infinity` と同じ扱い）。
+     * 時刻は **videoClock を優先**する（handball-project#380）。タイマーから動画へ移行した試合では
+     * phaseStart / stoppage が両方の時計を、play が videoClock だけを持つので、matchClock を
+     * 優先すると control と play が別の時計の秒で比べられ、区間が交互に並ぶ。
+     *
+     * - 第 1 キー: videoClock を持たない fact を後ろへ寄せる。移行が途中で止まった試合で、
+     *   matchClock だけの fact と videoClock の秒を同じ数直線で比べないため
+     * - 第 2 キー: どちらの時計も持たない fact を末尾へ寄せる（SQLite の ASC は NULL を先頭に置くため）
+     * - 第 3 キー: videoClock、無ければ matchClock
      */
     @Query(
         """
         SELECT * FROM fact WHERE matchId = :matchId
         ORDER BY
+          (startVideoSeconds IS NULL) ASC,
           (startMatchSeconds IS NULL AND startVideoSeconds IS NULL) ASC,
-          COALESCE(startMatchSeconds, startVideoSeconds) ASC,
+          COALESCE(startVideoSeconds, startMatchSeconds) ASC,
           recordedAtEpochSecond ASC,
           recordedAtNano ASC,
           id ASC
