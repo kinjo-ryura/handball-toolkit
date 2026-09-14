@@ -478,7 +478,7 @@ fn poc_video_source() -> VideoSource {
 }
 
 #[test]
-fn video_移行_commit_は_config_先行_save_後に_facts_を計画順に更新する() {
+fn video_移行_commit_は_config_を_save_して_facts_を計画順に更新する() {
     let repo = Arc::new(FakeRepo::new(vec![
         phase_start(),
         goal(GOAL_ID, 60.0, Some(PlayerId(Uuid::from_u128(SCORER_ID)))),
@@ -496,7 +496,7 @@ fn video_移行_commit_は_config_先行_save_後に_facts_を計画順に更新
     ));
     assert_eq!(result, Ok(()));
 
-    // config は先行 save で .video 化されている。
+    // config は .video で save されている。
     let saved = repo
         .saved_matches
         .lock()
@@ -557,6 +557,55 @@ fn video_移行_commit_は_sync_欠落なら何も発火しない() {
         repo.fact_log()[1].anchor(),
         FactAnchor::MatchClock(_)
     ));
+}
+
+/// 検証に落ちたら 1 件も保存しない — 半移行を作らない（handball-project#388）。
+///
+/// phase は検証を通り、後ろの goal（roster に居ない選手を参照）だけが落ちる入力にする。
+/// config を先に save して逐次 update していたころは、ここで「`.video` なのに goal は
+/// matchClock のまま」が残った。
+#[test]
+fn video_移行_commit_は途中の記録が検証に落ちると_config_も_facts_も保存しない() {
+    let unknown_player = PlayerId(Uuid::from_u128(99));
+    let facts = vec![phase_start(), goal(GOAL_ID, 60.0, Some(unknown_player))];
+    let mut repo = FakeRepo::new(facts.clone());
+    repo.roster_players = vec![PlayerTeamRef {
+        player_id: PlayerId(Uuid::from_u128(SCORER_ID)),
+        team_id: TeamId(Uuid::from_u128(HOME_ID)),
+    }];
+    let repo = Arc::new(repo);
+
+    let result = run(commit_video_migration(
+        repo.clone(),
+        match_id(),
+        poc_video_source(),
+        vec![VideoSyncInput {
+            fact_id: FactId(Uuid::from_u128(PHASE_START_ID)),
+            video_start_seconds: 10.0,
+            video_end_seconds: 1810.0,
+        }],
+        vec![],
+    ));
+
+    match result {
+        Err(CoreWriteError::ValidationFailed { issues }) => {
+            assert!(issues.contains(&DomainValidationIssue::Fact(
+                FactValidationError::UnknownPlayerReference {
+                    player_id: unknown_player
+                }
+            )));
+        }
+        other => panic!("ValidationFailed を期待したが {other:?}"),
+    }
+    assert!(
+        repo.saved_matches().is_empty(),
+        "config はタイマーモードのまま（save_match を呼ばない）"
+    );
+    assert_eq!(
+        repo.fact_log(),
+        facts,
+        "検証を通った phase も含め、記録は 1 件も書き換わらない"
+    );
 }
 
 // ── repository 失敗の伝播 ──

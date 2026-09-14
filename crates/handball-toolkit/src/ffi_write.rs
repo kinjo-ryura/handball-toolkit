@@ -327,9 +327,18 @@ fn apply_fact_updates(existing: &[MatchFact], updates: &[MatchFact]) -> Vec<Matc
 ///
 /// 順序設計をコアが所有する:
 /// 1. 更新後 facts を計画（純粋関数 `video_migration_plan` — control → play の順）
-/// 2. Match.configuration を先に `.video` へ save（素朴 CRUD・検証なし。既存 facts が
-///    matchClock anchor の途中状態でも通り、後続 update が `.video` config 下で検証される）
-/// 3. facts を計画順に逐次 validate → update（挙動パリティ: 非 atomic、途中失敗は再実行で復旧）
+/// 2. 計画した facts を、メモリ上の `.video` の試合と working ログに対して計画順に 1 件ずつ
+///    `validate_update` する（検証の意味論は逐次 update と同じ）
+/// 3. **全件が通ったときだけ**、Match.configuration を `.video` で save → facts を計画順に update
+///
+/// **検証に落ちたら 1 件も保存しない**（handball-project#388）。以前は configuration を先に
+/// save してから逐次 validate → update していたので、途中の違反で「`.video` なのに記録が
+/// matchClock のまま」の半移行が残った。検証は保存済みの configuration を読まずメモリ上の
+/// 試合で行えるので、保存を先にする理由は無い。
+///
+/// 保存そのものは逐次・非 atomic のまま — 発火の途中で repository が失敗した（DB エラー /
+/// アプリ終了）ときは半移行が残りうる。1 トランザクションにするにはシェルに保存口が要る
+/// （import の `ImportWriteRepository` と同型）ため、ここでは扱わない。
 #[uniffi::export]
 pub async fn commit_video_migration(
     repo: Arc<dyn MatchWriteRepository>,
@@ -349,18 +358,21 @@ pub async fn commit_video_migration(
     let updated = write::video_migration_plan(&facts, &phase_syncs, &stoppage_syncs)?;
 
     match_.configuration = MatchConfiguration::Video(video_source);
-    repo.save_match(match_.clone()).await?;
 
     let mut working = facts;
-    for fact in updated {
-        let issues = validators::validate_update(&fact, &working, &match_, roster.as_ref());
+    for fact in &updated {
+        let issues = validators::validate_update(fact, &working, &match_, roster.as_ref());
         if !issues.is_empty() {
             return Err(CoreWriteError::ValidationFailed { issues });
         }
-        repo.update_fact(match_id, fact.clone()).await?;
         if let Some(slot) = working.iter_mut().find(|f| f.id == fact.id) {
-            *slot = fact;
+            *slot = fact.clone();
         }
+    }
+
+    repo.save_match(match_).await?;
+    for fact in updated {
+        repo.update_fact(match_id, fact).await?;
     }
     Ok(())
 }
