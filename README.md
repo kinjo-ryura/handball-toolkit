@@ -55,7 +55,7 @@ timeline を一度組んで渡し回すことで、segment の解決を二度や
 
 ### 入力契約
 
-**fact 列は永続化順（累積秒 → recordedAt → id）にソートしてから**渡すこと。未ソートのまま渡してもエラーにはならず、**黙って誤った結果を返す**。
+**fact 列は永続化順（動画秒を持つ fact が先 → 動画秒、無ければ累積秒 → recordedAt → id）にソートしてから**渡すこと。未ソートのまま渡してもエラーにはならず、**黙って誤った結果を返す**。
 
 ```rust
 use handball_toolkit::persistence_order;

@@ -1,4 +1,4 @@
-//! fact 列の永続化順（累積秒 → recordedAt → id）。
+//! fact 列の永続化順（動画秒を持つか → 時刻 → recordedAt → id）。
 //!
 //! Rust 側の追加モジュール（移植元 `RecorderDomain` に対応物はない — ADR 0001 ミラー表の外）。
 //! 規約の正典は読み出し側の `SwiftDataMatchRepository.factRecordOrder` で、
@@ -10,16 +10,30 @@
 //!
 //! FFI へは公開しない。Swift 側は SwiftData のクエリ順（`SortDescriptor`）で同じ並びを得ており、
 //! コアを経由しないため（ADR 0001 関数目録の対象外）。
+//!
+//! **時刻は動画秒を優先する**（handball-project#380）。タイマーから動画へ移行した試合では
+//! phaseStart / stoppage が `Both`、play が `VideoClock` だけを持つ。累積秒を優先すると control は
+//! 累積秒・play は動画秒で比べられ、後半の phaseStart（累積秒 1800）が前半終盤の play
+//! （動画秒 1800 超）より前に来て、区間が交互に並んでいた。
+//!
+//! **動画秒を持たない fact は後ろにまとめる。** 移行が途中で止まった試合（`Video` なのに
+//! `MatchClock` だけの fact が残る — handball-project#320）で、累積秒と動画秒を同じ数直線で
+//! 比べないため。動画秒を持たない fact どうしは累積秒で並ぶので、タイマーの試合の並びは変わらない。
 
 use crate::facts::MatchFact;
 
-/// 整列キーの代表時刻。累積秒（matchClock）を優先し、無ければ動画秒を使う。
+/// 動画秒を持たない fact を後ろへ寄せる第 1 キー（`false` = 持つ が先）。
+fn lacks_video_seconds(fact: &MatchFact) -> bool {
+    fact.anchor().video_elapsed_seconds().is_none()
+}
+
+/// 整列キーの代表時刻。動画秒を優先し、無ければ累積秒（matchClock）を使う。
 /// どちらも無い fact は末尾へ寄せる（読み出し側の `?? .infinity` と同じ扱い）。
 fn order_seconds(fact: &MatchFact) -> f64 {
     let anchor = fact.anchor();
     anchor
-        .match_elapsed_seconds()
-        .or_else(|| anchor.video_elapsed_seconds())
+        .video_elapsed_seconds()
+        .or_else(|| anchor.match_elapsed_seconds())
         .unwrap_or(f64::INFINITY)
 }
 
@@ -29,8 +43,9 @@ fn order_seconds(fact: &MatchFact) -> f64 {
 /// `FactId` の `Ord` は内包 `Uuid` のバイト順 = Swift `uuidString` 昇順と同順。
 pub fn sort_by_persistence_order(facts: &mut [MatchFact]) {
     facts.sort_by(|lhs, rhs| {
-        order_seconds(lhs)
-            .total_cmp(&order_seconds(rhs))
+        lacks_video_seconds(lhs)
+            .cmp(&lacks_video_seconds(rhs))
+            .then_with(|| order_seconds(lhs).total_cmp(&order_seconds(rhs)))
             .then_with(|| lhs.recorded_at.cmp(&rhs.recorded_at))
             .then_with(|| lhs.id.cmp(&rhs.id))
     });

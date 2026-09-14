@@ -21,7 +21,7 @@ use crate::facts::{ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, 
 use crate::ids::FactId;
 use crate::validation::{DomainValidationIssue, TimelineValidationError};
 
-/// `facts` は永続化順（cumulative seconds + recordedAt + id）で並んでいる前提。
+/// `facts` は永続化順（動画秒を持つか → 時刻 → recordedAt → id — `persistence_order`）で並んでいる前提。
 /// `match_` は title チェック用。
 pub fn validate_fact_log(facts: &[MatchFact], match_: &Match) -> Vec<DomainValidationIssue> {
     let configuration = &match_.configuration;
