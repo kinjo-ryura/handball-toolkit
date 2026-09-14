@@ -43,6 +43,8 @@ jobs:
     #         rust-toolchain.toml が動かない限り保存し直さない
     #   手 2: cargo キャッシュも「キーが無いときだけ保存」に戻し、run_id を外す
     #   手 3: PR の変更が docs だけなら、ビルドと検査を全部飛ばして成功で抜ける（`scope`）
+    #   手 4: cargo / Gradle キャッシュのキーから版番号を除き、版切りの PR と merge 後の main
+    #         でも hit させる（`cache_keys`。handball-project#389）
     #
     # 変更前後の実測は handball-project#386 に書いてある。
 
@@ -118,10 +120,68 @@ jobs:
             /nix
             ~/.cache/nix
 
+      # 下の cargo / Gradle キャッシュのキーを作る。**どちらも版番号を除いてハッシュする**
+      # （handball-project#389）。
+      #
+      # FFI を変えるたびに版を切る規約（CLAUDE.md）なので、版はよく動く。版切りの PR は
+      # Cargo.toml / Cargo.lock / android/toolkit/build.gradle.kts の版を書き換えるだけで
+      # 依存は何も変わらないのに、ファイルをそのままハッシュしていたので完全一致が外れていた。
+      # v0.10.0（toolkit PR #65）では cargo がゼロからビルドし直し、PR 6m35s / main 7m02s
+      # （キャッシュが効いた回は PR 2m50s / main 4m30s）。
+      #
+      #   cargo : Cargo.lock から、source 行を持たない package（= workspace の crate）の
+      #           version 行だけを除く。依存のリストは残すので、workspace の crate が依存を
+      #           増減したらキーは変わる
+      #   Gradle: android/toolkit/build.gradle.kts から `val toolkitVersion = ` の行を除く。
+      #           この値は Gradle のビルドでは使われず、scripts/build_aar.sh が Cargo.toml と
+      #           照合するためだけに置いてある
+      #
+      # **除く行が見つからなければ落とす。** 書式が変わって版がキーに戻っても CI は緑のまま
+      # 遅くなるだけで、誰も気付けないため。Gradle 側は build_aar.sh の版照合と同じ行に
+      # 依存しているので、`val toolkitVersion = ` の書き方を変えるときは両方を直すこと。
+      #
+      # hashFiles は使わない。キャッシュの保存（post）で `with:` が評価し直され、`**` が
+      # target/ を走査して落ちたことがある（下の cargo キャッシュのコメント）。ここで出した
+      # 値は steps の出力なので、評価し直しても同じ値のまま。
+      - name: キャッシュのキーを作る（版番号を除く）
+        id: cache_keys
+        if: steps.scope.outputs.docs_only != 'true'
+        run: |
+          set -euo pipefail
+
+          # Cargo.lock は空行区切りの [[package]] ブロックの並びなので、段落単位（RS = ""）で読む。
+          # 変数への代入にしておくと、awk が落ちたときに set -e で止まる（パイプの途中だと止まらない）。
+          lock=$(awk '
+            BEGIN { RS = ""; ORS = "\n\n" }
+            /^\[\[package\]\]/ && !/\nsource = / { n += sub(/\nversion = "[^"]*"/, "") }
+            { print }
+            END {
+              if (n == 0) { print "error: Cargo.lock に workspace の crate の version 行が見つからない" > "/dev/stderr"; exit 1 }
+            }
+          ' Cargo.lock)
+          cargo=$(printf '%s\n' "$lock" | cat - rust-toolchain.toml .github/workflows/ci.yml | shasum -a 256 | cut -d' ' -f1)
+
+          if [ "$(grep -c '^val toolkitVersion = ' android/toolkit/build.gradle.kts)" != 1 ]; then
+            echo "error: android/toolkit/build.gradle.kts に \`val toolkitVersion = \` の行がちょうど 1 つ無い" >&2
+            exit 1
+          fi
+          gradle=$(
+            for f in $(git ls-files 'android/*.gradle.kts' android/gradle.properties); do
+              echo "== $f"
+              sed '/^val toolkitVersion = /d' "$f"
+            done | shasum -a 256 | cut -d' ' -f1
+          )
+
+          echo "cargo=$cargo" >> "$GITHUB_OUTPUT"
+          echo "gradle=$gradle" >> "$GITHUB_OUTPUT"
+          echo "cargo  のキー: $cargo"
+          echo "gradle のキー: $gradle"
+
       # cargo のレジストリと target/ をキャッシュする（ツールチェーンは上の Nix store 側）。
       #
-      # キーは Cargo.lock / rust-toolchain.toml / この workflow のハッシュで、**完全一致したら
-      # 保存しない**。restore-keys（前方一致の fallback）も置かない。経緯:
+      # キーは Cargo.lock（workspace の crate の版を除く）/ rust-toolchain.toml / この workflow
+      # のハッシュで（上の cache_keys）、**完全一致したら保存しない**。restore-keys（前方一致の
+      # fallback）も置かない。経緯:
       #
       #   - handball-project#143 では Cargo.lock のハッシュだけをキーにしていて、最初に
       #     保存された時点の target/（debug のみ）で凍結し、release と --features bindgen の
@@ -130,18 +190,25 @@ jobs:
       #     前回の target/ を継ぎ足すので古い成果物が消えず 5 GB まで肥大（復元 216 秒 +
       #     保存 127 秒）。10 GB の上限で main のキャッシュが evict され、PR がゼロから
       #     ビルドする回も出ていた
+      #   - handball-project#389 で、版切りの PR と merge 後の main が毎回 miss していたので、
+      #     キーから workspace の crate の版を除いた
       #
       # いまは job の最後（release と bindgen も済んだ後）に一度だけ保存するので、#143 の
       # 「debug で凍結」は起きない。ビルドの構成を変える（ステップを足す）ときは、この
       # workflow 自体がキーに入っているので保存し直される。miss（依存やツールチェーンの更新）
-      # のときはゼロから作る — 2026-09-13 の実測で +90 秒程度。週次の Dependabot で PR と
-      # main の 2 回だけ。
+      # のときはゼロから作る。週次の Dependabot で PR と main の 2 回だけ。
       #
-      # **Cargo.lock は `**` を付けず直下だけを指す。** ワークスペースなので Cargo.lock は
-      # root の 1 本しかなく、`**/Cargo.lock` にするとハッシュ値は同じまま target/ を含む
-      # ツリー全体を走査する。ビルド後の post（キャッシュ保存）でだけ走査が失敗し、
+      # 版を上げても hit するので、保存済みの target/ は古い版の workspace crate を抱えたまま
+      # 更新されない。workspace crate はソースを変えれば毎回ビルドし直すものなので、効くのは
+      # 依存の成果物だけで足りる。hit では保存しないので、古い成果物が積み増されて #386 の
+      # 肥大も起きない。
+      #
+      # **キーに hashFiles の `**` を戻さない。** かつて `hashFiles('**/Cargo.lock', ...)` に
+      # していた頃、ワークスペースなので Cargo.lock は root の 1 本しかないのに target/ を含む
+      # ツリー全体を走査し、ビルド後の post（キャッシュ保存）でだけ走査が失敗して
       # `hashFiles(...) failed. Fail to hash files under directory` で job が落ちていた
-      # （復元時は target/ がまだ無いので通る）。2026-09-12 に main でも再発。
+      # （復元時は target/ がまだ無いので通る。2026-09-12 に main でも再発）。いまのキーは
+      # 上の cache_keys が出す値なので、この問題は起きない。
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         if: steps.scope.outputs.docs_only != 'true'
         with:
@@ -149,7 +216,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', '.github/workflows/ci.yml') }}
+          key: cargo-${{ runner.os }}-${{ steps.cache_keys.outputs.cargo }}
 
       - name: cargo fmt
         if: steps.scope.outputs.docs_only != 'true'
@@ -258,13 +325,17 @@ jobs:
 
       # Gradle は flake が提供する（pkgs.gradle。ADR 0006 実装追記 2026-07-28）が、
       # AGP / Kotlin プラグインと依存 jar は Maven から引くのでキャッシュする。
+      #
+      # キーは android/ の *.gradle.kts と gradle.properties のハッシュで、toolkitVersion の
+      # 行を除いてある（上の cache_keys。handball-project#389）。版を上げるだけの PR で
+      # 保存し直さないため。
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         if: steps.scope.outputs.docs_only != 'true'
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle.kts', 'android/gradle.properties') }}
+          key: gradle-${{ runner.os }}-${{ steps.cache_keys.outputs.gradle }}
           restore-keys: gradle-${{ runner.os }}-
 
       - name: host 向け cdylib をビルド（NDK 不要）
