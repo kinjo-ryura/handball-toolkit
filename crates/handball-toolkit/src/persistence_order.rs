@@ -1,4 +1,4 @@
-//! fact 列の永続化順（動画秒を持つか → 時刻 → recordedAt → id）。
+//! fact 列の永続化順（動画秒を持つか → 時刻 → phase 開始か → recordedAt → id）。
 //!
 //! Rust 側の追加モジュール（移植元 `RecorderDomain` に対応物はない — ADR 0001 ミラー表の外）。
 //! 規約の正典は読み出し側の `SwiftDataMatchRepository.factRecordOrder` で、
@@ -19,12 +19,30 @@
 //! **動画秒を持たない fact は後ろにまとめる。** 移行が途中で止まった試合（`Video` なのに
 //! `MatchClock` だけの fact が残る — handball-project#320）で、累積秒と動画秒を同じ数直線で
 //! 比べないため。動画秒を持たない fact どうしは累積秒で並ぶので、タイマーの試合の並びは変わらない。
+//!
+//! **同じ時刻なら phase 開始が先**（handball-project#401）。タイマーモードの phase は記録した
+//! 瞬間に auto-create される（ADR 0001 / `write::phase_completion_plan`）ので、その phase の
+//! 最初の記録と phase 開始は必ず同じ累積秒を持つ。どちらが先かは種別で決まっていて、
+//! 時刻からは決まらない。
+//!
+//! **この判定を `recorded_at` に任せない。** `recorded_at` は記録した実時刻で、シェルが発行する
+//! スタンプの順が発火順と一致する保証は無い。実際 ADR 0005 で phase 自動補完をコア入口へ移した
+//! とき、シェルが本 fact のスタンプを先・補完 phase のスタンプを後に発行するようになり、
+//! 発火順（補完 phase → 本 fact）と逆転して 00:00 の得点が「前半の開始」より上に並んでいた。
 
-use crate::facts::MatchFact;
+use crate::facts::{ControlFact, MatchFact, MatchFactPayload};
 
 /// 動画秒を持たない fact を後ろへ寄せる第 1 キー（`false` = 持つ が先）。
 fn lacks_video_seconds(fact: &MatchFact) -> bool {
     fact.anchor().video_elapsed_seconds().is_none()
+}
+
+/// 同じ時刻では phase 開始を先に置く第 3 キー（`false` = phase 開始 が先）。
+fn is_not_phase_start(fact: &MatchFact) -> bool {
+    !matches!(
+        fact.payload,
+        MatchFactPayload::Control(ControlFact::PhaseStart(_))
+    )
 }
 
 /// 整列キーの代表時刻。動画秒を優先し、無ければ累積秒（matchClock）を使う。
@@ -46,6 +64,7 @@ pub fn sort_by_persistence_order(facts: &mut [MatchFact]) {
         lacks_video_seconds(lhs)
             .cmp(&lacks_video_seconds(rhs))
             .then_with(|| order_seconds(lhs).total_cmp(&order_seconds(rhs)))
+            .then_with(|| is_not_phase_start(lhs).cmp(&is_not_phase_start(rhs)))
             .then_with(|| lhs.recorded_at.cmp(&rhs.recorded_at))
             .then_with(|| lhs.id.cmp(&rhs.id))
     });

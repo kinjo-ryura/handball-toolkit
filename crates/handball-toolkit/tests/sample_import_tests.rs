@@ -318,7 +318,7 @@ fn default_import_dto() -> SampleMatchDtoV2 {
 }
 
 /// DTO の facts が記録順（時刻順とは限らない）で来ても、plan は永続化順
-/// （動画秒を持つか → 時刻 → recordedAt → id）へ整列して返す。
+/// （動画秒を持つか → 時刻 → phase 開始か → recordedAt → id）へ整列して返す。
 ///
 /// 配信中の `.video` サンプルは phase 開始が配列の後方にあり、DTO 順のまま逐次 append すると
 /// 最初の play を積んだ時点で whole-log 検証の R3 / R5 に抵触して必ず失敗していた
