@@ -1,4 +1,5 @@
-//! 永続化順（動画秒を持つか → 時刻 → recordedAt → id）の規約そのものを固定する（handball-project#87）。
+//! 永続化順（動画秒を持つか → 時刻 → phase 開始か → recordedAt → id）の規約そのものを固定する
+//! （handball-project#87 / #401）。
 //!
 //! これまでこの規約は import 経路の `commit_plan_sorts_facts_into_persistence_order` からしか
 //! 触れられておらず、規約単体の回帰ロックが無かった。オラクルは読み出し側の
@@ -6,7 +7,10 @@
 
 use chrono::{DateTime, Utc};
 use handball_toolkit::clock::{FactAnchor, MatchClock, VideoClock};
-use handball_toolkit::facts::{MatchFact, MatchFactPayload, PlayEventKind, PlayFact};
+use handball_toolkit::configuration::PhaseKind;
+use handball_toolkit::facts::{
+    ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
+};
 use handball_toolkit::ids::{FactId, PlayerId, TeamId};
 use handball_toolkit::persistence_order::{persistence_ordered, sort_by_persistence_order};
 use uuid::Uuid;
@@ -28,6 +32,19 @@ fn fact(id: u128, recorded_at: i64, anchor: FactAnchor) -> MatchFact {
             title: None,
             note: None,
         }),
+    }
+}
+
+/// PhaseStart fact。種別が並びに効くことを確かめる test だけが使う（handball-project#401）。
+fn phase_start(id: u128, recorded_at: i64, start_secs: f64, end_secs: f64) -> MatchFact {
+    MatchFact {
+        id: FactId(Uuid::from_u128(id)),
+        recorded_at: at(recorded_at),
+        payload: MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
+            kind: PhaseKind::Regular,
+            start_anchor: match_anchor(start_secs),
+            end_anchor: match_anchor(end_secs),
+        })),
     }
 }
 
@@ -122,6 +139,32 @@ fn 動画秒を持たない_fact_は後ろにまとまり累積秒で並ぶ() {
 }
 
 #[test]
+fn 同じ時刻なら_phase_開始が記録より先に並ぶ() {
+    // タイマーモードの phase は記録した瞬間に auto-create される（ADR 0001）ので、その phase の
+    // 最初の記録と phase 開始は必ず同じ累積秒を持つ（handball-project#401）。
+    // recorded_at は逆順にしてある — ここを recorded_at に任せていた頃は、スタンプの発行順が
+    // 発火順と逆転したときに 00:00 の得点が「前半の開始」より上に並んでいた。
+    let mut facts = vec![
+        fact(2, 100, match_anchor(0.0)),
+        phase_start(1, 200, 0.0, 1800.0),
+    ];
+    sort_by_persistence_order(&mut facts);
+    assert_eq!(ids(&facts), vec![1, 2]);
+}
+
+#[test]
+fn phase_開始が先に来るのは同じ時刻のときだけ() {
+    // 種別は秒より弱い第 3 キー。前半終盤の得点（1700）は後半の開始（1800）より前のまま。
+    let mut facts = vec![
+        phase_start(3, 0, 1800.0, 3600.0),
+        fact(2, 0, match_anchor(1700.0)),
+        phase_start(1, 0, 0.0, 1800.0),
+    ];
+    sort_by_persistence_order(&mut facts);
+    assert_eq!(ids(&facts), vec![1, 2, 3]);
+}
+
+#[test]
 fn 同一秒は_recorded_at_で_tie_break_する() {
     let mut facts = vec![
         fact(1, 300, match_anchor(600.0)),
@@ -145,18 +188,19 @@ fn 秒と_recorded_at_が同一なら_fact_id_で_tie_break_する() {
 }
 
 #[test]
-fn キーは_4_段で優先順位どおりに効く() {
-    // 動画秒を持つかが最優先（秒・recordedAt が大きくても前へ）。その中で秒、
-    // 秒が同じものの中でだけ recordedAt、さらに同じものの中でだけ id。
+fn キーは_5_段で優先順位どおりに効く() {
+    // 動画秒を持つかが最優先（秒・recordedAt が大きくても前へ）。その中で秒、秒が同じものの
+    // 中でだけ phase 開始か、さらに同じものの中でだけ recordedAt、最後に id。
     let mut facts = vec![
         fact(2, 500, match_anchor(600.0)),
         fact(9, 100, match_anchor(1800.0)),
         fact(7, 900, video_anchor(3000.0)),
         fact(1, 500, match_anchor(600.0)),
         fact(5, 100, match_anchor(600.0)),
+        phase_start(8, 900, 600.0, 2400.0),
     ];
     sort_by_persistence_order(&mut facts);
-    assert_eq!(ids(&facts), vec![7, 5, 1, 2, 9]);
+    assert_eq!(ids(&facts), vec![7, 8, 5, 1, 2, 9]);
 }
 
 #[test]

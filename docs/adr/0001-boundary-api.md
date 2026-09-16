@@ -174,7 +174,7 @@ pub fn validate_delete(removed_fact_id: FactId, existing_facts: &[MatchFact], ma
 
 ### 入力契約（precondition）
 
-- `facts` は**永続化順（動画秒を持つか → 時刻 → recordedAt → id）でソート済み**である前提（Swift `FactLogValidator` と同一の契約）。時刻は動画秒を優先し、無ければ累積秒（2026-09-14 追記 — handball-project#380。以前は累積秒を優先していたが、動画へ移行した試合で control（`Both`）と play（`VideoClock`）が別の時計で比べられ、区間が交互に並んだ。動画秒を持たない fact を後ろにまとめるのは、移行が途中で止まった試合で両方の時計の秒を同じ数直線で比べないため。規約の実装は `persistence_order`）。SegmentResolver は PhaseStart を内部で primary 秒ソートするが、log 全体の防御的ソートはコアでは行わない。
+- `facts` は**永続化順（動画秒を持つか → 時刻 → phase 開始か → recordedAt → id）でソート済み**である前提（Swift `FactLogValidator` と同一の契約）。**同じ時刻なら PhaseStart が先**（2026-09-16 追記 — handball-project#401。タイマーモードの phase は記録した瞬間に auto-create される（ADR 0001 の `phase_completion_plan`）ので、その phase の最初の記録と phase 開始は必ず同じ累積秒を持つ。前後は種別で決まっていて時刻からは決まらないため明示する。`recorded_at` に任せると、シェルのスタンプ発行順が発火順と食い違ったときに逆転する — ADR 0005 の移行で実際に起きた）。時刻は動画秒を優先し、無ければ累積秒（2026-09-14 追記 — handball-project#380。以前は累積秒を優先していたが、動画へ移行した試合で control（`Both`）と play（`VideoClock`）が別の時計で比べられ、区間が交互に並んだ。動画秒を持たない fact を後ろにまとめるのは、移行が途中で止まった試合で両方の時計の秒を同じ数直線で比べないため。規約の実装は `persistence_order`）。SegmentResolver は PhaseStart を内部で primary 秒ソートするが、log 全体の防御的ソートはコアでは行わない。
 - timestamp / ID はシェルが発行して fact に載せて渡す。コアは `now()` / UUID 生成を持たない（決定性）。
 
 ## 型マッピング方針（Foundation → Rust）
