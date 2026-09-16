@@ -329,6 +329,25 @@ jobs:
       # キーは android/ の *.gradle.kts と gradle.properties のハッシュで、toolkitVersion の
       # 行を除いてある（上の cache_keys。handball-project#389）。版を上げるだけの PR で
       # 保存し直さないため。
+      #
+      # **cargo / Nix と違って、ここだけ restore-keys（前方一致の fallback）を残してある。**
+      # 肥大していないことを実測で確かめたうえでの例外（handball-project#394。2026-09-16）:
+      #
+      #   - 保存サイズは 2026-08-09 の初回 294MB → 08-20 に 396MB へ一度だけ増え、そこから
+      #     09-14 まで 10 回以上キーが変わっても 396〜407MB。減る回もあり増加傾向は無い
+      #   - 08-20 の +102MB は積み増しではない。`.aar` の assembleRelease を足した 08-09 以降も
+      #     キーが完全一致し続けて保存が起きず（hit では保存しない）、08-20 の版切りで初めて
+      #     release 経路ぶんが書き戻された一度きりの取り込み
+      #   - cargo の target/ と違い ~/.gradle/caches は依存 jar が主で、ビルド成果物を
+      #     積み増す構造ではない（handball-project#386 の経路に乗らない）
+      #
+      # 残す理由は、#389 でキーから版を除いた結果、**キーが動くのは依存が実際に変わる回**
+      # （Dependabot の gradle）**だけ**になったこと。そこで fallback を外すと、変わっていない
+      # 依存まで Maven から取り直して 1〜2 分増える。
+      #
+      # **未観測**: その「依存が実際に変わる回」の復元 / 保存サイズ。09-03 と 09-10 の
+      # Dependabot gradle PR はどちらも `Kotlin シムの単体テスト` で落ちて保存に至っていない。
+      # 次にキーが動く PR で、保存サイズが 400MB 前後から跳ねないかを見ること。
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         if: steps.scope.outputs.docs_only != 'true'
         with:
