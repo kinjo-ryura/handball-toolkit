@@ -342,12 +342,22 @@ jobs:
       #     積み増す構造ではない（handball-project#386 の経路に乗らない）
       #
       # 残す理由は、#389 でキーから版を除いた結果、**キーが動くのは依存が実際に変わる回**
-      # （Dependabot の gradle）**だけ**になったこと。そこで fallback を外すと、変わっていない
-      # 依存まで Maven から取り直して 1〜2 分増える。
+      # **だけ**になったこと。そこで fallback を外すと、変わっていない依存まで Maven から
+      # 取り直して 1〜2 分増える。
       #
-      # **未観測**: その「依存が実際に変わる回」の復元 / 保存サイズ。09-03 と 09-10 の
-      # Dependabot gradle PR はどちらも `Kotlin シムの単体テスト` で落ちて保存に至っていない。
-      # 次にキーが動く PR で、保存サイズが 400MB 前後から跳ねないかを見ること。
+      # **その「依存が実際に変わる回」は Dependabot の `gradle-android` グループだけ**
+      # （2026-09-17 に確認）。キーは android/ の *.gradle.kts と gradle.properties しか見ず、
+      # 下のビルドも `-p android` しか回さないので、`gradle-examples` グループ
+      # （examples/android/）の PR はキーも ~/.gradle/caches の中身も動かさない。
+      #
+      #   - 復元は fallback でも primary hit と変わらない。キーが外れた回（#39 の 09-17 run）は
+      #     `gradle-macOS-` で前の 408MB を拾って約 12 秒。同じ日に primary hit した回（#74）も
+      #     408MB で約 11 秒
+      #
+      # **未観測**: その回の**保存**サイズ。**job が落ちると actions/cache の Post（保存）は
+      # skipped になる**ので、赤い run からはどうやっても取れない。#39 は AGP 9.4.0 が
+      # Gradle 9.6.0 以上を要求して落ちており（handball-project#412）、それが解けて
+      # gradle-android の PR が緑になった回で、保存サイズが 400MB 前後から跳ねないかを見ること。
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         if: steps.scope.outputs.docs_only != 'true'
         with:
