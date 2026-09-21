@@ -11,6 +11,13 @@
 //! FFI へは公開しない。Swift 側は SwiftData のクエリ順（`SortDescriptor`）で同じ並びを得ており、
 //! コアを経由しないため（ADR 0001 関数目録の対象外）。
 //!
+//! **したがって同じ規約の実装はコアの外にも残る。** このモジュールのほか、HandballRecorder の
+//! `SwiftDataMatchRepository.factRecordOrder`、Android の Room の `ORDER BY`（`examples/android` の
+//! `ShellDao.factLog` と handball-recorder-android の同名メソッド）の計 4 箇所。Room のクエリは
+//! この関数を呼べない。4 箇所とも共通 fixture（`tests/fixtures/persistence-order-cases.json`）を
+//! 読むテストを持ち、どれか 1 つだけ変えると赤くなる（handball-project#405 — handball-project#401 の段が
+//! Android に入らないまま残った）。**規約を変えるときは fixture を先に変える。**
+//!
 //! **時刻は動画秒を優先する**（handball-project#380）。タイマーから動画へ移行した試合では
 //! phaseStart / stoppage が `Both`、play が `VideoClock` だけを持つ。累積秒を優先すると control は
 //! 累積秒・play は動画秒で比べられ、後半の phaseStart（累積秒 1800）が前半終盤の play

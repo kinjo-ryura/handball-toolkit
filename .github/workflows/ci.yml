@@ -168,7 +168,7 @@ jobs:
       #
       # **除く行が見つからなければ落とす。** 書式が変わって版がキーに戻っても CI は緑のまま
       # 遅くなるだけで、誰も気付けないため。Gradle 側は build_aar.sh の版照合と下の
-      # 「Android サンプルをビルド」と同じ行に依存しているので、書き方を変えるときは揃えて直すこと。
+      # 「Android サンプルをビルドして単体テストを回す」と同じ行に依存しているので、書き方を変えるときは揃えて直すこと。
       #
       # hashFiles は使わない。キャッシュの保存（post）で `with:` が評価し直され、`**` が
       # target/ を走査して落ちたことがある（下の cargo キャッシュのコメント）。ここで出した
@@ -471,7 +471,12 @@ jobs:
       #
       # **版は toolkitVersion から決め、サンプル側の参照と突き合わせる。** ずれたまま Gradle に
       # 渡すと、落ちても原因が版の直し忘れだと読み取りにくいので、先に理由つきで止める。
-      - name: Android サンプルをビルド
+      #
+      # 単体テストも回す（handball-project#405）。サンプルの `factLog` の ORDER BY はコアの
+      # `persistence_order` を SQL で書き写したもので、コアと共有する fixture
+      # （crates/handball-toolkit/tests/fixtures/persistence-order-cases.json）と突き合わせる。
+      # 突き合わせる前は、handball-project#401 の段がサンプルへ入らないまま誰も気付かなかった。
+      - name: Android サンプルをビルドして単体テストを回す
         if: steps.scope.outputs.docs_only != 'true'
         run: |
           set -euo pipefail
@@ -483,7 +488,7 @@ jobs:
           fi
           mkdir -p examples/android/app/libs
           cp android/toolkit/build/outputs/aar/toolkit-release.aar "examples/android/app/libs/$aar"
-          nix develop --command gradle -p examples/android :app:assembleDebug --console=plain
+          nix develop --command gradle -p examples/android :app:assembleDebug :app:testDebugUnitTest --console=plain
 
       # ── キャッシュの保存（main だけ。上の「保存は main だけ」）──
       #
