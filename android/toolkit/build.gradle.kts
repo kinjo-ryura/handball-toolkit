@@ -1,6 +1,7 @@
+// Kotlin は AGP の built-in Kotlin がコンパイルする（org.jetbrains.kotlin.android は
+// apply しない。版はルートの build.gradle.kts が決める — handball-project#412）。
 plugins {
     id("com.android.library")
-    id("org.jetbrains.kotlin.android")
 }
 
 // コア crate（ワークスペース Cargo.toml の workspace.package.version）と同じ値を置く。
@@ -43,17 +44,27 @@ android {
         // — README の Android 節に利用者向けの注意として書いてある。
         isCoreLibraryDesugaringEnabled = true
     }
+    // Kotlin の jvmTarget は書かない。built-in Kotlin では上の targetCompatibility（17）が
+    // そのまま既定値になる（handball-project#412 で `kotlin { compilerOptions }` を外した）。
 
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    // built-in Kotlin では Kotlin のソースディレクトリを `kotlin.directories` で足す
+    // （kotlin 拡張の sourceSets は使えず、`kotlin.srcDir` は非推奨。handball-project#412）。
+    //
+    // **`sourceSets.named(...)` / `sourceSets["main"]` と書かず、`sourceSets { }` の中で引く。**
+    // AGP 9.4.0 は Kotlin DSL の `android` を LibraryExtensionImpl 型で見せていて、その
+    // `sourceSets` プロパティは要素を旧 API の `com.android.build.gradle.api.AndroidLibrarySourceSet`
+    // と宣言しているが、実体（DefaultAndroidLibrarySourceSet）はそれを実装していない。
+    // プロパティ経由で要素に触ると ClassCastException で構成段階が落ちる（2026-09-21、
+    // toolkit PR #77 の CI で踏んだ）。`sourceSets { }` 関数が要素を渡す型（新 DSL の
+    // AndroidLibrarySourceSet / 旧 API の AndroidSourceSet）は実体が実装しているので通る。
+    sourceSets {
+        named("main") {
+            // scripts/build_aar.sh が生成する Kotlin バインディング（生成物なのでコミットしない）。
+            kotlin.directories += "src/generated/kotlin"
+            // 手書きのシム層（handball-project#136）。生成物と混ざらないよう別ディレクトリに置く。
+            kotlin.directories += "src/main/kotlin"
         }
     }
-
-    // scripts/build_aar.sh が生成する Kotlin バインディング（生成物なのでコミットしない）。
-    sourceSets["main"].kotlin.srcDir("src/generated/kotlin")
-    // 手書きのシム層（handball-project#136）。生成物と混ざらないよう別ディレクトリに置く。
-    sourceSets["main"].kotlin.srcDir("src/main/kotlin")
 
     packaging {
         jniLibs {
@@ -77,12 +88,19 @@ dependencies {
     // 介在しないため。README の Android 節に利用者向けのコピペ用として載せてある。
     // ここでの api 宣言はライブラリ自身のコンパイルに効き、将来 Maven publish へ
     // 格上げしたときはそのまま POM の compile scope に出る。
-    api("net.java.dev.jna:jna:5.17.0@aar")
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    api("net.java.dev.jna:jna:5.19.1@aar")
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 
     // シムの単体テスト（handball-project#136）。JVM 上で回り、.so も端末も要らない
     // — シムは生成 data class を組み替えるだけでネイティブに触らないため。
-    testImplementation(kotlin("test"))
+    //
+    // **`kotlin("test")` ではなく JUnit 4 用の `kotlin("test-junit")` を名指しする**（handball-project#412）。
+    // `kotlin.test.Test` はフレームワーク別のアダプタ（kotlin-test-junit 等）にしか無い。以前は
+    // org.jetbrains.kotlin.android プラグインがテストタスクのフレームワークから自動で選んでいたが、
+    // AGP 9 の built-in Kotlin はその推定をしない（AGP が肩代わりするのは KMP だけ）。
+    // `kotlin("test")` のままだと assertEquals は解決して @Test だけが Unresolved になる。
+    // AGP の単体テストは Gradle の既定どおり JUnit 4 で走る。junit:junit もこのアダプタが連れてくる。
+    testImplementation(kotlin("test-junit"))
 }

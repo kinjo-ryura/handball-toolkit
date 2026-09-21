@@ -21,7 +21,8 @@ handball-toolkit = { path = "../handball-toolkit" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }
 # wasm-bindgen は生成ツール（wasm-bindgen-cli）と**バージョン完全一致**が必要。
-# flake.nix が nixpkgs から入れる CLI に合わせて `=` でピン留めする（更新は両方同時に）。
+# flake.nix が版付きの属性（wasm-bindgen-cli_0_2_NNN）で入れる CLI に合わせて `=` で
+# ピン留めする（更新は両方同時に）。
 wasm-bindgen = "=0.2.121"
 # JS が渡す UUID 文字列の parse に使う。v4 は入れない（コアも本 crate も UUID を生成しない
 # = getrandom の wasm バックエンド設定が要らない — 設計不変条件 2）。

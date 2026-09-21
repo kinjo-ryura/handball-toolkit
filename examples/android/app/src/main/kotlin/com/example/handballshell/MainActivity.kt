@@ -174,14 +174,20 @@ class MainActivity : Activity() {
 
     /**
      * ポゼッション開始（handball-project#154 / #184）。play / control のどちらでもない
-     * **第 3 の payload** で、teamId は必須・anchor は 1 本だけ持つ。記録可否は
+     * **第 3 の payload** で、teamId は必須・開始の anchor を 1 本持つ。記録可否は
      * `AvailableActions.can_record_possession` が持つ（R7 / R8 が掛かるので play 3 種と同値）。
+     *
+     * 終わりの `endAnchor` は任意（handball-project#220）。渡さなければ `PossessionProjection` が
+     * 導出する。人がボタンで記録する経路では終わりを持たないので null。
+     * **関数の引数には既定値が無い**（`PossessionFact` のフィールドは既定 null だが、
+     * `build_possession_fact` の引数は省略できない）ので、null を明示する。
      */
     private suspend fun recordPossession() {
         val fact = buildPossessionFact(
             stamp = newStamp(),
             teamId = seed.homeTeamId,
             anchor = FactAnchor.MatchClock(MatchClock(clockSeconds)),
+            endAnchor = null,
         )
         recordAppendFact(matchRepo, seed.matchId, fact)
         append("✓ ポゼッション開始 @ ${clockSeconds.toInt()}s")

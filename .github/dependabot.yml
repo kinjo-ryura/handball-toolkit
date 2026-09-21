@@ -31,7 +31,8 @@ updates:
     ignore:
       # wasm-bindgen crate は flake が入れる wasm-bindgen-cli と**バージョン完全一致**が
       # 必要で（Cargo.toml 側は `=` でピン留め）、片方だけ上げると生成時の schema version
-      # mismatch で落ちる。nixpkgs が上がったときに両方同時に合わせるので、機械に上げさせない。
+      # mismatch で落ちる。flake.nix の版付き属性（wasm-bindgen-cli_0_2_NNN）と同時に手で
+      # 合わせるので、機械に上げさせない（handball-project#412）。
       - dependency-name: wasm-bindgen
 
   # android/ は .aar を束ねる Gradle モジュール、examples/android/ は配布 .aar を
