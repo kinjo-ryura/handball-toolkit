@@ -121,8 +121,8 @@ dependencies {
     // .aar ファイル単体は依存情報を運ばない（運ぶのは Maven の POM）ので、
     // この 2 つは利用側で宣言する。生成コードが Native.register で .so を dlopen する
     // のに JNA、suspend 関数に coroutines を使う。
-    implementation("net.java.dev.jna:jna:5.17.0@aar")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("net.java.dev.jna:jna:5.19.1@aar")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 }
 ```
 
@@ -216,7 +216,7 @@ ABI は `arm64-v8a` 単独。生成 `.so` の実行時依存は `libdl.so` / `li
 | `.aar` ファイル名 | `handball-toolkit-0.11.0.aar` |
 | git タグ / Release | `v0.11.0` |
 
-`build_aar.sh` はビルド前に `Cargo.toml` と `android/toolkit/build.gradle.kts` の値を照合し、不一致なら止める。上げるときは両方を同時に直して `v<version>` のタグを打つ。
+`build_aar.sh` はビルド前に `Cargo.toml` と `android/toolkit/build.gradle.kts` の値を照合し、不一致なら止める。上げるときは両方を同時に直して `v<version>` のタグを打つ。サンプル（`examples/android/app/build.gradle.kts`）の `.aar` の参照も同じ PR で直す — CI がその名前で `.aar` を置いてサンプルをビルドするので、直し忘れると落ちる。
 
 #### リリース
 

@@ -225,6 +225,52 @@ CI 全体は **3 m 57 s** で、Android 追加前のベースライン（main �
 
 **再検討トリガー**: (b) を載せるのは、`.aar` のリリースが月次以上の頻度になったとき、または ABI を追加して（決定 5）クロスビルドの組み合わせが増えたとき。(c) は、サンプルが「動く参照実装」として外部から実際に参照され始めたとき。
 
+## 実装追記（2026-09-21 — handball-project#412 で Gradle 9 / AGP 9 へ上げ、サンプルのビルドを CI に載せた）
+
+Dependabot の `gradle-android`（toolkit#39。AGP 8.11.1 → 9.4.0 / Kotlin 2.1.21 → 2.4.20）が
+`Minimum supported Gradle version is 9.6.0. Current version is 8.14.4.` で落ち続けていた。
+依存の中身ではなく、flake の `pkgs.gradle` の版が原因。
+
+**決定 1 は変更しない。** Gradle は引き続き flake が持ち、SDK / NDK はホストが持つ。変えたのは flake の中身だけ:
+
+- **`pkgs.gradle` → `pkgs.gradle_9`**。nixpkgs の無印 `gradle` は 8.x に据え置かれていて、nixpkgs を
+  最新にしても 8.14.4 のまま。`gradle_9` は固定していた nixpkgs で 9.5.1、最新の unstable で 9.7.1
+  （JDK 25 で wrap）。nixpkgs を上げたうえで `gradle_9` を名指しした
+- **nixpkgs を上げると `wasm-bindgen-cli` も 0.2.121 → 0.2.127 に動く**（Cargo.toml の `=0.2.121` と
+  食い違って wasm の生成が落ちる）。版付きの属性 `pkgs.wasm-bindgen-cli_0_2_121` で名指しして止めた。
+  以後 nixpkgs は wasm-bindgen と無関係に上げられ、wasm-bindgen を上げるときは属性名と `=` を同時に変える。
+  他の同梱ツール（cargo-about / cargo-deny / jq）は版が変わらなかった
+- `nix flake update` ではなく `flake.lock` の nixpkgs を 1 ノードだけ書き換えた（rust-overlay は据え置き）
+
+**AGP 9 は built-in Kotlin へ移行した**（opt-out の `android.builtInKotlin=false` は AGP 10 で使えなくなるため採らない）。
+
+- モジュールから `org.jetbrains.kotlin.android` の apply を外した（AGP 9 では apply するとエラー）。
+  ルートの `apply false` 宣言は残し、Kotlin Gradle Plugin の版（2.4.20）を決めるのに使う。AGP 9.x が
+  実行時に引く KGP は 2.2.10 で、ルートの宣言が新しければそちらが使われる。Dependabot もこの行で追う
+- `kotlin { compilerOptions { jvmTarget } }` を外した。built-in Kotlin では `compileOptions.targetCompatibility`
+  （17）がそのまま既定値になる
+- 生成 Kotlin とシムのディレクトリは `sourceSets.named("main") { kotlin.directories += … }` で足す
+  （built-in Kotlin では `kotlin.srcDir` を使えない）
+- KSP は 2.3 系から Kotlin と版が連動しない（`2.1.21-2.0.1` → `2.3.12`）。built-in Kotlin には 2.3.1 以上が要る
+
+**サンプル APK のビルドを CI に載せた**（上の実装追記 2026-08-09 の段階 c のうち、ビルドだけ）。
+2026-08-09 に載せなかった理由は「エミュレータの起動が要る」だったが、それは**動かす**ときのコストで、
+`:app:assembleDebug` までなら要らない。載せなかったことで次の 2 つが見えないまま入っていた:
+
+- `gradle-examples`（toolkit#74）は #39 と同じ AGP 9.4.0 を含むのに**緑**だった。CI が `-p android` しか
+  回していなかったため。#74 を先に merge していれば、手元でサンプルがビルドできない状態が黙って入った
+- サンプルの `.aar` の参照が `handball-toolkit-0.2.0.aar` のまま 0.11.0 まで取り残されていた
+  （README は 0.11.0 を案内していた）
+
+CI はライセンス確認のステップで組んだ `toolkit-release.aar`（jni/ は空）を `handball-toolkit-<toolkitVersion>.aar`
+の名前で `app/libs/` に置き、`gradle -p examples/android :app:assembleDebug` を回す。サンプル側の参照がその
+名前と一致しなければ先に止める。これで AGP / Gradle / KSP / Room の組み合わせ、`.aar` の API とサンプルのずれ、
+版切り時の参照の直し忘れが CI で落ちる。**端末での実行（`.so` のロード・Room の実行）は引き続き見ない。**
+Gradle キャッシュのキーには examples/android の設定ファイルを足し、`.aar` の版の行はキーから除いた（handball-project#389 と同じ理由）。
+
+**未計測**: サンプルのビルドが `check` に上乗せする時間と、Gradle キャッシュの保存サイズの変化。この変更の
+PR の run で測る。
+
 ## Considered options
 
 - **`flake.nix` に NDK / SDK を入れて repo 完結にする** → 却下（決定 1）。closure 10.9 GiB を repo ごとに抱えることになり、他プロジェクトでも使う実態と合わない。再現性は「`ANDROID_NDK_ROOT` だけを要求する」形で最小限確保する

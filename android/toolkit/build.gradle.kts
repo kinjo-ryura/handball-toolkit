@@ -1,6 +1,7 @@
+// Kotlin は AGP の built-in Kotlin がコンパイルする（org.jetbrains.kotlin.android は
+// apply しない。版はルートの build.gradle.kts が決める — handball-project#412）。
 plugins {
     id("com.android.library")
-    id("org.jetbrains.kotlin.android")
 }
 
 // コア crate（ワークスペース Cargo.toml の workspace.package.version）と同じ値を置く。
@@ -43,17 +44,17 @@ android {
         // — README の Android 節に利用者向けの注意として書いてある。
         isCoreLibraryDesugaringEnabled = true
     }
+    // Kotlin の jvmTarget は書かない。built-in Kotlin では上の targetCompatibility（17）が
+    // そのまま既定値になる（handball-project#412 で `kotlin { compilerOptions }` を外した）。
 
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
+    // built-in Kotlin で Kotlin のソースディレクトリを足せるのは `kotlin.directories` だけ
+    // （`kotlin.srcDir` / kotlin 拡張の sourceSets は使えない。handball-project#412）。
+    sourceSets.named("main") {
+        // scripts/build_aar.sh が生成する Kotlin バインディング（生成物なのでコミットしない）。
+        kotlin.directories += "src/generated/kotlin"
+        // 手書きのシム層（handball-project#136）。生成物と混ざらないよう別ディレクトリに置く。
+        kotlin.directories += "src/main/kotlin"
     }
-
-    // scripts/build_aar.sh が生成する Kotlin バインディング（生成物なのでコミットしない）。
-    sourceSets["main"].kotlin.srcDir("src/generated/kotlin")
-    // 手書きのシム層（handball-project#136）。生成物と混ざらないよう別ディレクトリに置く。
-    sourceSets["main"].kotlin.srcDir("src/main/kotlin")
 
     packaging {
         jniLibs {
@@ -77,8 +78,8 @@ dependencies {
     // 介在しないため。README の Android 節に利用者向けのコピペ用として載せてある。
     // ここでの api 宣言はライブラリ自身のコンパイルに効き、将来 Maven publish へ
     // 格上げしたときはそのまま POM の compile scope に出る。
-    api("net.java.dev.jna:jna:5.17.0@aar")
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    api("net.java.dev.jna:jna:5.19.1@aar")
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 

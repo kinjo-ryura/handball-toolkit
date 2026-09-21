@@ -1,7 +1,8 @@
+// Kotlin は AGP の built-in Kotlin がコンパイルする（org.jetbrains.kotlin.android は
+// apply しない。版はルートの build.gradle.kts が決める — handball-project#412）。
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    // Room の DAO 実装生成（kapt ではなく KSP）。
+    // Room の DAO 実装生成（kapt ではなく KSP。kapt は built-in Kotlin と併用できない）。
     id("com.google.devtools.ksp")
 }
 
@@ -45,12 +46,8 @@ android {
         // 外部シェル実装者向けの注意点として README にも記載している。
         isCoreLibraryDesugaringEnabled = true
     }
-
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
-    }
+    // Kotlin の jvmTarget は書かない。built-in Kotlin では上の targetCompatibility（17）が
+    // そのまま既定値になる（handball-project#412 で `kotlin { compilerOptions }` を外した）。
 
     packaging {
         jniLibs {
@@ -69,18 +66,23 @@ dependencies {
     //   - 外部利用者と同じ: GitHub Release から .aar をダウンロードして libs/ へ置く
     //   - 手元でコアを直したとき: ./scripts/build_aar.sh の出力を libs/ へコピー
     // どちらも手順は examples/android/README.md「ビルドと実行」。
-    implementation(files("libs/handball-toolkit-0.2.0.aar"))
+    //
+    // 版はコア crate の version（android/toolkit/build.gradle.kts の toolkitVersion）と揃える。
+    // CI はいまのソースから組んだ .aar を handball-toolkit-<toolkitVersion>.aar の名前で置いて
+    // このサンプルをビルドするので、版を上げてここを直し忘れると CI が落ちる
+    // （CI がビルドしていなかった間、ここは 0.2.0 のまま 0.11.0 までずれていた — handball-project#412）。
+    implementation(files("libs/handball-toolkit-0.11.0.aar"))
 
     // .aar ファイル単体は依存情報を運ばない（運ぶのは Maven の POM で、ローカルファイル
     // 参照では POM が介在しない）。そのため利用側がこの 2 つを自分で宣言する必要がある。
     // 生成コードが Native.register で .so を dlopen するのに JNA、suspend 関数に coroutines。
-    implementation("net.java.dev.jna:jna:5.17.0@aar")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("net.java.dev.jna:jna:5.19.1@aar")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     // ── 永続化（シェルの責務。コアは DB を所有しない）──
-    implementation("androidx.room:room-runtime:2.7.2")
-    implementation("androidx.room:room-ktx:2.7.2")
-    ksp("androidx.room:room-compiler:2.7.2")
+    implementation("androidx.room:room-runtime:2.8.5")
+    implementation("androidx.room:room-ktx:2.8.5")
+    ksp("androidx.room:room-compiler:2.8.5")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }

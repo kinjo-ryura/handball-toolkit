@@ -64,17 +64,23 @@ cp target/aar/handball-toolkit-0.11.0.aar examples/android/app/libs/
 
 `app/libs/` と `local.properties` はコミットしない。
 
+**CI（`check`）はこのサンプルを `:app:assembleDebug` まで通す**（handball-project#412）。いまのソースから
+組んだ `.aar`（`.so` なし）を `app/libs/handball-toolkit-<toolkitVersion>.aar` に置いてビルドするので、
+AGP / Gradle / KSP / Room の組み合わせ、`.aar` の API とサンプルのずれ、`app/build.gradle.kts` の
+`.aar` の版の直し忘れは CI で落ちる。**端末での動作は見ない**（`.so` が無く、エミュレータも起動しない）ので、
+依存を上げたら手元でも一度動かすこと。
+
 ### バージョンの対応関係
 
 | | バージョン | 備考 |
 |---|---|---|
-| Gradle | 8.14.4 | flake の `pkgs.gradle` |
-| AGP | 8.11.1 | Gradle 8.13+ を要求 |
-| Kotlin | 2.1.21 | KSP と組で上げること |
-| KSP | 2.1.21-2.0.1 | Kotlin と完全一致が必要 |
-| Room | 2.7.2 | |
-| handball-toolkit | 0.11.0 | `app/libs/handball-toolkit-0.11.0.aar`。コア crate の version に従う |
-| JNA | 5.17.0（`@aar`） | 生成コードが `Native.register` で使う。**`.aar` は依存情報を運ばない**ので利用側で宣言する |
+| Gradle | 9.7.1 | flake の `pkgs.gradle_9`（無印の `pkgs.gradle` は 8.x のまま） |
+| AGP | 9.4.0 | Gradle 9.6.0+ を要求。Kotlin は AGP の built-in Kotlin がコンパイルするので、`org.jetbrains.kotlin.android` は app に apply しない |
+| Kotlin | 2.4.20 | ルートの `build.gradle.kts` に `apply false` で宣言して版を決める（AGP 9.x が既定で引くのは 2.2.10） |
+| KSP | 2.3.12 | 2.3 系から Kotlin と版が連動しない。AGP 9 の built-in Kotlin には 2.3.1 以上が要る |
+| Room | 2.8.5 | |
+| handball-toolkit | 0.11.0 | `app/libs/handball-toolkit-0.11.0.aar`。コア crate の version に従う（ずれると CI が落ちる — 下記） |
+| JNA | 5.19.1（`@aar`） | 生成コードが `Native.register` で使う。**`.aar` は依存情報を運ばない**ので利用側で宣言する |
 | compileSdk / targetSdk | 36 | `buildToolsVersion = "37.0.0"` を明示（nix の SDK には 1 つしか無い） |
 | minSdk | **24** | 下記参照 |
 

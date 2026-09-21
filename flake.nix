@@ -38,17 +38,25 @@
           toolchain
           # wasm バインディングの JS グルー生成（handball-project#57）。
           # crates/handball-toolkit-wasm の wasm-bindgen 依存と**バージョン完全一致**が要る
-          # （不一致だと生成時に schema version mismatch で落ちる）。nixpkgs 側が上がったら
-          # Cargo.toml の `=` ピンも同時に合わせること。
-          pkgs.wasm-bindgen-cli
+          # （不一致だと生成時に schema version mismatch で落ちる）。
+          #
+          # 無印の `pkgs.wasm-bindgen-cli` ではなく版付きの属性で名指しする（handball-project#412）。
+          # 無印だと nixpkgs を別の理由（Gradle など）で上げただけで CLI の版が動き、
+          # Cargo.toml の `=` ピンと食い違う。上げるときは**この属性名と Cargo.toml の `=` を
+          # 同時に**変える。古い版の属性は nixpkgs から消えることがあり、そのときは評価エラーで分かる。
+          pkgs.wasm-bindgen-cli_0_2_121
 
           # Android サンプルシェル（examples/android）のビルド（handball-project#133）。
           # SDK / NDK をホストに任せる判断（ADR 0006 決定 1）は変えないが、gradle は
           # ビルドツールなので wasm-bindgen-cli と同格でこの flake が宣言する
           # （closure は約 200 MB で、SDK の 10.9 GiB とは桁が違う）。
-          # JDK は gradle が自前で wrap したものを使うため別途入れない。
+          # JDK は gradle が自前で wrap したものを使うため別途入れない（gradle_9 は JDK 25）。
           # Gradle 自身のバージョンは AGP の要求と対応する — examples/android/README.md 参照。
-          pkgs.gradle
+          #
+          # 無印の `pkgs.gradle` は 8.x に据え置かれていて、AGP 9.4 が要求する 9.6.0 以上に
+          # 届かない（handball-project#412。2026-09 時点で無印 8.14.4 / gradle_9 9.7.1）。
+          # AGP を上げて Gradle の下限が上がったら、ここの属性で追随する。
+          pkgs.gradle_9
 
           # 依存ライセンス一覧の生成（handball-project#140。scripts/generate_licenses.sh）。
           # 配布バイナリの OSS ライセンス表示は手書きせず Cargo.lock から起こす。

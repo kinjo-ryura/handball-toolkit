@@ -132,13 +132,16 @@ jobs:
       #   cargo : Cargo.lock から、source 行を持たない package（= workspace の crate）の
       #           version 行だけを除く。依存のリストは残すので、workspace の crate が依存を
       #           増減したらキーは変わる
-      #   Gradle: android/toolkit/build.gradle.kts から `val toolkitVersion = ` の行を除く。
-      #           この値は Gradle のビルドでは使われず、scripts/build_aar.sh が Cargo.toml と
-      #           照合するためだけに置いてある
+      #   Gradle: android/ と examples/android/ の *.gradle.kts / gradle.properties から、版の
+      #           行を 2 つ除く。android/toolkit/build.gradle.kts の `val toolkitVersion = `
+      #           （Gradle のビルドでは使われず、scripts/build_aar.sh が Cargo.toml と照合するため
+      #           だけに置いてある）と、examples/android/app/build.gradle.kts の
+      #           `implementation(files("libs/handball-toolkit-<版>.aar"))`（版切りのたびに動く。
+      #           handball-project#412 でサンプルもビルドするようにしてキーに入った）
       #
       # **除く行が見つからなければ落とす。** 書式が変わって版がキーに戻っても CI は緑のまま
-      # 遅くなるだけで、誰も気付けないため。Gradle 側は build_aar.sh の版照合と同じ行に
-      # 依存しているので、`val toolkitVersion = ` の書き方を変えるときは両方を直すこと。
+      # 遅くなるだけで、誰も気付けないため。Gradle 側は build_aar.sh の版照合と下の
+      # 「Android サンプルをビルド」と同じ行に依存しているので、書き方を変えるときは揃えて直すこと。
       #
       # hashFiles は使わない。キャッシュの保存（post）で `with:` が評価し直され、`**` が
       # target/ を走査して落ちたことがある（下の cargo キャッシュのコメント）。ここで出した
@@ -165,10 +168,15 @@ jobs:
             echo "error: android/toolkit/build.gradle.kts に \`val toolkitVersion = \` の行がちょうど 1 つ無い" >&2
             exit 1
           fi
+          if [ "$(grep -c 'implementation(files("libs/handball-toolkit-' examples/android/app/build.gradle.kts)" != 1 ]; then
+            echo "error: examples/android/app/build.gradle.kts に .aar を参照する行がちょうど 1 つ無い" >&2
+            exit 1
+          fi
           gradle=$(
-            for f in $(git ls-files 'android/*.gradle.kts' android/gradle.properties); do
+            for f in $(git ls-files 'android/*.gradle.kts' android/gradle.properties \
+                                    'examples/android/*.gradle.kts' examples/android/gradle.properties); do
               echo "== $f"
-              sed '/^val toolkitVersion = /d' "$f"
+              sed -e '/^val toolkitVersion = /d' -e '/implementation(files("libs\/handball-toolkit-/d' "$f"
             done | shasum -a 256 | cut -d' ' -f1
           )
 
@@ -251,8 +259,8 @@ jobs:
       #     `crypto.randomUUID()`）が発行する（設計不変条件 2）。バックエンド設定を
       #     足す前に、その依存が本当に要るかを疑うこと
       #   - **wasm-bindgen のバージョン不一致**。crate 側（Cargo.toml の `=` ピン）と
-      #     flake が入れる wasm-bindgen-cli は完全一致が必要。nixpkgs が上がったら
-      #     両方を同時に合わせる
+      #     flake が入れる wasm-bindgen-cli は完全一致が必要。flake 側は版付きの属性
+      #     （wasm-bindgen-cli_0_2_NNN）で名指しするので、上げるときは両方を同時に変える
       - name: cargo check（wasm32）
         if: steps.scope.outputs.docs_only != 'true'
         run: nix develop --command cargo check --target wasm32-unknown-unknown -p handball-toolkit-wasm
@@ -323,11 +331,11 @@ jobs:
         with:
           packages: 'platforms;android-36 build-tools;37.0.0'
 
-      # Gradle は flake が提供する（pkgs.gradle。ADR 0006 実装追記 2026-07-28）が、
+      # Gradle は flake が提供する（pkgs.gradle_9。ADR 0006 実装追記 2026-07-28 / 2026-09-21）が、
       # AGP / Kotlin プラグインと依存 jar は Maven から引くのでキャッシュする。
       #
-      # キーは android/ の *.gradle.kts と gradle.properties のハッシュで、toolkitVersion の
-      # 行を除いてある（上の cache_keys。handball-project#389）。版を上げるだけの PR で
+      # キーは android/ と examples/android/ の *.gradle.kts と gradle.properties のハッシュで、
+      # 版の行を除いてある（上の cache_keys。handball-project#389 / #412）。版を上げるだけの PR で
       # 保存し直さないため。
       #
       # **cargo / Nix と違って、ここだけ restore-keys（前方一致の fallback）を残してある。**
@@ -345,19 +353,20 @@ jobs:
       # **だけ**になったこと。そこで fallback を外すと、変わっていない依存まで Maven から
       # 取り直して 1〜2 分増える。
       #
-      # **その「依存が実際に変わる回」は Dependabot の `gradle-android` グループだけ**
-      # （2026-09-17 に確認）。キーは android/ の *.gradle.kts と gradle.properties しか見ず、
-      # 下のビルドも `-p android` しか回さないので、`gradle-examples` グループ
-      # （examples/android/）の PR はキーも ~/.gradle/caches の中身も動かさない。
+      # **その「依存が実際に変わる回」は Dependabot の `gradle-android` / `gradle-examples`
+      # の 2 グループ。** 2026-09-17 の確認時点ではキーが android/ しか見ず、ビルドも `-p android`
+      # だけだったので `gradle-examples` の PR はキーを動かさなかった。handball-project#412 で
+      # examples/android もビルドしてキーに入れたので、今はどちらも動かす。
       #
       #   - 復元は fallback でも primary hit と変わらない。キーが外れた回（#39 の 09-17 run）は
       #     `gradle-macOS-` で前の 408MB を拾って約 12 秒。同じ日に primary hit した回（#74）も
       #     408MB で約 11 秒
       #
-      # **未観測**: その回の**保存**サイズ。**job が落ちると actions/cache の Post（保存）は
-      # skipped になる**ので、赤い run からはどうやっても取れない。#39 は AGP 9.4.0 が
-      # Gradle 9.6.0 以上を要求して落ちており（handball-project#412）、それが解けて
-      # gradle-android の PR が緑になった回で、保存サイズが 400MB 前後から跳ねないかを見ること。
+      # **未観測**: 依存が変わった回の**保存**サイズ。**job が落ちると actions/cache の Post
+      # （保存）は skipped になる**ので、赤い run からはどうやっても取れない。#39 は AGP 9.4.0 が
+      # Gradle 9.6.0 以上を要求して落ち続けていた（handball-project#412）。#412 の PR は
+      # AGP 9 への移行と examples（KSP / Room）の取り込みを同時に入れるので、そこが緑になった回で
+      # 保存サイズが 400MB 前後からどれだけ跳ねるか、その後の回で増え続けないかを見ること。
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         if: steps.scope.outputs.docs_only != 'true'
         with:
@@ -405,3 +414,31 @@ jobs:
           # 見つからなければ grep が非ゼロで返り、このステップが落ちる。
           unzip -l android/toolkit/build/outputs/aar/toolkit-release.aar \
             | grep -F 'assets/handball_toolkit/third-party-licenses.json'
+
+      # Android サンプルシェル（examples/android）をビルドする（handball-project#412）。
+      #
+      # ここまでは `-p android` しか回しておらず、examples/android は誰もビルドしていなかった。
+      # そのため Dependabot の `gradle-examples` の PR（AGP 9.4.0 を含む toolkit#74）は、
+      # 同じ AGP で `gradle-android` の #39 が Gradle の版不足で落ちているのに緑だった。
+      # サンプルの `.aar` の参照も 0.2.0 のまま 0.11.0 まで取り残されていた。
+      #
+      # 上のステップで組んだ `.aar`（jni/ は空）を、サンプルが参照する名前で app/libs/ に置く。
+      # サンプルは外部利用者と同じく配布 `.aar` を引く作りなので、Release から落とす代わりに
+      # いまのソースから組んだものを渡す — `.aar` の API とサンプルのずれもここで落ちる。
+      # 実機での動作（.so のロード・Room の実行）は見ない。
+      #
+      # **版は toolkitVersion から決め、サンプル側の参照と突き合わせる。** ずれたまま Gradle に
+      # 渡すと、落ちても原因が版の直し忘れだと読み取りにくいので、先に理由つきで止める。
+      - name: Android サンプルをビルド
+        if: steps.scope.outputs.docs_only != 'true'
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^val toolkitVersion = "\(.*\)"$/\1/p' android/toolkit/build.gradle.kts)
+          aar="handball-toolkit-$version.aar"
+          if ! grep -qF "implementation(files(\"libs/$aar\"))" examples/android/app/build.gradle.kts; then
+            echo "error: examples/android/app/build.gradle.kts が libs/$aar を参照していない（toolkitVersion = $version）。版を上げたらサンプルの参照も直すこと" >&2
+            exit 1
+          fi
+          mkdir -p examples/android/app/libs
+          cp android/toolkit/build/outputs/aar/toolkit-release.aar "examples/android/app/libs/$aar"
+          nix develop --command gradle -p examples/android :app:assembleDebug --console=plain

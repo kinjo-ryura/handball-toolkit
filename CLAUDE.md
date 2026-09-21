@@ -44,7 +44,7 @@ Kotlin バインディングは専用の workspace member を持たない。生�
 
 ### Web 向け wasm（wasm-bindgen）
 
-ビルドは `./scripts/build_wasm.sh`。`wasm-bindgen` crate と `wasm-bindgen-cli`（flake が nixpkgs から入れる）は**バージョン完全一致**が必要。Cargo.toml 側は `=` でピン留めしてあるので、nixpkgs が上がったら両方を同時に合わせる（不一致は生成時の schema version mismatch で落ちる）。
+ビルドは `./scripts/build_wasm.sh`。`wasm-bindgen` crate と `wasm-bindgen-cli`（flake が nixpkgs から入れる）は**バージョン完全一致**が必要（不一致は生成時の schema version mismatch で落ちる）。Cargo.toml 側は `=` で、flake 側は版付きの属性（`pkgs.wasm-bindgen-cli_0_2_121`）でピン留めしてあるので、nixpkgs を上げても CLI は動かない。上げるときは**両方を同時に**変える（handball-project#412）。
 
 ### Android 向け `.aar`（UniFFI + JNA）
 
@@ -64,6 +64,9 @@ Kotlin バインディングは専用の workspace member を持たない。生�
 Room + 3 trait の 15 メソッド + 最小 UI の参照実装。**公開できるシェル実装はこれだけ**。ビルド手順と Android 固有の落とし穴は [`examples/android/README.md`](examples/android/README.md)。
 
 **このサンプルは配布された `.aar` を `app/libs/` から参照する**（外部利用者と同じ経路）。コアを直したら `./scripts/build_aar.sh` の出力を `examples/android/app/libs/` へコピーする。
+
+- **版を切ったら `examples/android/app/build.gradle.kts` の `.aar` の参照も直す**。CI がいまのソースから組んだ `.aar` を `handball-toolkit-<toolkitVersion>.aar` の名前で置いてサンプルを `assembleDebug` するので、直し忘れると落ちる（CI がサンプルをビルドしていなかった間に 0.2.0 のまま 0.11.0 まで取り残された — handball-project#412）
+- **AGP 9 の built-in Kotlin を使う**。`org.jetbrains.kotlin.android` はルートで `apply false` にして Kotlin の版を決めるためだけに置き、モジュールには apply しない（apply すると AGP がエラーにする）。`android/` も同じ
 
 ### 設計不変条件（コアに入れてよいもの / いけないもの）
 
