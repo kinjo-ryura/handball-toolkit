@@ -239,11 +239,16 @@ fun MatchFact.toRow(matchId: UUID): FactRow {
         is MatchFactPayload.Possession -> {
             val possession = payload.v1
             val start = possession.anchor.columns()
+            // 終わりは任意（handball-project#220）。stoppage と同じ形なので同じ end 列に置く。
+            val end = possession.endAnchor?.columns()
             base.copy(
                 payloadKind = "possession",
                 startAnchorKind = start.kind,
                 startMatchSeconds = start.matchSeconds,
                 startVideoSeconds = start.videoSeconds,
+                endAnchorKind = end?.kind,
+                endMatchSeconds = end?.matchSeconds,
+                endVideoSeconds = end?.videoSeconds,
                 teamId = possession.teamId.key(),
             )
         }
@@ -290,6 +295,9 @@ fun FactRow.toDomain(): MatchFact {
                 // ポゼッションの teamId は「常に値あり」がドメインの不変条件。
                 teamId = requireNotNull(teamId) { "possession に teamId が無い" }.toUuid(),
                 anchor = startAnchor,
+                // 省略すると既定の null になり、保存した終わりが黙って消える（handball-project#412 で
+                // 足すまで実際に消えていた）ので、フィールドの既定値に頼らず明示する。
+                endAnchor = endAnchor,
             ),
         )
         else -> error("未知の payloadKind: $payloadKind")

@@ -267,6 +267,9 @@ Dependabot の `gradle-android`（toolkit#39。AGP 8.11.1 → 9.4.0 / Kotlin 2.1
   回していなかったため。#74 を先に merge していれば、手元でサンプルがビルドできない状態が黙って入った
 - サンプルの `.aar` の参照が `handball-toolkit-0.2.0.aar` のまま 0.11.0 まで取り残されていた
   （README は 0.11.0 を案内していた）
+- サンプルが現行の API でコンパイルできなかった。`build_possession_fact` に #220 で足した `end_anchor` を
+  渡しておらず（関数の引数には既定値が無い）、ビルドを載せた最初の通しで落ちた。あわせて、サンプルの
+  Room への対応付けが possession の `endAnchor` を保存も復元もしておらず、読み戻すと消えていたのも直した
 
 CI はライセンス確認のステップで組んだ `toolkit-release.aar`（jni/ は空）を `handball-toolkit-<toolkitVersion>.aar`
 の名前で `app/libs/` に置き、`gradle -p examples/android :app:assembleDebug` を回す。サンプル側の参照がその

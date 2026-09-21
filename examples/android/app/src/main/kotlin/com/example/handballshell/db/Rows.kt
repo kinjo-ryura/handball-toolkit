@@ -65,14 +65,14 @@ data class FactRow(
     val matchId: String,
     val recordedAtEpochSecond: Long,
     val recordedAtNano: Int,
-    /** "play" | "phaseStart" | "stoppage" */
+    /** "play" | "phaseStart" | "stoppage" | "possession" */
     val payloadKind: String,
-    // ── 代表 anchor（play は anchor、control は startAnchor）──
+    // ── 代表 anchor（play / possession は anchor、control は startAnchor）──
     /** "matchClock" | "videoClock" | "both" */
     val startAnchorKind: String,
     val startMatchSeconds: Double?,
     val startVideoSeconds: Double?,
-    // ── 終了 anchor（phaseStart は必須 / stoppage は任意 / play は常に null）──
+    // ── 終了 anchor（phaseStart は必須 / stoppage・possession は任意 / play は常に null）──
     val endAnchorKind: String?,
     val endMatchSeconds: Double?,
     val endVideoSeconds: Double?,
