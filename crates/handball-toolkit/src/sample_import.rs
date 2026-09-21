@@ -335,7 +335,8 @@ pub struct ImportCommitPlan {
     /// 新規作成する選手のみ。home 所属 → away 所属の順（各チーム内は DTO の並び順）。
     pub players_to_save: Vec<Player>,
     pub r#match: Match,
-    /// 永続化順（動画秒を持つか → 時刻 → recordedAt → id）へ整列済み。DTO の並び順ではない。
+    /// 永続化順（動画秒を持つか → 時刻 → phase 開始か → recordedAt → id）へ整列済み。
+    /// DTO の並び順ではない。
     pub facts: Vec<MatchFact>,
     pub outcome: ImportCommitOutcome,
 }

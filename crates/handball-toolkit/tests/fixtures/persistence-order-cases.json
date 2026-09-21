@@ -1,0 +1,172 @@
+{
+  "about": "fact 列の永続化順（動画秒を持つか → 時刻 → phase 開始か → recordedAt → id）の共通 fixture（handball-project#405）。同じ規約を別々に実装している 4 箇所（toolkit の persistence_order / HandballRecorder の SwiftDataMatchRepository.factRecordOrder / Android の Room の ORDER BY 2 本）が、それぞれのテストでこのファイルを読んで突き合わせる。規約を変えるときはここを先に変え、写しを更新する。facts は入力の順（わざと崩してある）、expected は永続化順に並べた id。kind は play / phaseStart / stoppage / possession。matchSeconds / videoSeconds は累積秒 / 動画秒で、持たなければ null。recordedAt は UNIX 秒。どちらの時計も持たない fact は Rust の型で表せないので含めない。",
+  "cases": [
+    {
+      "name": "累積秒の昇順で並ぶ",
+      "facts": [
+        { "id": "00000000-0000-0000-0000-000000000003", "kind": "play", "matchSeconds": 1800.0, "videoSeconds": null, "recordedAt": 1700000000 },
+        { "id": "00000000-0000-0000-0000-000000000001", "kind": "play", "matchSeconds": 0.0, "videoSeconds": null, "recordedAt": 1700000000 },
+        { "id": "00000000-0000-0000-0000-000000000002", "kind": "play", "matchSeconds": 600.0, "videoSeconds": null, "recordedAt": 1700000000 }
+      ],
+      "expected": [
+        "00000000-0000-0000-0000-000000000001",
+        "00000000-0000-0000-0000-000000000002",
+        "00000000-0000-0000-0000-000000000003"
+      ]
+    },
+    {
+      "name": "累積秒を持たない fact は動画秒で並ぶ",
+      "facts": [
+        { "id": "00000000-0000-0000-0000-000000000002", "kind": "play", "matchSeconds": null, "videoSeconds": 1130.0, "recordedAt": 1700000000 },
+        { "id": "00000000-0000-0000-0000-000000000001", "kind": "play", "matchSeconds": null, "videoSeconds": 1086.0, "recordedAt": 1700000000 }
+      ],
+      "expected": [
+        "00000000-0000-0000-0000-000000000001",
+        "00000000-0000-0000-0000-000000000002"
+      ]
+    },
+    {
+      "name": "両方の時計を持つ fact は動画秒を優先する（handball-project#380）",
+      "facts": [
+        { "id": "00000000-0000-0000-0000-000000000001", "kind": "play", "matchSeconds": 100.0, "videoSeconds": 100.0, "recordedAt": 1700000000 },
+        { "id": "00000000-0000-0000-0000-000000000002", "kind": "play", "matchSeconds": 200.0, "videoSeconds": 5.0, "recordedAt": 1700000000 }
+      ],
+      "expected": [
+        "00000000-0000-0000-0000-000000000002",
+        "00000000-0000-0000-0000-000000000001"
+      ]
+    },
+    {
+      "name": "動画へ移行した試合は区間が交互にならず動画秒の順で並ぶ（handball-project#380）",
+      "facts": [
+        { "id": "00000000-0000-0000-0000-000000000004", "kind": "play", "matchSeconds": null, "videoSeconds": 2200.0, "recordedAt": 1700000000 },
+        { "id": "00000000-0000-0000-0000-000000000003", "kind": "phaseStart", "matchSeconds": 1800.0, "videoSeconds": 2100.0, "recordedAt": 1700000000 },
+        { "id": "00000000-0000-0000-0000-000000000002", "kind": "play", "matchSeconds": null, "videoSeconds": 1850.0, "recordedAt": 1700000000 },
+        { "id": "00000000-0000-0000-0000-000000000001", "kind": "phaseStart", "matchSeconds": 0.0, "videoSeconds": 120.0, "recordedAt": 1700000000 }
+      ],
+      "expected": [
+        "00000000-0000-0000-0000-000000000001",
+        "00000000-0000-0000-0000-000000000002",
+        "00000000-0000-0000-0000-000000000003",
+        "00000000-0000-0000-0000-000000000004"
+      ]
+    },
+    {
+      "name": "動画秒を持たない fact は後ろにまとまり累積秒で並ぶ（handball-project#320）",
+      "facts": [
+        { "id": "00000000-0000-0000-0000-000000000003", "kind": "play", "matchSeconds": 200.0, "videoSeconds": null, "recordedAt": 1700000000 },
+        { "id": "00000000-0000-0000-0000-000000000001", "kind": "play", "matchSeconds": null, "videoSeconds": 2000.0, "recordedAt": 1700000000 },
+        { "id": "00000000-0000-0000-0000-000000000002", "kind": "play", "matchSeconds": 100.0, "videoSeconds": null, "recordedAt": 1700000000 }
+      ],
+      "expected": [
+        "00000000-0000-0000-0000-000000000001",
+        "00000000-0000-0000-0000-000000000002",
+        "00000000-0000-0000-0000-000000000003"
+      ]
+    },
+    {
+      "name": "同じ時刻なら phase 開始が記録より先に並ぶ。recordedAt は逆順にしてある（handball-project#401）",
+      "facts": [
+        { "id": "00000000-0000-0000-0000-000000000002", "kind": "play", "matchSeconds": 0.0, "videoSeconds": null, "recordedAt": 1700000100 },
+        { "id": "00000000-0000-0000-0000-000000000001", "kind": "phaseStart", "matchSeconds": 0.0, "videoSeconds": null, "recordedAt": 1700000200 }
+      ],
+      "expected": [
+        "00000000-0000-0000-0000-000000000001",
+        "00000000-0000-0000-0000-000000000002"
+      ]
+    },
+    {
+      "name": "配信サンプルの 30:00 — 得点と後半の開始が recordedAt まで同じでも、id ではなく種別で決まる（handball-project#405）",
+      "facts": [
+        { "id": "00000000-0000-0000-0000-000000000001", "kind": "play", "matchSeconds": 1800.0, "videoSeconds": null, "recordedAt": 1700001800 },
+        { "id": "00000000-0000-0000-0000-000000000002", "kind": "phaseStart", "matchSeconds": 1800.0, "videoSeconds": null, "recordedAt": 1700001800 }
+      ],
+      "expected": [
+        "00000000-0000-0000-0000-000000000002",
+        "00000000-0000-0000-0000-000000000001"
+      ]
+    },
+    {
+      "name": "動画秒が同じでも phase 開始が先。stoppage は phase 開始ではないので記録と同じく recordedAt で並ぶ",
+      "facts": [
+        { "id": "00000000-0000-0000-0000-000000000003", "kind": "stoppage", "matchSeconds": null, "videoSeconds": 2100.0, "recordedAt": 1700000150 },
+        { "id": "00000000-0000-0000-0000-000000000002", "kind": "play", "matchSeconds": null, "videoSeconds": 2100.0, "recordedAt": 1700000100 },
+        { "id": "00000000-0000-0000-0000-000000000001", "kind": "phaseStart", "matchSeconds": 1800.0, "videoSeconds": 2100.0, "recordedAt": 1700000200 }
+      ],
+      "expected": [
+        "00000000-0000-0000-0000-000000000001",
+        "00000000-0000-0000-0000-000000000002",
+        "00000000-0000-0000-0000-000000000003"
+      ]
+    },
+    {
+      "name": "possession も phase 開始ではない",
+      "facts": [
+        { "id": "00000000-0000-0000-0000-000000000002", "kind": "possession", "matchSeconds": 0.0, "videoSeconds": null, "recordedAt": 1700000100 },
+        { "id": "00000000-0000-0000-0000-000000000001", "kind": "phaseStart", "matchSeconds": 0.0, "videoSeconds": null, "recordedAt": 1700000300 }
+      ],
+      "expected": [
+        "00000000-0000-0000-0000-000000000001",
+        "00000000-0000-0000-0000-000000000002"
+      ]
+    },
+    {
+      "name": "phase 開始が先に来るのは同じ時刻のときだけ",
+      "facts": [
+        { "id": "00000000-0000-0000-0000-000000000003", "kind": "phaseStart", "matchSeconds": 1800.0, "videoSeconds": null, "recordedAt": 1700000000 },
+        { "id": "00000000-0000-0000-0000-000000000002", "kind": "play", "matchSeconds": 1700.0, "videoSeconds": null, "recordedAt": 1700000000 },
+        { "id": "00000000-0000-0000-0000-000000000001", "kind": "phaseStart", "matchSeconds": 0.0, "videoSeconds": null, "recordedAt": 1700000000 }
+      ],
+      "expected": [
+        "00000000-0000-0000-0000-000000000001",
+        "00000000-0000-0000-0000-000000000002",
+        "00000000-0000-0000-0000-000000000003"
+      ]
+    },
+    {
+      "name": "同じ時刻・同じ種別なら recordedAt で並ぶ",
+      "facts": [
+        { "id": "00000000-0000-0000-0000-000000000001", "kind": "play", "matchSeconds": 600.0, "videoSeconds": null, "recordedAt": 1700000300 },
+        { "id": "00000000-0000-0000-0000-000000000002", "kind": "play", "matchSeconds": 600.0, "videoSeconds": null, "recordedAt": 1700000100 },
+        { "id": "00000000-0000-0000-0000-000000000003", "kind": "play", "matchSeconds": 600.0, "videoSeconds": null, "recordedAt": 1700000200 }
+      ],
+      "expected": [
+        "00000000-0000-0000-0000-000000000002",
+        "00000000-0000-0000-0000-000000000003",
+        "00000000-0000-0000-0000-000000000001"
+      ]
+    },
+    {
+      "name": "recordedAt まで同じなら id の昇順。数字は英字より前（UUID のバイト順・大文字・小文字の文字列順が一致する範囲）",
+      "facts": [
+        { "id": "00000000-0000-0000-0000-0000000000a0", "kind": "play", "matchSeconds": 600.0, "videoSeconds": null, "recordedAt": 1700000000 },
+        { "id": "00000000-0000-0000-0000-00000000000a", "kind": "play", "matchSeconds": 600.0, "videoSeconds": null, "recordedAt": 1700000000 },
+        { "id": "00000000-0000-0000-0000-000000000009", "kind": "play", "matchSeconds": 600.0, "videoSeconds": null, "recordedAt": 1700000000 }
+      ],
+      "expected": [
+        "00000000-0000-0000-0000-000000000009",
+        "00000000-0000-0000-0000-00000000000a",
+        "00000000-0000-0000-0000-0000000000a0"
+      ]
+    },
+    {
+      "name": "キーは 5 段で優先順位どおりに効く",
+      "facts": [
+        { "id": "00000000-0000-0000-0000-000000000002", "kind": "play", "matchSeconds": 600.0, "videoSeconds": null, "recordedAt": 1700000500 },
+        { "id": "00000000-0000-0000-0000-000000000009", "kind": "play", "matchSeconds": 1800.0, "videoSeconds": null, "recordedAt": 1700000100 },
+        { "id": "00000000-0000-0000-0000-000000000007", "kind": "play", "matchSeconds": null, "videoSeconds": 3000.0, "recordedAt": 1700000900 },
+        { "id": "00000000-0000-0000-0000-000000000001", "kind": "play", "matchSeconds": 600.0, "videoSeconds": null, "recordedAt": 1700000500 },
+        { "id": "00000000-0000-0000-0000-000000000005", "kind": "play", "matchSeconds": 600.0, "videoSeconds": null, "recordedAt": 1700000100 },
+        { "id": "00000000-0000-0000-0000-000000000008", "kind": "phaseStart", "matchSeconds": 600.0, "videoSeconds": null, "recordedAt": 1700000900 }
+      ],
+      "expected": [
+        "00000000-0000-0000-0000-000000000007",
+        "00000000-0000-0000-0000-000000000008",
+        "00000000-0000-0000-0000-000000000005",
+        "00000000-0000-0000-0000-000000000001",
+        "00000000-0000-0000-0000-000000000002",
+        "00000000-0000-0000-0000-000000000009"
+      ]
+    }
+  ]
+}

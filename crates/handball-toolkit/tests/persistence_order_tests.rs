@@ -4,15 +4,23 @@
 //! これまでこの規約は import 経路の `commit_plan_sorts_facts_into_persistence_order` からしか
 //! 触れられておらず、規約単体の回帰ロックが無かった。オラクルは読み出し側の
 //! `SwiftDataMatchRepository.factRecordOrder`。
+//!
+//! 末尾の `共通_fixture_の並びと一致する` は、同じ規約を別々に実装している Swift / Android と
+//! 共有する fixture（`tests/fixtures/persistence-order-cases.json`）を読む（handball-project#405）。
+
+use std::fs;
+use std::path::Path;
 
 use chrono::{DateTime, Utc};
 use handball_toolkit::clock::{FactAnchor, MatchClock, VideoClock};
 use handball_toolkit::configuration::PhaseKind;
 use handball_toolkit::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
+    PossessionFact, StoppageKind, StoppagePayload,
 };
 use handball_toolkit::ids::{FactId, PlayerId, TeamId};
 use handball_toolkit::persistence_order::{persistence_ordered, sort_by_persistence_order};
+use serde::Deserialize;
 use uuid::Uuid;
 
 fn at(secs: i64) -> DateTime<Utc> {
@@ -227,4 +235,116 @@ fn 整列済みの列は不変に保たれる() {
 
     assert_eq!(ids(&once), vec![1, 2, 3]);
     assert_eq!(ids(&twice), ids(&once), "冪等");
+}
+
+// ── 共通 fixture（handball-project#405）──
+//
+// 同じ規約の実装は 4 箇所ある（このモジュール / Swift の `factRecordOrder` / Android の Room の
+// `ORDER BY` 2 本）。Room のクエリはコアの関数を呼べず、SwiftData もクエリの並びで読むため、
+// 集約できない。代わりに 4 箇所が同じ fixture を読み、どれか 1 つだけ変えると赤くなるようにする。
+
+#[derive(Deserialize)]
+struct Fixture {
+    cases: Vec<FixtureCase>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureCase {
+    name: String,
+    facts: Vec<FixtureFact>,
+    expected: Vec<Uuid>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct FixtureFact {
+    id: Uuid,
+    kind: FixtureKind,
+    match_seconds: Option<f64>,
+    video_seconds: Option<f64>,
+    /// UNIX 秒。
+    recorded_at: i64,
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum FixtureKind {
+    Play,
+    PhaseStart,
+    Stoppage,
+    Possession,
+}
+
+/// fixture の時計 2 つから anchor を作る。どちらも無い fact は型で表せないので fixture に置かない。
+fn fixture_anchor(match_secs: Option<f64>, video_secs: Option<f64>) -> FactAnchor {
+    match (match_secs, video_secs) {
+        (Some(m), Some(v)) => both_anchor(m, v),
+        (Some(m), None) => match_anchor(m),
+        (None, Some(v)) => video_anchor(v),
+        (None, None) => panic!("fixture の fact はどちらかの時計を持つ（Rust の型で表せないため）"),
+    }
+}
+
+fn fixture_fact(source: &FixtureFact) -> MatchFact {
+    let anchor = fixture_anchor(source.match_seconds, source.video_seconds);
+    let payload = match source.kind {
+        FixtureKind::Play => MatchFactPayload::Play(PlayFact {
+            kind: PlayEventKind::Goal,
+            team_id: Some(TeamId(Uuid::from_u128(9001))),
+            player_id: None,
+            related_player_id: None,
+            anchor,
+            title: None,
+            note: None,
+        }),
+        // 並びは開始 anchor だけで決まる。終了は開始を 1800 秒ずらしたもので埋める。
+        FixtureKind::PhaseStart => {
+            MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
+                kind: PhaseKind::Regular,
+                start_anchor: anchor,
+                end_anchor: fixture_anchor(
+                    source.match_seconds.map(|s| s + 1800.0),
+                    source.video_seconds.map(|s| s + 1800.0),
+                ),
+            }))
+        }
+        FixtureKind::Stoppage => {
+            MatchFactPayload::Control(ControlFact::Stoppage(StoppagePayload {
+                kind: StoppageKind::Timeout,
+                start_anchor: anchor,
+                end_anchor: None,
+                note: None,
+            }))
+        }
+        FixtureKind::Possession => MatchFactPayload::Possession(PossessionFact {
+            team_id: TeamId(Uuid::from_u128(9001)),
+            anchor,
+            end_anchor: None,
+        }),
+    };
+    MatchFact {
+        id: FactId(source.id),
+        recorded_at: at(source.recorded_at),
+        payload,
+    }
+}
+
+#[test]
+fn 共通_fixture_の並びと一致する() {
+    let path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/persistence-order-cases.json");
+    let text = fs::read_to_string(&path).expect("共通 fixture を読めない");
+    let fixture: Fixture = serde_json::from_str(&text).expect("共通 fixture の形が違う");
+    // 空の fixture で緑にならないようにする（件数は書かない — 足すたびにずれる）。
+    assert!(!fixture.cases.is_empty(), "共通 fixture にケースが無い");
+
+    for case in &fixture.cases {
+        let facts: Vec<MatchFact> = case.facts.iter().map(fixture_fact).collect();
+        let actual: Vec<Uuid> = persistence_ordered(&facts)
+            .iter()
+            .map(|fact| fact.id.0)
+            .collect();
+        assert_eq!(actual, case.expected, "{}", case.name);
+    }
 }

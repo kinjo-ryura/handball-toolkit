@@ -85,4 +85,10 @@ dependencies {
     ksp("androidx.room:room-compiler:2.8.5")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+
+    // ── 単体テスト（JVM 上で回る。testImplementation は APK に入らない）──
+    // `factLog` の ORDER BY をコアと共有する fixture と突き合わせる（FactPersistenceOrderTest。
+    // handball-project#405）。JVM には Android の SQLite が無いので sqlite-jdbc で同じ SQL を実行する。
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.xerial:sqlite-jdbc:3.53.4.0")
 }
