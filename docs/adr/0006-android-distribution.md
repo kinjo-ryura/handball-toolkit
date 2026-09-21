@@ -249,8 +249,11 @@ Dependabot の `gradle-android`（toolkit#39。AGP 8.11.1 → 9.4.0 / Kotlin 2.1
   実行時に引く KGP は 2.2.10 で、ルートの宣言が新しければそちらが使われる。Dependabot もこの行で追う
 - `kotlin { compilerOptions { jvmTarget } }` を外した。built-in Kotlin では `compileOptions.targetCompatibility`
   （17）がそのまま既定値になる
-- 生成 Kotlin とシムのディレクトリは `sourceSets.named("main") { kotlin.directories += … }` で足す
-  （built-in Kotlin では `kotlin.srcDir` を使えない）
+- 生成 Kotlin とシムのディレクトリは `sourceSets { named("main") { kotlin.directories += … } }` で足す
+  （`kotlin.srcDir` は非推奨）。**`sourceSets` をプロパティとして引くと落ちる** — AGP 9.4.0 の Kotlin DSL は
+  `android` を `LibraryExtensionImpl` 型で見せ、その `sourceSets` プロパティは要素を旧 API の
+  `AndroidLibrarySourceSet` と宣言しているが、実体はそれを実装していない（toolkit PR #77 の CI で
+  ClassCastException。詳細は `android/toolkit/build.gradle.kts` のコメント）
 - KSP は 2.3 系から Kotlin と版が連動しない（`2.1.21-2.0.1` → `2.3.12`）。built-in Kotlin には 2.3.1 以上が要る
 
 **サンプル APK のビルドを CI に載せた**（上の実装追記 2026-08-09 の段階 c のうち、ビルドだけ）。
