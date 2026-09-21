@@ -49,7 +49,7 @@ jobs:
     # 変更前後の実測は handball-project#386 に書いてある。
 
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # 下の `scope` が HEAD^1（PR の base）との差分を取るので、merge commit の両親まで要る。
           fetch-depth: 2
@@ -217,7 +217,7 @@ jobs:
       # `hashFiles(...) failed. Fail to hash files under directory` で job が落ちていた
       # （復元時は target/ がまだ無いので通る。2026-09-12 に main でも再発）。いまのキーは
       # 上の cache_keys が出す値なので、この問題は起きない。
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: steps.scope.outputs.docs_only != 'true'
         with:
           path: |
@@ -326,7 +326,7 @@ jobs:
       # ランナー同梱の SDK が無い場合のみ導入する。compileSdk = 36 /
       # buildToolsVersion = "37.0.0"（android/toolkit/build.gradle.kts）に対応させる。
       # 上のステップが skip されると outputs は空（!= 'true'）なので、docs_only も見る。
-      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         if: steps.scope.outputs.docs_only != 'true' && steps.android_sdk.outputs.preinstalled != 'true'
         with:
           packages: 'platforms;android-36 build-tools;37.0.0'
@@ -367,7 +367,7 @@ jobs:
       # Gradle 9.6.0 以上を要求して落ち続けていた（handball-project#412）。#412 の PR は
       # AGP 9 への移行と examples（KSP / Room）の取り込みを同時に入れるので、そこが緑になった回で
       # 保存サイズが 400MB 前後からどれだけ跳ねるか、その後の回で増え続けないかを見ること。
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: steps.scope.outputs.docs_only != 'true'
         with:
           path: |
