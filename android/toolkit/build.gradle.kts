@@ -95,5 +95,12 @@ dependencies {
 
     // シムの単体テスト（handball-project#136）。JVM 上で回り、.so も端末も要らない
     // — シムは生成 data class を組み替えるだけでネイティブに触らないため。
-    testImplementation(kotlin("test"))
+    //
+    // **`kotlin("test")` ではなく JUnit 4 用の `kotlin("test-junit")` を名指しする**（handball-project#412）。
+    // `kotlin.test.Test` はフレームワーク別のアダプタ（kotlin-test-junit 等）にしか無い。以前は
+    // org.jetbrains.kotlin.android プラグインがテストタスクのフレームワークから自動で選んでいたが、
+    // AGP 9 の built-in Kotlin はその推定をしない（AGP が肩代わりするのは KMP だけ）。
+    // `kotlin("test")` のままだと assertEquals は解決して @Test だけが Unresolved になる。
+    // AGP の単体テストは Gradle の既定どおり JUnit 4 で走る。junit:junit もこのアダプタが連れてくる。
+    testImplementation(kotlin("test-junit"))
 }

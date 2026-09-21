@@ -254,6 +254,9 @@ Dependabot の `gradle-android`（toolkit#39。AGP 8.11.1 → 9.4.0 / Kotlin 2.1
   `android` を `LibraryExtensionImpl` 型で見せ、その `sourceSets` プロパティは要素を旧 API の
   `AndroidLibrarySourceSet` と宣言しているが、実体はそれを実装していない（toolkit PR #77 の CI で
   ClassCastException。詳細は `android/toolkit/build.gradle.kts` のコメント）
+- 単体テストの依存を `kotlin("test")` → `kotlin("test-junit")` に変えた。`kotlin.test.Test` はフレームワーク別の
+  アダプタにしか無く、以前は `org.jetbrains.kotlin.android` がテストタスクから JUnit 4 用を自動で選んでいた。
+  built-in Kotlin はこの推定をしない（AGP が肩代わりするのは KMP だけ）ので、`@Test` だけが Unresolved になった
 - KSP は 2.3 系から Kotlin と版が連動しない（`2.1.21-2.0.1` → `2.3.12`）。built-in Kotlin には 2.3.1 以上が要る
 
 **サンプル APK のビルドを CI に載せた**（上の実装追記 2026-08-09 の段階 c のうち、ビルドだけ）。
