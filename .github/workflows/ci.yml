@@ -45,8 +45,32 @@ jobs:
     #   手 3: PR の変更が docs だけなら、ビルドと検査を全部飛ばして成功で抜ける（`scope`）
     #   手 4: cargo / Gradle キャッシュのキーから版番号を除き、版切りの PR と merge 後の main
     #         でも hit させる（`cache_keys`。handball-project#389）
+    #   手 5: キャッシュを保存するのは main への push だけ。PR は復元だけして、キーが外れたら
+    #         main の直近のものを前方一致で拾う（handball-project#404。下の「保存は main だけ」）
     #
     # 変更前後の実測は handball-project#386 に書いてある。
+    #
+    # ── 保存は main だけ（handball-project#404）──
+    #
+    # キャッシュはそれを保存した ref からしか使えない（PR の ref で保存したものを main も他の PR
+    # も使えない）のに、以前は PR も保存していた。2026-09-21 は repo の総量が 21.4GB / 24 本で、
+    # 上限の 10GB を倍超えていた。そのうち 16 本 14.7GB が PR の ref のもの:
+    #
+    #   - toolkit PR #77（ci.yml と flake を変更）の merge 直後、Dependabot が open な 3 本を
+    #     rebase した。main がまだ新しいキーを保存していないので 3 本とも完全一致が外れ、
+    #     それぞれが Nix 1.45GB・cargo・Gradle を自分の ref に丸ごと保存した。25 分で 15 本 15.1GB
+    #   - 上限を超えた分は最終アクセスの古い順に消される。main の現役のキャッシュは、同じ時刻に
+    #     作られた PR の重複より先に消される位置にあった。消されると次の PR はゼロから作り直す
+    #
+    # PR は保存しないので、キャッシュは main の分だけになる（現役 3 本で約 3GB。キーが変わって
+    # 使われなくなったものは最終アクセスが古いので、上限を超えても先に消される）。代わりに PR
+    # では Nix / cargo にも前方一致の fallback を付け、キーを変える PR（Dependabot・ci.yml や
+    # flake を触る PR）でも main の直近のキャッシュを拾う。fallback が問題になるのは「古い
+    # キャッシュの上に積み増したものを保存する」ときだけ（handball-project#386）で、PR は保存
+    # しないので起きない。
+    # main には従来どおり fallback を付けず、キーが変わった回はゼロから作って保存する。
+    #
+    # 保存のステップは job の最後にまとめてある。
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -103,12 +127,13 @@ jobs:
 
       # /nix（store と DB）と Nix のフェッチャキャッシュを GitHub Actions のキャッシュに置く。
       # キーが完全一致したら保存し直さないので、flake.lock / flake.nix / rust-toolchain.toml
-      # が動かない限り書き戻しは起きない。
+      # が動かない限り書き戻しは起きない。保存するのは main だけ（上の「保存は main だけ」）。
+      # このアクションは復元と保存（post）が一体なので、`save` で main 以外の保存を止める。
       #
-      # **前方一致の fallback（restore-prefixes-first-match）は付けない。** 古い store の上に
-      # 新しいツールチェーンを重ねて保存すると、キーが変わるたびに肥大する（cargo キャッシュが
-      # 5 GB になったのと同じ経路）。miss のときはゼロから取り直す（2〜3 分。flake.lock を
-      # 動かすのは稀）。
+      # **main では前方一致の fallback（restore-prefixes-first-match）を付けない。** 古い store の
+      # 上に新しいツールチェーンを重ねて保存すると、キーが変わるたびに肥大する（cargo キャッシュが
+      # 5 GB になったのと同じ経路）。main の miss はゼロから取り直す（2〜3 分。flake.lock を
+      # 動かすのは稀）。PR は保存しないので fallback を付ける。
       #
       # ガベージコレクションも掛けない（gc-max-store-size 未設定）。この job が使ったパスは
       # 全部要るし、`nix develop` は GC root を作らないので、GC するとツールチェーンごと消える。
@@ -116,6 +141,8 @@ jobs:
         if: steps.scope.outputs.docs_only != 'true'
         with:
           primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', 'flake.nix', 'rust-toolchain.toml') }}
+          restore-prefixes-first-match: ${{ github.ref != 'refs/heads/main' && format('nix-{0}-', runner.os) || '' }}
+          save: ${{ github.ref == 'refs/heads/main' }}
           paths: |
             /nix
             ~/.cache/nix
@@ -188,8 +215,8 @@ jobs:
       # cargo のレジストリと target/ をキャッシュする（ツールチェーンは上の Nix store 側）。
       #
       # キーは Cargo.lock（workspace の crate の版を除く）/ rust-toolchain.toml / この workflow
-      # のハッシュで（上の cache_keys）、**完全一致したら保存しない**。restore-keys（前方一致の
-      # fallback）も置かない。経緯:
+      # のハッシュで（上の cache_keys）、**完全一致したら保存しない**。main では restore-keys
+      # （前方一致の fallback）も置かない（PR だけに置く。上の「保存は main だけ」）。経緯:
       #
       #   - handball-project#143 では Cargo.lock のハッシュだけをキーにしていて、最初に
       #     保存された時点の target/（debug のみ）で凍結し、release と --features bindgen の
@@ -200,11 +227,14 @@ jobs:
       #     ビルドする回も出ていた
       #   - handball-project#389 で、版切りの PR と merge 後の main が毎回 miss していたので、
       #     キーから workspace の crate の版を除いた
+      #   - handball-project#404 で、保存を main だけにした。キーが変わる PR は、main の直近の
+      #     キャッシュを前方一致で拾う
       #
       # いまは job の最後（release と bindgen も済んだ後）に一度だけ保存するので、#143 の
       # 「debug で凍結」は起きない。ビルドの構成を変える（ステップを足す）ときは、この
-      # workflow 自体がキーに入っているので保存し直される。miss（依存やツールチェーンの更新）
-      # のときはゼロから作る。週次の Dependabot で PR と main の 2 回だけ。
+      # workflow 自体がキーに入っているので保存し直される。main の miss（依存やツールチェーン
+      # の更新、この workflow の変更）のときはゼロから作る。Dependabot の週次の PR を merge
+      # したときなどで、main の 1 回だけ。
       #
       # 版を上げても hit するので、保存済みの target/ は古い版の workspace crate を抱えたまま
       # 更新されない。workspace crate はソースを変えれば毎回ビルドし直すものなので、効くのは
@@ -217,7 +247,10 @@ jobs:
       # `hashFiles(...) failed. Fail to hash files under directory` で job が落ちていた
       # （復元時は target/ がまだ無いので通る。2026-09-12 に main でも再発）。いまのキーは
       # 上の cache_keys が出す値なので、この問題は起きない。
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      #
+      # 保存は job の最後の「cargo キャッシュを保存」。path と key はそこと揃えること。
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: cargo_cache
         if: steps.scope.outputs.docs_only != 'true'
         with:
           path: |
@@ -225,6 +258,7 @@ jobs:
             ~/.cargo/git
             target
           key: cargo-${{ runner.os }}-${{ steps.cache_keys.outputs.cargo }}
+          restore-keys: ${{ github.ref != 'refs/heads/main' && format('cargo-{0}-', runner.os) || '' }}
 
       - name: cargo fmt
         if: steps.scope.outputs.docs_only != 'true'
@@ -362,12 +396,20 @@ jobs:
       #     `gradle-macOS-` で前の 408MB を拾って約 12 秒。同じ日に primary hit した回（#74）も
       #     408MB で約 11 秒
       #
-      # **未観測**: 依存が変わった回の**保存**サイズ。**job が落ちると actions/cache の Post
-      # （保存）は skipped になる**ので、赤い run からはどうやっても取れない。#39 は AGP 9.4.0 が
-      # Gradle 9.6.0 以上を要求して落ち続けていた（handball-project#412）。#412 の PR は
-      # AGP 9 への移行と examples（KSP / Room）の取り込みを同時に入れるので、そこが緑になった回で
-      # 保存サイズが 400MB 前後からどれだけ跳ねるか、その後の回で増え続けないかを見ること。
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      # 依存が変わった回の**保存**サイズ（handball-project#404。2026-09-21 の実測）:
+      #
+      #   - #412（AGP 9 への移行と examples の KSP / Room の取り込み）の merge 後、main は
+      #     899MB を保存した。400MB 前後から倍になった（AGP 9 と examples のどちらの分かは
+      #     分けて測っていない）
+      #   - Dependabot の AGP 9.4.0 → 9.4.1 の PR（toolkit #78 / #79）は、fallback で 899MB を
+      #     拾って 969MB を保存した。古い AGP を抱えたまま新しい AGP を足した +70MB
+      #   - **未観測**: 保存を main だけにした後で、main でキーが動くたびに増え続けないか。
+      #     Gradle は既定で 30 日使われない依存を消すが、CI のキャッシュ越しに効くかは
+      #     確かめていない
+      #
+      # 保存は job の最後の「Gradle キャッシュを保存」。path と key はそこと揃えること。
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: gradle_cache
         if: steps.scope.outputs.docs_only != 'true'
         with:
           path: |
@@ -442,3 +484,30 @@ jobs:
           mkdir -p examples/android/app/libs
           cp android/toolkit/build/outputs/aar/toolkit-release.aar "examples/android/app/libs/$aar"
           nix develop --command gradle -p examples/android :app:assembleDebug --console=plain
+
+      # ── キャッシュの保存（main だけ。上の「保存は main だけ」）──
+      #
+      # 以前の actions/cache が post で保存していたのと同じく、job の最後に置き、キーが
+      # 完全一致して復元できた回は保存しない。前のステップが落ちたら保存しない（actions/cache の
+      # post と同じ）。Nix は cache-nix-action の post が保存する（`save` で main に絞ってある）。
+      #
+      # **cargo キャッシュは release と bindgen のビルドより後で保存する。** 前に置くと
+      # handball-project#143 の「debug のまま凍結」に戻る。
+      - name: cargo キャッシュを保存
+        if: steps.scope.outputs.docs_only != 'true' && github.ref == 'refs/heads/main' && steps.cargo_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ steps.cache_keys.outputs.cargo }}
+
+      - name: Gradle キャッシュを保存
+        if: steps.scope.outputs.docs_only != 'true' && github.ref == 'refs/heads/main' && steps.gradle_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ steps.cache_keys.outputs.gradle }}
