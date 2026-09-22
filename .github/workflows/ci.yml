@@ -75,7 +75,7 @@ jobs:
     # 保存のステップは job の最後にまとめてある。
 
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # 下の `scope` が HEAD^1（PR の base）との差分を取るので、merge commit の両親まで要る。
           fetch-depth: 2
@@ -251,7 +251,7 @@ jobs:
       # 上の cache_keys が出す値なので、この問題は起きない。
       #
       # 保存は job の最後の「cargo キャッシュを保存」。path と key はそこと揃えること。
-      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: cargo_cache
         if: steps.scope.outputs.docs_only != 'true'
         with:
@@ -362,7 +362,7 @@ jobs:
       # ランナー同梱の SDK が無い場合のみ導入する。compileSdk = 36 /
       # buildToolsVersion = "37.0.0"（android/toolkit/build.gradle.kts）に対応させる。
       # 上のステップが skip されると outputs は空（!= 'true'）なので、docs_only も見る。
-      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         if: steps.scope.outputs.docs_only != 'true' && steps.android_sdk.outputs.preinstalled != 'true'
         with:
           packages: 'platforms;android-36 build-tools;37.0.0'
@@ -403,7 +403,7 @@ jobs:
       # 約 12 秒、同じ日に完全一致した toolkit PR #74 も 408MB で約 11 秒）。
       #
       # 保存は job の最後の「Gradle キャッシュを保存」。path と key はそこと揃えること。
-      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: gradle_cache
         if: steps.scope.outputs.docs_only != 'true'
         with:
@@ -495,7 +495,7 @@ jobs:
       # handball-project#143 の「debug のまま凍結」に戻る。
       - name: cargo キャッシュを保存
         if: steps.scope.outputs.docs_only != 'true' && github.ref == 'refs/heads/main' && steps.cargo_cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -505,7 +505,7 @@ jobs:
 
       - name: Gradle キャッシュを保存
         if: steps.scope.outputs.docs_only != 'true' && github.ref == 'refs/heads/main' && steps.gradle_cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.gradle/caches
