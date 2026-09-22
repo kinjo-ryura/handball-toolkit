@@ -68,7 +68,9 @@ jobs:
     # flake を触る PR）でも main の直近のキャッシュを拾う。fallback が問題になるのは「古い
     # キャッシュの上に積み増したものを保存する」ときだけ（handball-project#386）で、PR は保存
     # しないので起きない。
-    # main には従来どおり fallback を付けず、キーが変わった回はゼロから作って保存する。
+    # main には fallback を付けず、キーが変わった回はゼロから作って保存する。Gradle だけは
+    # main にも fallback を残していたが、積み増しが出たので揃えた（handball-project#394。
+    # 下の Gradle キャッシュのコメント）。
     #
     # 保存のステップは job の最後にまとめてある。
 
@@ -370,42 +372,35 @@ jobs:
       #
       # キーは android/ と examples/android/ の *.gradle.kts と gradle.properties のハッシュで、
       # 版の行を除いてある（上の cache_keys。handball-project#389 / #412）。版を上げるだけの PR で
-      # 保存し直さないため。
+      # 保存し直さないため。キーが動くのは依存が実際に変わる回（Dependabot の `gradle-android` /
+      # `gradle-examples`、Gradle や AGP の移行）だけ。
       #
-      # **cargo / Nix と違って、ここだけ restore-keys（前方一致の fallback）を残してある。**
-      # 肥大していないことを実測で確かめたうえでの例外（handball-project#394。2026-09-16）:
+      # **restore-keys（前方一致の fallback）は cargo / Nix と同じく PR だけに置く**（上の「保存は
+      # main だけ」）。main で fallback すると、キーが動いた回に前のキャッシュを丸ごと拾い、その上に
+      # 新しい依存を足して保存するので、使われなくなった依存が残り続ける（handball-project#386 で
+      # cargo の target/ に起きたのと同じ経路）。経緯（handball-project#394）:
       #
-      #   - 保存サイズは 2026-08-09 の初回 294MB → 08-20 に 396MB へ一度だけ増え、そこから
-      #     09-14 まで 10 回以上キーが変わっても 396〜407MB。減る回もあり増加傾向は無い
-      #   - 08-20 の +102MB は積み増しではない。`.aar` の assembleRelease を足した 08-09 以降も
-      #     キーが完全一致し続けて保存が起きず（hit では保存しない）、08-20 の版切りで初めて
-      #     release 経路ぶんが書き戻された一度きりの取り込み
-      #   - cargo の target/ と違い ~/.gradle/caches は依存 jar が主で、ビルド成果物を
-      #     積み増す構造ではない（handball-project#386 の経路に乗らない）
+      #   - 2026-09-16 は、main にも fallback を残した。08-20〜09-14 に 10 回以上キーが変わっても
+      #     保存は 396〜407MB で増加傾向が無く、~/.gradle/caches は依存 jar が主なので積み増さない
+      #     と読んだ
+      #   - 2026-09-21 に積み増しが出た。toolkit PR #77（Gradle 8 → 9・AGP 8 → 9 と examples の
+      #     ビルド。handball-project#412）の merge 後の main は、408MB を fallback で拾って 858MB を
+      #     保存した。次の toolkit PR #82（handball-project#405）の merge 後は、その 858MB を拾って
+      #     877MB を保存した。Gradle 8 の版別のディレクトリや AGP 8 の jar は、もう使われないのに
+      #     入ったまま
+      #   - Gradle 自身の掃除（既定で 30 日使われないものを消す）は daemon が止まるときに走る
+      #     （Gradle のドキュメント）。保存は job の途中なので、掃除の結果はキャッシュに入らない
+      #     見込み（確かめていない）
+      #   - android/ と examples/android/ は Dependabot の別グループなので、AGP を上げる PR は 2 本に
+      #     割れる。片方だけ merge した間は 2 つの版を両方引く（toolkit PR #78 は android/ だけ
+      #     9.4.1 にし、examples/ の 9.4.0 と両方を引いて、main の同じ回より約 70MB 多く保存した。
+      #     handball-project#404 の記録）。両方 merge すると旧版は使われなくなるが、main が fallback
+      #     していると残る
       #
-      # 残す理由は、#389 でキーから版を除いた結果、**キーが動くのは依存が実際に変わる回**
-      # **だけ**になったこと。そこで fallback を外すと、変わっていない依存まで Maven から
-      # 取り直して 1〜2 分増える。
-      #
-      # **その「依存が実際に変わる回」は Dependabot の `gradle-android` / `gradle-examples`
-      # の 2 グループ。** 2026-09-17 の確認時点ではキーが android/ しか見ず、ビルドも `-p android`
-      # だけだったので `gradle-examples` の PR はキーを動かさなかった。handball-project#412 で
-      # examples/android もビルドしてキーに入れたので、今はどちらも動かす。
-      #
-      #   - 復元は fallback でも primary hit と変わらない。キーが外れた回（#39 の 09-17 run）は
-      #     `gradle-macOS-` で前の 408MB を拾って約 12 秒。同じ日に primary hit した回（#74）も
-      #     408MB で約 11 秒
-      #
-      # 依存が変わった回の**保存**サイズ（handball-project#404。2026-09-21 の実測）:
-      #
-      #   - #412（AGP 9 への移行と examples の KSP / Room の取り込み）の merge 後、main は
-      #     899MB を保存した。400MB 前後から倍になった（AGP 9 と examples のどちらの分かは
-      #     分けて測っていない）
-      #   - Dependabot の AGP 9.4.0 → 9.4.1 の PR（toolkit #78 / #79）は、fallback で 899MB を
-      #     拾って 969MB を保存した。古い AGP を抱えたまま新しい AGP を足した +70MB
-      #   - **未観測**: 保存を main だけにした後で、main でキーが動くたびに増え続けないか。
-      #     Gradle は既定で 30 日使われない依存を消すが、CI のキャッシュ越しに効くかは
-      #     確かめていない
+      # その代わり、main はキーが動いた回だけ依存を Maven から取り直すので、その回の main の run が
+      # 延びる。PR は fallback で main の直近を拾うので、PR の待ち時間は変わらない。復元は fallback
+      # でも完全一致と変わらない（2026-09-17。キーが外れた toolkit PR #39 は前の 408MB を拾って
+      # 約 12 秒、同じ日に完全一致した toolkit PR #74 も 408MB で約 11 秒）。
       #
       # 保存は job の最後の「Gradle キャッシュを保存」。path と key はそこと揃えること。
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -416,7 +411,7 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: gradle-${{ runner.os }}-${{ steps.cache_keys.outputs.gradle }}
-          restore-keys: gradle-${{ runner.os }}-
+          restore-keys: ${{ github.ref != 'refs/heads/main' && format('gradle-{0}-', runner.os) || '' }}
 
       - name: host 向け cdylib をビルド（NDK 不要）
         if: steps.scope.outputs.docs_only != 'true'
