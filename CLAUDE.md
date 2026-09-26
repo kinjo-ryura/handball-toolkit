@@ -14,7 +14,8 @@
 **main へ直接 push できない。** ruleset [`protect-main`](https://github.com/kinjo-ryura/handball-toolkit/rules/19753789) が **直 push / force push / main の削除を禁止し、PR 必須 + CI の `check` ジョブ green 必須**にしている。bypass actor は無しなので**オーナーでも通らない**。docs 1 行の修正でもブランチを切る。
 
 ブランチ（prefix は `feat/` `fix/` `ci/` `docs/`）→ `gh pr create`（本文に関連 Issue）→ `gh pr checks --watch`
-→ `gh pr merge --merge --delete-branch` → `git switch main && git pull`。required approvals は 0 なので自分で merge できる。
+→ **merge は人が GitHub の画面で行う**（Claude Code は `gh pr merge` を打たない。required approvals は 0 だが、merge の判断は人に残す）
+→ merge 後に `git switch main && git pull`。
 
 - **push 前にローカルで `cargo fmt --all --check` / `cargo clippy --workspace --all-targets -- -D warnings` / `cargo test --workspace` を通す。** CI の `check` が同じものを走らせるので、落ちると 1 往復まるごと待つことになる
 - **親リポの submodule pointer は merge 後の main を指す**（PR ブランチの commit を直接指さない）。push 順は **toolkit → 親リポ** — 逆にすると親リポがリモートに無い commit を指す
