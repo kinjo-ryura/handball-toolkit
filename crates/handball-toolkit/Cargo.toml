@@ -23,7 +23,10 @@ chrono = { version = "0.4", default-features = false, features = ["std", "serde"
 # rc: TimelineProjection.resolver の Arc を透過 serialize するため（ADR 0004）。
 serde = { version = "1", features = ["derive", "rc"] }
 # sample_dto の encode（Swift JSONEncoder 互換の配信 JSON 書き出し — ADR 0004 決定 2）。
-serde_json = { version = "1" }
+# float_roundtrip: 同期で運ぶ形（`sync::payload`）は anchor の秒（f64）を JSON で往復させ、届いた値と
+# 端末の値を等しいかで比べる。既定の parse は最後の 1 ulp がずれうるので、同期済みの同じ記録が
+# 「中身が違う」に見える（ADR 0007）。テストは dev-dependencies で既にこの feature を使っている。
+serde_json = { version = "1", features = ["float_roundtrip"] }
 uniffi = { version = "0.32", optional = true }
 uuid = { version = "1", features = ["serde"] }
 
