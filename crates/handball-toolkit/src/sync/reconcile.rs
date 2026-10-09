@@ -13,7 +13,7 @@
 //! **聞いて選ばれた版は `now` で書き直す**。次の同期でどの端末と比べても選ばれた版が新しいので、
 //! 同じ結果になる。
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -27,9 +27,10 @@ use super::compare::{
     fact_content_equal, match_content_equal, player_content_equal, team_content_equal,
 };
 use super::normalize::{normalized, round_to_millis};
+use super::pairing::pair_copies;
 use super::{
-    SyncAnswer, SyncFact, SyncMatch, SyncPlayer, SyncQuestion, SyncQuestionKind, SyncRecordRef,
-    SyncSide, SyncSnapshot, SyncStamp, SyncTeam,
+    Answers, SyncAnswer, SyncFact, SyncMatch, SyncPlayer, SyncQuestion, SyncQuestionKind,
+    SyncRecordRef, SyncSide, SyncSnapshot, SyncStamp, SyncTeam,
 };
 
 /// [`reconcile`] の結果。
@@ -41,7 +42,23 @@ pub enum SyncReconcileResult {
     /// 答えた後に別の問い（`MergedMatchInvalid`）が出ることがある — 返らなくなるまで繰り返す。
     Questions { questions: Vec<SyncQuestion> },
     /// そろえた中身（端末ごとの値は入れたまま）。両方の端末が [`super::materialize`] して保存する。
-    Merged { snapshot: SyncSnapshot },
+    /// `duplicates` は、同じ試合に見えるがまとめなかった組（利用者に知らせる）。
+    Merged {
+        snapshot: SyncSnapshot,
+        duplicates: Vec<SyncDuplicateGroup>,
+    },
+}
+
+/// 同じ試合に見えるが、まとめずに両方残した試合の組（ADR 0007 決定 7）。
+///
+/// 突き合わせが 1 つにするのは、まだ同期していない端末をまたぐ写しの組だけ。同じ端末の中の写しや、
+/// 同期済みの試合に後から届いた写しは、別の試合として残してここで知らせる（利用者が見て消す）。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[serde(rename_all = "camelCase")]
+pub struct SyncDuplicateGroup {
+    /// 昇順。
+    pub match_ids: Vec<MatchId>,
 }
 
 /// 2 台の全記録をそろえる。
@@ -58,12 +75,23 @@ pub fn reconcile(
 ) -> SyncReconcileResult {
     // 時刻をミリ秒に丸めてから比べる（`normalize` の doc — 端末との往復で ns の桁がずれる）。
     let (local, remote) = (normalized(local), normalized(remote));
-    let (local, remote) = (&local, &remote);
     let now = round_to_millis(now);
     let answers: Answers = answers
         .iter()
         .map(|answer| ((answer.kind, answer.record), answer.keep))
         .collect();
+
+    // ID の違う写しを先に 1 つにする（突き合わせ）。聞くことがあれば、記録ごとの比較より先に聞く。
+    let pairing = pair_copies(&local, &remote, &answers, now);
+    if !pairing.questions.is_empty() {
+        return questions_result(pairing.questions);
+    }
+    let duplicates: Vec<SyncDuplicateGroup> = pairing
+        .duplicates
+        .into_iter()
+        .map(|match_ids| SyncDuplicateGroup { match_ids })
+        .collect();
+    let (local, remote) = (&pairing.local, &pairing.remote);
     let ctx = Context {
         answers: &answers,
         now,
@@ -185,12 +213,11 @@ pub fn reconcile(
             players: players.into_values().collect(),
             facts: facts.into_values().collect(),
         },
+        duplicates,
     }
 }
 
 // ── 記録ごとの判定 ──
-
-type Answers = HashMap<(SyncQuestionKind, SyncRecordRef), SyncSide>;
 
 struct Context<'a> {
     answers: &'a Answers,

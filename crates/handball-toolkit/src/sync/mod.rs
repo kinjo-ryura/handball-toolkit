@@ -10,6 +10,9 @@
 //! このモジュールは**純粋関数だけ**を持つ（ADR 0005 決定 1 の計画層）。時刻はシェルが `now` で渡し、
 //! ID は作らない。つなぐ・交換する・保存するのはシェルで、保存の発火は `ffi_write::apply_sync`。
 //!
+//! そろえるときは、記録ごとに比べる前に、試合ファイルで受け取った ID の違う写しを 1 つにする
+//! （突き合わせ — `pairing`）。
+//!
 //! 流れ（始めた側の端末で）:
 //! 1. 自分と相手のスナップショットを [`reconcile`] に渡す。利用者に聞くことがあれば
 //!    [`SyncReconcileResult::Questions`] が返るので、答えを足して呼び直す（返らなくなるまで）
@@ -22,6 +25,7 @@
 mod compare;
 mod materialize;
 mod normalize;
+mod pairing;
 mod payload;
 mod reconcile;
 
@@ -30,7 +34,9 @@ pub use materialize::{SyncApplyPlan, VideoRelink, materialize};
 pub use payload::{
     SYNC_FORMAT_VERSION, SyncPayload, SyncPayloadError, decode_sync_payload, encode_sync_payload,
 };
-pub use reconcile::{SyncReconcileResult, reconcile};
+pub use reconcile::{SyncDuplicateGroup, SyncReconcileResult, reconcile};
+
+use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -143,8 +149,9 @@ pub struct SyncSnapshot {
     pub facts: Vec<SyncFact>,
 }
 
-/// 始めた側から見た端末。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+/// 始めた側から見た端末。`Ord` は突き合わせで（端末, ID）を順序付きの表の鍵にするため
+/// （並び自体に意味は無い）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "camelCase")]
 pub enum SyncSide {
@@ -177,6 +184,9 @@ pub enum SyncQuestionKind {
     /// 両方の直しを合わせると、その試合の記録が規則（R3〜R9 等）に合わなくなる。
     /// 答えた側の試合を丸ごと採る
     MergedMatchInvalid,
+    /// ID の違う同じ試合の写しが両方の端末にあり、中身が違う（突き合わせ — ADR 0007 決定 7）。
+    /// 答えた側の試合を残し、もう片方の写しを消す。`record` は 2 つの写しのうち小さい方の ID
+    CopiesDiffer,
 }
 
 /// 利用者に聞くこと。答えは [`SyncAnswer`] で同じ `record` と `kind` に対して渡す。
@@ -204,3 +214,6 @@ pub struct SyncAnswer {
     pub record: SyncRecordRef,
     pub keep: SyncSide,
 }
+
+/// これまでの問いへの答え（問いの種類と対象の記録 → 採る側）。
+pub(crate) type Answers = HashMap<(SyncQuestionKind, SyncRecordRef), SyncSide>;

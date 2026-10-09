@@ -2,7 +2,7 @@
 //!
 //! 固定する挙動:
 //! - 記録ごとに `updated_at` の新しい方を採る。片方にしか無いものは足す
-//! - 規則で決められない 4 つ（同じ時刻 / 消した後の変更 / 混ざった試合が規則に合わない）だけを
+//! - 規則で決められないもの（同じ時刻 / 消した後の変更 / 混ざった試合が規則に合わない / 写しの中身が違う）だけを
 //!   問いにし、答えた版を `now` で書き直す
 //! - 端末ごとの値（左右配置・写真・端末内動画の参照）は比べず、保存する端末の値を残す
 //! - 時刻はミリ秒に丸めて比べる（端末との往復で ns の桁がずれても問いを出さない）
@@ -408,6 +408,146 @@ fn local_video_references_alone_are_not_a_difference() {
     assert!(matches!(result, SyncReconcileResult::Merged { .. }));
 }
 
+// ── 突き合わせ ──
+
+/// 試合ファイルで受け取った写し（ID が全部違う）が元の試合と同じ中身なら、聞かずに 1 つにする。
+/// 小さい方の ID を残し、写しの試合・fact・名前の同じチームと選手を消す。
+#[test]
+fn identical_copy_from_a_match_file_is_merged_without_asking() {
+    let w = World::new();
+    let local = w.snapshot(alive(1));
+    let remote = MatchFileCopy::new(&w).snapshot(alive(2));
+
+    let result = reconcile(&local, &remote, &[], at(100));
+
+    let (merged, duplicates) = merged_with_duplicates(result);
+    assert!(duplicates.is_empty());
+    let live_matches: Vec<MatchId> = merged
+        .matches
+        .iter()
+        .filter(|m| m.stamp.deleted_at.is_none())
+        .map(|m| m.match_.id)
+        .collect();
+    assert_eq!(live_matches, vec![w.match_.id]);
+    let copy = MatchFileCopy::new(&w);
+    for team in [copy.home, copy.away] {
+        let t = merged.teams.iter().find(|t| t.team.id == team).unwrap();
+        assert_eq!(t.stamp, deleted(100));
+    }
+    let p = merged
+        .players
+        .iter()
+        .find(|p| p.player.id == copy.player)
+        .unwrap();
+    assert_eq!(p.stamp, deleted(100));
+    for f in merged.facts.iter().filter(|f| f.match_id == copy.match_id) {
+        assert_eq!(f.stamp, deleted(100));
+    }
+}
+
+/// 写しの中身が違えば、どちらを残すかを聞く。答えた側の ID と中身を残し、もう片方を消す。
+/// 名前の同じチームと選手は、残した側へまとめる。
+#[test]
+fn copy_with_different_content_is_asked_and_the_answer_keeps_that_side() {
+    let w = World::new();
+    let local = w.snapshot(alive(1));
+    let copy = MatchFileCopy::new(&w);
+    let mut remote = copy.snapshot(alive(2));
+    set_fact_note(&mut remote, copy.goal, "速攻", alive(3));
+    let record = SyncRecordRef::Match { id: w.match_.id };
+
+    let asked = questions(reconcile(&local, &remote, &[], at(100)));
+    assert_eq!(
+        asked,
+        vec![SyncQuestion {
+            kind: SyncQuestionKind::CopiesDiffer,
+            record,
+            match_id: Some(w.match_.id),
+            deleted_on: None,
+        }]
+    );
+
+    let answer = SyncAnswer {
+        kind: SyncQuestionKind::CopiesDiffer,
+        record,
+        keep: SyncSide::Remote,
+    };
+    let merged = merged(reconcile(&local, &remote, &[answer], at(100)));
+    let kept = merged
+        .matches
+        .iter()
+        .find(|m| m.match_.id == copy.match_id)
+        .unwrap();
+    assert_eq!(kept.stamp, alive(100));
+    let original = merged
+        .matches
+        .iter()
+        .find(|m| m.match_.id == w.match_.id)
+        .unwrap();
+    assert_eq!(original.stamp, deleted(100));
+    let home = merged
+        .teams
+        .iter()
+        .find(|t| t.team.id == w.home.id)
+        .unwrap();
+    assert_eq!(home.stamp, deleted(100));
+    let alice = merged
+        .players
+        .iter()
+        .find(|p| p.player.id == w.player.id)
+        .unwrap();
+    assert_eq!(alice.stamp, deleted(100));
+}
+
+/// 同じ端末の中の写しどうしはまとめず、同じ試合に見える組として知らせる。
+#[test]
+fn copies_on_the_same_device_are_left_and_reported() {
+    let w = World::new();
+    let mut local = w.snapshot(alive(1));
+    let copy = MatchFileCopy::new(&w);
+    let copied = copy.snapshot(alive(2));
+    local.matches.extend(copied.matches);
+    local.teams.extend(copied.teams);
+    local.players.extend(copied.players);
+    local.facts.extend(copied.facts);
+    let remote = SyncSnapshot::default();
+
+    let (merged, duplicates) = merged_with_duplicates(reconcile(&local, &remote, &[], at(100)));
+
+    assert_eq!(merged.matches.len(), 2);
+    assert!(merged.matches.iter().all(|m| m.stamp.deleted_at.is_none()));
+    assert_eq!(duplicates.len(), 1);
+    assert_eq!(duplicates[0].match_ids, vec![w.match_.id, copy.match_id]);
+}
+
+/// 同期済みの試合（両方の端末で同じ ID）に、後から試合ファイルで写しが届いていても、まとめずに
+/// 別の試合として足し、同じ試合に見える組として知らせる。
+#[test]
+fn copy_of_an_already_synced_match_is_added_and_reported() {
+    let w = World::new();
+    let local = w.snapshot(alive(1));
+    let mut remote = w.snapshot(alive(1));
+    let copy = MatchFileCopy::new(&w);
+    let copied = copy.snapshot(alive(2));
+    remote.matches.extend(copied.matches);
+    remote.teams.extend(copied.teams);
+    remote.players.extend(copied.players);
+    remote.facts.extend(copied.facts);
+
+    let (merged, duplicates) = merged_with_duplicates(reconcile(&local, &remote, &[], at(100)));
+
+    assert_eq!(
+        merged
+            .matches
+            .iter()
+            .filter(|m| m.stamp.deleted_at.is_none())
+            .count(),
+        2
+    );
+    assert_eq!(duplicates.len(), 1);
+    assert_eq!(duplicates[0].match_ids, vec![w.match_.id, copy.match_id]);
+}
+
 // ── 運ぶ形 ──
 
 #[test]
@@ -455,6 +595,7 @@ fn payload_that_is_not_json_is_invalid() {
 // ── helpers ──
 
 /// 両方の端末に共通の記録: チーム 2・選手 1・タイマーの試合 1（区切り 0〜3600 秒・得点 1）。
+#[derive(Clone)]
 struct World {
     home: Team,
     away: Team,
@@ -530,6 +671,102 @@ impl World {
     }
 }
 
+/// `World` の試合を試合ファイルで受け取った写し: 試合・チーム・選手・fact の ID が全部違い、
+/// 名前・中身・記録した時刻は同じ。
+struct MatchFileCopy {
+    match_id: MatchId,
+    home: TeamId,
+    away: TeamId,
+    player: PlayerId,
+    phase: FactId,
+    goal: FactId,
+    world: World,
+}
+
+impl MatchFileCopy {
+    fn new(w: &World) -> MatchFileCopy {
+        MatchFileCopy {
+            match_id: MatchId(Uuid::from_u128(50)),
+            home: TeamId(Uuid::from_u128(51)),
+            away: TeamId(Uuid::from_u128(52)),
+            player: PlayerId(Uuid::from_u128(53)),
+            phase: FactId(Uuid::from_u128(60)),
+            goal: FactId(Uuid::from_u128(61)),
+            world: w.clone(),
+        }
+    }
+
+    fn snapshot(&self, stamp: SyncStamp) -> SyncSnapshot {
+        let w = &self.world;
+        let mut match_ = w.match_.clone();
+        match_.id = self.match_id;
+        match_.home_team_id = self.home;
+        match_.away_team_id = self.away;
+        let mut phase = w.phase.clone();
+        phase.id = self.phase;
+        let mut scored = play_at_match(PlayEventKind::Goal, self.home, self.player, 600.0);
+        scored.id = self.goal;
+        SyncSnapshot {
+            matches: vec![SyncMatch {
+                match_,
+                stamp,
+                local_video: None,
+            }],
+            teams: vec![
+                SyncTeam {
+                    team: Team {
+                        id: self.home,
+                        name: w.home.name.clone(),
+                    },
+                    stamp,
+                },
+                SyncTeam {
+                    team: Team {
+                        id: self.away,
+                        name: w.away.name.clone(),
+                    },
+                    stamp,
+                },
+            ],
+            players: vec![SyncPlayer {
+                player: Player {
+                    id: self.player,
+                    team_id: self.home,
+                    ..w.player.clone()
+                },
+                stamp,
+            }],
+            facts: vec![
+                SyncFact {
+                    match_id: self.match_id,
+                    fact: phase,
+                    stamp,
+                },
+                SyncFact {
+                    match_id: self.match_id,
+                    fact: scored,
+                    stamp,
+                },
+            ],
+        }
+    }
+}
+
+fn merged_with_duplicates(
+    result: SyncReconcileResult,
+) -> (
+    SyncSnapshot,
+    Vec<handball_toolkit::sync::SyncDuplicateGroup>,
+) {
+    match result {
+        SyncReconcileResult::Merged {
+            snapshot,
+            duplicates,
+        } => (snapshot, duplicates),
+        SyncReconcileResult::Questions { questions } => panic!("問いが出た: {questions:?}"),
+    }
+}
+
 fn goal(id: FactId, w: &World, secs: f64) -> MatchFact {
     let mut fact = play_at_match(PlayEventKind::Goal, w.home.id, w.player.id, secs);
     fact.id = id;
@@ -556,7 +793,7 @@ fn deleted(secs: i64) -> SyncStamp {
 
 fn merged(result: SyncReconcileResult) -> SyncSnapshot {
     match result {
-        SyncReconcileResult::Merged { snapshot } => snapshot,
+        SyncReconcileResult::Merged { snapshot, .. } => snapshot,
         SyncReconcileResult::Questions { questions } => panic!("問いが出た: {questions:?}"),
     }
 }
@@ -564,7 +801,7 @@ fn merged(result: SyncReconcileResult) -> SyncSnapshot {
 fn questions(result: SyncReconcileResult) -> Vec<SyncQuestion> {
     match result {
         SyncReconcileResult::Questions { questions } => questions,
-        SyncReconcileResult::Merged { snapshot } => panic!("問いが出なかった: {snapshot:?}"),
+        SyncReconcileResult::Merged { snapshot, .. } => panic!("問いが出なかった: {snapshot:?}"),
     }
 }
 
