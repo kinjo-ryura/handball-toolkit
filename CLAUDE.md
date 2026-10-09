@@ -4,7 +4,7 @@
 
 ハンドボール試合データのツールキット（Rust workspace）。[HandballRecorder](https://github.com/kinjo-ryura/HandballRecorder) のドメイン層 `RecorderDomain`（Swift の純粋計算）の移植であり、単一の共有コアを iOS / Android / Web (wasm) / CLI へ届けるための基盤。[handball-project](https://github.com/kinjo-ryura/handball-project) の submodule（`apps/handball-toolkit/`）として管理される。
 
-- 設計の正典: `docs/adr/`（0001 境界 API / 0002 エラー体系 / 0003 パリティ検証 / 0004 iOS FFI 本境界 / 0005 write orchestration / 0006 Android 配布境界）。**各 ADR の「実装追記」が実装の現況を持つ**
+- 設計の正典: `docs/adr/`（0001 境界 API / 0002 エラー体系 / 0003 パリティ検証 / 0004 iOS FFI 本境界 / 0005 write orchestration / 0006 Android 配布境界 / 0007 端末どうしの同期）。**各 ADR の「実装追記」が実装の現況を持つ**
 - 境界のエラーコード一覧は [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md)。**エラー case を追加・改名したらこの表も更新する**（code は安定契約 — ADR 0002 決定 2）。`DomainValidationMessagesTest` が表の 1 列目を sealed 型の case 名と集合比較するので、**期待する件数をテストへ書き写さないこと**。テストは表の書式に依存する — 1 列目の `` `code` `` と見出し末尾の `(N)` を崩さない
 - [`docs/PORTING.md`](docs/PORTING.md) は移植の完了記録（現在地の管理台帳ではない）。進行中・未着手の作業は GitHub Issues が正
 - ドキュメント・コードコメントは日本語で書く。**例外は [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md) の 1 本のみ**（外部シェル実装者向けの参照表なので英語。翻訳の二重管理を作らない）

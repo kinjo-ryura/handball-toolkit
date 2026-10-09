@@ -21,6 +21,7 @@ use crate::facts::MatchFact;
 use crate::ids::{FactId, MatchId, PlayerId, TeamId};
 use crate::sample_dto::SampleMatchDtoV2;
 use crate::sample_import::{self, ImportCommitOutcome, ImportDecisions, ImportWriteBatch};
+use crate::sync::{self, SyncSnapshot, VideoRelink};
 use crate::validation::DomainValidationIssue;
 use crate::validators::{self, RosterContext};
 use crate::write::{
@@ -620,4 +621,51 @@ async fn load_validation_inputs(
     let roster =
         write::roster_context_from_players(match_.home_team_id, match_.away_team_id, &players);
     Ok((match_, existing, roster))
+}
+
+// ── 端末どうしの同期（handball-project#506 / ADR 0007）──
+
+/// 同期の repository（シェルが実装して注入する foreign trait）。
+///
+/// 同期は試合・チーム・選手・fact を**まとめて**入れ替えるので、試合ごとの
+/// `MatchWriteRepository` とは別に、店全体を 1 回で読み書きする口を持つ。
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait SyncWriteRepository: Send + Sync + std::fmt::Debug {
+    /// この端末の全記録。**消した記録（`deleted_at` 付き）も含む**。端末ごとの値（試合の左右配置・
+    /// 選手の写真・端末内動画の参照と手がかり）もこの端末の値のまま入れる。
+    async fn load_sync_snapshot(&self) -> Result<SyncSnapshot, CoreWriteError>;
+    /// 店の全記録を `snapshot` と同じにする。`snapshot` に無い記録は消す（論理削除ではなく
+    /// 行ごと）。**1 トランザクション** — 途中で失敗したら何も書かない。
+    async fn replace_all(&self, snapshot: SyncSnapshot) -> Result<(), CoreWriteError>;
+}
+
+/// この端末の全記録を読む（相手へ送る・そろえる材料）。
+#[uniffi::export]
+pub async fn load_sync_snapshot(
+    repo: Arc<dyn SyncWriteRepository>,
+) -> Result<SyncSnapshot, CoreWriteError> {
+    repo.load_sync_snapshot().await
+}
+
+/// 同期の結果をこの端末に保存する（そろえた中身、または上書きで合わせる側の中身）。
+///
+/// **端末ごとの値は、店の最新の記録から戻す**（`sync::materialize`）。そろえる計算をしている間に
+/// この端末で写真を付け替えていても、保存の直前に読んだ値を残す（ADR 0005 決定 2 — 検証の入力は
+/// 保存時点の店の値）。
+///
+/// 試合ごとの記録の規則（R3〜R9）はここでは検証しない。そろえる計算（`sync::reconcile`）が、
+/// 両方の直しが混ざった試合を検証して聞いている。それ以外の試合は、どちらかの端末で保存する
+/// ときに検証を通った版のままだから。
+///
+/// 戻り値は端末内動画の参照を引き直す試合（シェルは手がかりを置き、初回再生で引き直す）。
+#[uniffi::export]
+pub async fn apply_sync(
+    repo: Arc<dyn SyncWriteRepository>,
+    incoming: SyncSnapshot,
+) -> Result<Vec<VideoRelink>, CoreWriteError> {
+    let local = repo.load_sync_snapshot().await?;
+    let plan = sync::materialize(&incoming, &local);
+    repo.replace_all(plan.snapshot).await?;
+    Ok(plan.video_relinks)
 }

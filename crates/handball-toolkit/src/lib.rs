@@ -30,6 +30,7 @@ pub mod persistence_order;
 pub mod projection;
 pub mod sample_dto;
 pub mod sample_import;
+pub mod sync;
 pub mod validation;
 pub mod validators;
 pub mod write;

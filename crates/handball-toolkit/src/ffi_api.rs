@@ -563,3 +563,50 @@ impl SegmentResolver {
         self.segment_for_match_elapsed(seconds).cloned()
     }
 }
+
+// ── 端末どうしの同期（handball-project#506 / ADR 0007）──
+//
+// 比べる・聞く・端末ごとの値を戻すのはここ（純粋関数）。保存は `ffi_write::apply_sync`。
+
+/// `sync::reconcile` — 2 台の全記録をそろえる。問いが返る限り、答えを足して呼び直す。
+#[uniffi::export]
+pub fn sync_reconcile(
+    local: crate::sync::SyncSnapshot,
+    remote: crate::sync::SyncSnapshot,
+    answers: Vec<crate::sync::SyncAnswer>,
+    now: chrono::DateTime<chrono::Utc>,
+) -> crate::sync::SyncReconcileResult {
+    crate::sync::reconcile(&local, &remote, &answers, now)
+}
+
+/// `sync::materialize` — 届いた中身を、この端末の端末ごとの値で戻す（保存前の確認用。保存は
+/// `apply_sync` がこの計算を店の最新の記録に対してやり直す）。
+#[uniffi::export]
+pub fn sync_materialize(
+    incoming: crate::sync::SyncSnapshot,
+    local: crate::sync::SyncSnapshot,
+) -> crate::sync::SyncApplyPlan {
+    crate::sync::materialize(&incoming, &local)
+}
+
+/// `sync::encode_sync_payload` — 運ぶ形の JSON にする。
+#[uniffi::export]
+pub fn encode_sync_payload(
+    payload: crate::sync::SyncPayload,
+) -> Result<String, crate::sync::SyncPayloadError> {
+    crate::sync::encode_sync_payload(&payload)
+}
+
+/// `sync::decode_sync_payload` — 運ぶ形の JSON を読む。版が違えば中身を読まない。
+#[uniffi::export]
+pub fn decode_sync_payload(
+    json: String,
+) -> Result<crate::sync::SyncPayload, crate::sync::SyncPayloadError> {
+    crate::sync::decode_sync_payload(&json)
+}
+
+/// 運ぶ形の今の版（`sync::SYNC_FORMAT_VERSION`）。シェルが相手との版の食い違いを文言にするときに使う。
+#[uniffi::export]
+pub fn sync_format_version() -> u32 {
+    crate::sync::SYNC_FORMAT_VERSION
+}
