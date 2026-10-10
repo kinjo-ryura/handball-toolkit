@@ -36,6 +36,7 @@ use crate::entities::Match;
 use crate::facts::{ControlFact, MatchFact, MatchFactPayload};
 use crate::ids::{MatchId, PlayerId, TeamId};
 
+use super::changes::IdMerges;
 use super::compare::same_local_video;
 use super::{
     Answers, SyncFact, SyncMatch, SyncPlayer, SyncQuestion, SyncQuestionKind, SyncRecordRef,
@@ -49,6 +50,9 @@ pub(crate) struct Pairing {
     pub(crate) questions: Vec<SyncQuestion>,
     /// まとめずに残した、同じ試合に見える組（試合 ID の昇順）。
     pub(crate) duplicates: Vec<Vec<MatchId>>,
+    /// 端末ごとの、まとめた写し・チーム・選手の ID の読み替え（一覧 — `changes`）。
+    pub(crate) local_merges: IdMerges,
+    pub(crate) remote_merges: IdMerges,
 }
 
 pub(crate) fn pair_copies(
@@ -122,7 +126,7 @@ pub(crate) fn pair_copies(
             }
         };
 
-        edits.drop_match(loser.side, loser.id);
+        edits.replace_match(loser.side, loser.id, survivor.id, identical);
         if restamp_survivor {
             edits.restamp_match(survivor.side, survivor.id);
         }
@@ -157,15 +161,19 @@ pub(crate) fn pair_copies(
             remote: remote.clone(),
             questions,
             duplicates: Vec::new(),
+            local_merges: IdMerges::default(),
+            remote_merges: IdMerges::default(),
         };
     }
 
     let team_merges = edits.team_merges();
     let mut local_out = local.clone();
     let mut remote_out = remote.clone();
-    for (side, out) in [
-        (SyncSide::Local, &mut local_out),
-        (SyncSide::Remote, &mut remote_out),
+    let mut local_merges = IdMerges::default();
+    let mut remote_merges = IdMerges::default();
+    for (side, out, id_merges) in [
+        (SyncSide::Local, &mut local_out, &mut local_merges),
+        (SyncSide::Remote, &mut remote_out, &mut remote_merges),
     ] {
         let merges: BTreeMap<TeamId, (SyncSide, TeamId)> = team_merges
             .iter()
@@ -174,6 +182,16 @@ pub(crate) fn pair_copies(
             .collect();
         let players_to_merge = player_merges(views.get(side), &merges, &views);
         apply(out, side, &edits, &merges, &players_to_merge, now);
+        *id_merges = IdMerges {
+            matches: edits
+                .replaced_matches
+                .iter()
+                .filter(|((s, _), _)| *s == side)
+                .map(|((_, loser), survivor)| (*loser, *survivor))
+                .collect(),
+            teams: merges.iter().map(|(from, (_, to))| (*from, *to)).collect(),
+            players: players_to_merge,
+        };
     }
 
     Pairing {
@@ -181,6 +199,8 @@ pub(crate) fn pair_copies(
         remote: remote_out,
         questions,
         duplicates,
+        local_merges,
+        remote_merges,
     }
 }
 
@@ -537,6 +557,8 @@ impl<'a> SideView<'a> {
 struct Edits {
     /// 消す写し（端末・試合）。
     dropped_matches: BTreeSet<(SyncSide, MatchId)>,
+    /// 消す写し（端末・試合）→ (残す写し, 中身が同じか)。
+    replaced_matches: BTreeMap<(SyncSide, MatchId), (MatchId, bool)>,
     /// 問いで残すと決めた写し（`now` で書き直す）。
     restamped_matches: BTreeSet<(SyncSide, MatchId)>,
     /// (端末, まとめられるチーム) → { (まとめ先の端末, まとめ先のチーム) → 票 }
@@ -544,8 +566,11 @@ struct Edits {
 }
 
 impl Edits {
-    fn drop_match(&mut self, side: SyncSide, id: MatchId) {
+    /// `side` の写し `id` を消し、`survivor`（相手の端末の写し）を残す。
+    fn replace_match(&mut self, side: SyncSide, id: MatchId, survivor: MatchId, identical: bool) {
         self.dropped_matches.insert((side, id));
+        self.replaced_matches
+            .insert((side, id), (survivor, identical));
     }
 
     fn restamp_match(&mut self, side: SyncSide, id: MatchId) {

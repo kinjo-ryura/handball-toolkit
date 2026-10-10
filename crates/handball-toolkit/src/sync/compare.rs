@@ -45,7 +45,8 @@ pub fn fact_content_equal(a: &SyncFact, b: &SyncFact) -> bool {
     a.match_id == b.match_id && a.fact == b.fact
 }
 
-fn configuration_equal(
+/// 記録の方法と動画が同じか（端末内動画は参照ではなく [`same_local_video`] で比べる）。
+pub(crate) fn configuration_equal(
     a: &MatchConfiguration,
     a_local: Option<&LocalVideoIdentity>,
     b: &MatchConfiguration,

@@ -16,12 +16,15 @@
 //! 流れ（始めた側の端末で）:
 //! 1. 自分と相手のスナップショットを [`reconcile`] に渡す。利用者に聞くことがあれば
 //!    [`SyncReconcileResult::Questions`] が返るので、答えを足して呼び直す（返らなくなるまで）
-//! 2. できた中身（[`SyncReconcileResult::Merged`]）を相手へ送る。相手と自分は、それぞれ自分の
-//!    スナップショットと合わせて [`materialize`] し、その結果で店を丸ごと置き換える
+//! 2. できた中身（[`SyncReconcileResult::Merged`]）の `changes`（それぞれの端末で何が変わるか — `changes`
+//!    モジュール）を利用者に見せる。どちらの端末にも変わるものが無ければ、ここで終わる（保存しない）
+//! 3. できた中身を相手へ送る。相手と自分は、それぞれ自分のスナップショットと合わせて [`materialize`] し、
+//!    その結果で店を丸ごと置き換える
 //!
 //! **両方の端末が同じ比較を別々にしない**。比べるのは始めた側だけで、相手はできた中身で店を入れ替える
 //! ので、結果が食い違わない。
 
+mod changes;
 mod compare;
 mod materialize;
 mod normalize;
@@ -29,6 +32,9 @@ mod pairing;
 mod payload;
 mod reconcile;
 
+pub use changes::{
+    SyncChangeKind, SyncChanges, SyncDeviceChanges, SyncMatchChange, SyncMatchField, SyncTeamChange,
+};
 pub use compare::{fact_content_equal, match_content_equal, player_content_equal};
 pub use materialize::{SyncApplyPlan, VideoRelink, materialize};
 pub use payload::{
