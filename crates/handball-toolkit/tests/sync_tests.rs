@@ -4,6 +4,8 @@
 //! - 記録ごとに `updated_at` の新しい方を採る。片方にしか無いものは足す
 //! - 規則で決められないもの（同じ時刻 / 消した後の変更 / 混ざった試合が規則に合わない / 写しの中身が違う）だけを
 //!   問いにし、答えた版を `now` で書き直す
+//! - ID の違う写し（試合ファイルで受け取ったもの）は、印の少ない側の半分以上が一致するときだけ
+//!   1 つにする。同じ試合を 2 台で別々に記録したものはまとめない
 //! - 端末ごとの値（左右配置・写真・端末内動画の参照）は比べず、保存する端末の値を残す
 //! - 時刻はミリ秒に丸めて比べる（端末との往復で ns の桁がずれても問いを出さない）
 //! - 運ぶ形は版を先に見る。f64 も時刻もそのまま往復する
@@ -258,6 +260,71 @@ fn match_taken_whole_from_one_side_is_not_revalidated() {
     let result = reconcile(&local, &remote, &[], at(100));
 
     assert!(matches!(result, SyncReconcileResult::Merged { .. }));
+}
+
+/// 片方で消した試合を「残す」と答えたら、両方の直しを合わせて規則に合わなくても、もう聞かずに
+/// 生きている側の試合を丸ごと採る（handball-project#510 — 続けて聞いた問いで消した側を選ぶと、
+/// 残すと答えた試合が消えていた）。
+///
+/// この端末は前半を縮めて後半を足してから試合を消し、相手は消される前の試合で前半を延ばした。
+#[test]
+fn match_kept_after_deletion_is_taken_whole_from_the_alive_side() {
+    let w = World::new();
+    let mut local = w.snapshot(alive(1));
+    let mut remote = w.snapshot(alive(1));
+    let second_half = timer_phase(FactId(Uuid::from_u128(31)), 1800.0, 3600.0);
+    replace_fact(&mut local, timer_phase(w.phase.id, 0.0, 1800.0), alive(10));
+    local.facts.push(w.fact(&second_half, alive(10)));
+    local.matches[0].stamp = deleted(20);
+    replace_fact(&mut remote, timer_phase(w.phase.id, 0.0, 2400.0), alive(30));
+    let record = SyncRecordRef::Match { id: w.match_.id };
+
+    let asked = questions(reconcile(&local, &remote, &[], at(100)));
+    assert_eq!(
+        asked,
+        vec![SyncQuestion {
+            kind: SyncQuestionKind::DeletedThenChanged,
+            record,
+            match_id: Some(w.match_.id),
+            deleted_on: Some(SyncSide::Local),
+        }]
+    );
+
+    let keep = SyncAnswer {
+        kind: SyncQuestionKind::DeletedThenChanged,
+        record,
+        keep: SyncSide::Remote,
+    };
+    // 前に出ていた問いへの答え（消した側）が残っていても使わない。
+    let stale = SyncAnswer {
+        kind: SyncQuestionKind::MergedMatchInvalid,
+        record,
+        keep: SyncSide::Local,
+    };
+    let assert_alive_side_taken = |answers: &[SyncAnswer]| {
+        let merged = merged(reconcile(&local, &remote, answers, at(100)));
+        let kept = merged
+            .matches
+            .iter()
+            .find(|m| m.match_.id == w.match_.id)
+            .unwrap();
+        assert_eq!(kept.stamp, alive(100));
+        let first_half = merged
+            .facts
+            .iter()
+            .find(|f| f.fact.id == w.phase.id)
+            .unwrap();
+        assert_eq!(first_half.fact, timer_phase(w.phase.id, 0.0, 2400.0));
+        assert_eq!(first_half.stamp, alive(100));
+        let dropped = merged
+            .facts
+            .iter()
+            .find(|f| f.fact.id == second_half.id)
+            .unwrap();
+        assert_eq!(dropped.stamp, deleted(100));
+    };
+    assert_alive_side_taken(&[keep]);
+    assert_alive_side_taken(&[keep, stale]);
 }
 
 // ── 参照の整合 ──
@@ -548,6 +615,174 @@ fn copy_of_an_already_synced_match_is_added_and_reported() {
     assert_eq!(duplicates[0].match_ids, vec![w.match_.id, copy.match_id]);
 }
 
+/// 試合ファイルで受け取った写しは、時刻が秒ちょうどになる（ファイルは秒までしか書かない）。元の記録が
+/// ミリ秒まで持っていても、同じ秒の印として一致する。
+#[test]
+fn match_file_copy_with_whole_second_times_is_still_a_copy() {
+    let w = World::new();
+    let mut local = w.snapshot(alive(1));
+    set_recorded_at(&mut local, w.phase.id, at_ms(5_347));
+    set_recorded_at(&mut local, w.goal.id, at_ms(700_120));
+    let copy = MatchFileCopy::new(&w);
+    let mut remote = copy.snapshot(alive(2));
+    set_recorded_at(&mut remote, copy.phase, at(5));
+    set_recorded_at(&mut remote, copy.goal, at(700));
+
+    let (merged, duplicates) = merged_with_duplicates(reconcile(&local, &remote, &[], at(100)));
+
+    assert_eq!(live_match_ids(&merged), vec![w.match_.id]);
+    assert!(duplicates.is_empty());
+}
+
+/// 同じ試合を 2 台で別々に記録したものは写しとみなさない。前半開始を同じ秒に押していても、端末で
+/// 記録した時刻はミリ秒まで持つので食い違う（handball-project#510 — 写しとみなして聞いた答えで、
+/// 片方の記録が丸ごと消えていた）。相手の記録は ID の振り方だけ写しと同じ（全部違う）。
+#[test]
+fn separate_recordings_of_the_same_match_are_not_copies() {
+    let w = World::new();
+    let mut local = w.snapshot(alive(1));
+    set_recorded_at(&mut local, w.phase.id, at_ms(5_347));
+    set_recorded_at(&mut local, w.goal.id, at_ms(700_120));
+    let other = MatchFileCopy::new(&w);
+    let mut remote = other.snapshot(alive(2));
+    set_recorded_at(&mut remote, other.phase, at_ms(5_812));
+    set_recorded_at(&mut remote, other.goal, at_ms(703_400));
+
+    let (merged, duplicates) = merged_with_duplicates(reconcile(&local, &remote, &[], at(100)));
+
+    assert_eq!(live_match_ids(&merged), vec![w.match_.id, other.match_id]);
+    assert!(duplicates.is_empty());
+}
+
+/// 別の人の記録の試合ファイル（秒ちょうど）が手元の記録と同じ秒に偶然当たっても、一致する印が
+/// 少ない側の半分に届かなければ写しとみなさない。
+#[test]
+fn match_file_sharing_less_than_half_of_the_prints_is_not_a_copy() {
+    let w = World::new();
+    let mut local = w.snapshot(alive(1));
+    set_recorded_at(&mut local, w.phase.id, at_ms(5_347));
+    set_recorded_at(&mut local, w.goal.id, at_ms(700_120));
+    let mut extra = goal(FactId(Uuid::from_u128(30)), &w, 900.0);
+    extra.recorded_at = at_ms(800_500);
+    local.facts.push(w.fact(&extra, alive(1)));
+    let other = MatchFileCopy::new(&w);
+    let mut remote = other.snapshot(alive(2));
+    // 前半開始だけが手元と同じ秒（3 つのうち 1 つ）。
+    set_recorded_at(&mut remote, other.phase, at(5));
+    set_recorded_at(&mut remote, other.goal, at(650));
+    let mut other_goal = play_at_match(PlayEventKind::Goal, other.home, other.player, 1200.0);
+    other_goal.id = FactId(Uuid::from_u128(62));
+    other_goal.recorded_at = at(1000);
+    remote.facts.push(SyncFact {
+        match_id: other.match_id,
+        fact: other_goal,
+        stamp: alive(2),
+    });
+
+    let (merged, duplicates) = merged_with_duplicates(reconcile(&local, &remote, &[], at(100)));
+
+    assert_eq!(live_match_ids(&merged), vec![w.match_.id, other.match_id]);
+    assert!(duplicates.is_empty());
+}
+
+/// 2 台が互いに試合ファイルを送り合っていると、組ごとに残す側が逆になる（この端末の試合 1 と、相手の
+/// 試合 2 が残る）。チームはどちらの組でも同じ行き先へまとめ、同じ名前のチームと選手を 1 つずつ残す
+/// （handball-project#510 — 向きのある票のまま互いに付け替え合い、参照のある両方が戻っていた）。
+#[test]
+fn copies_exchanged_both_ways_leave_one_team_and_player_per_name() {
+    let w = World::new();
+    let first = w.match_.id;
+    let second = MatchId(Uuid::from_u128(40));
+    let (b_home, b_away) = (TeamId(Uuid::from_u128(101)), TeamId(Uuid::from_u128(102)));
+    let b_alice = PlayerId(Uuid::from_u128(103));
+
+    // この端末: 自分で記録した試合 1 と、相手から試合ファイルで受け取った試合 2 の写し（ID 60。
+    // 取り込みで自分の同じ名前のチームに紐付けた）。
+    let mut local = w.snapshot(alive(1));
+    let (copy_of_second, copy_facts) = timer_match_records(
+        MatchId(Uuid::from_u128(60)),
+        (w.home.id, w.away.id),
+        w.player.id,
+        [(70, at(500)), (71, at(700))],
+        alive(2),
+    );
+    local.matches.push(copy_of_second);
+    local.facts.extend(copy_facts);
+
+    // 相手の端末: 自分のチームと選手、自分で記録した試合 2 と、受け取った試合 1 の写し（ID 150）。
+    let (original_second, second_facts) = timer_match_records(
+        second,
+        (b_home, b_away),
+        b_alice,
+        [(80, at_ms(500_250)), (81, at_ms(700_125))],
+        alive(1),
+    );
+    let (copy_of_first, first_copy_facts) = timer_match_records(
+        MatchId(Uuid::from_u128(150)),
+        (b_home, b_away),
+        b_alice,
+        [(160, epoch()), (161, epoch())],
+        alive(2),
+    );
+    let remote = SyncSnapshot {
+        matches: vec![original_second, copy_of_first],
+        teams: vec![
+            SyncTeam {
+                team: Team {
+                    id: b_home,
+                    name: w.home.name.clone(),
+                },
+                stamp: alive(1),
+            },
+            SyncTeam {
+                team: Team {
+                    id: b_away,
+                    name: w.away.name.clone(),
+                },
+                stamp: alive(1),
+            },
+        ],
+        players: vec![SyncPlayer {
+            player: Player {
+                id: b_alice,
+                team_id: b_home,
+                ..w.player.clone()
+            },
+            stamp: alive(1),
+        }],
+        facts: second_facts.into_iter().chain(first_copy_facts).collect(),
+    };
+
+    let merged = merged(reconcile(&local, &remote, &[], at(100)));
+
+    assert_eq!(live_match_ids(&merged), vec![first, second]);
+    let mut team_names: Vec<&str> = merged
+        .teams
+        .iter()
+        .filter(|t| !t.stamp.is_deleted())
+        .map(|t| t.team.name.as_str())
+        .collect();
+    team_names.sort_unstable();
+    assert_eq!(team_names, vec!["Away", "Home"]);
+    let player_names: Vec<&str> = merged
+        .players
+        .iter()
+        .filter(|p| !p.stamp.is_deleted())
+        .map(|p| p.player.name.as_str())
+        .collect();
+    assert_eq!(player_names, vec!["Alice"]);
+    // 残った試合は、残ったチームを指す。
+    let live_team = |id: TeamId| {
+        merged
+            .teams
+            .iter()
+            .any(|t| t.team.id == id && !t.stamp.is_deleted())
+    };
+    for m in merged.matches.iter().filter(|m| !m.stamp.is_deleted()) {
+        assert!(live_team(m.match_.home_team_id) && live_team(m.match_.away_team_id));
+    }
+}
+
 // ── 運ぶ形 ──
 
 #[test]
@@ -773,8 +1008,55 @@ fn goal(id: FactId, w: &World, secs: f64) -> MatchFact {
     fact
 }
 
+/// タイマーの試合 1 つ（区切り 0〜3600 秒・`scorer` の得点 1）と、その fact。
+/// fact は（ID に使う数、記録した時刻）を区切り・得点の順に渡す。
+fn timer_match_records(
+    id: MatchId,
+    (home, away): (TeamId, TeamId),
+    scorer: PlayerId,
+    [(phase_id, phase_at), (goal_id, goal_at)]: [(u128, DateTime<Utc>); 2],
+    stamp: SyncStamp,
+) -> (SyncMatch, Vec<SyncFact>) {
+    let mut match_ = make_timer_match(home, away);
+    match_.id = id;
+    let mut phase = timer_phase(FactId(Uuid::from_u128(phase_id)), 0.0, 3600.0);
+    phase.recorded_at = phase_at;
+    let mut scored = play_at_match(PlayEventKind::Goal, home, scorer, 600.0);
+    scored.id = FactId(Uuid::from_u128(goal_id));
+    scored.recorded_at = goal_at;
+    let facts = [phase, scored]
+        .into_iter()
+        .map(|fact| SyncFact {
+            match_id: id,
+            fact,
+            stamp,
+        })
+        .collect();
+    (
+        SyncMatch {
+            match_,
+            stamp,
+            local_video: None,
+        },
+        facts,
+    )
+}
+
+fn live_match_ids(snapshot: &SyncSnapshot) -> Vec<MatchId> {
+    snapshot
+        .matches
+        .iter()
+        .filter(|m| !m.stamp.is_deleted())
+        .map(|m| m.match_.id)
+        .collect()
+}
+
 fn at(secs: i64) -> DateTime<Utc> {
     epoch() + TimeDelta::seconds(secs)
+}
+
+fn at_ms(millis: i64) -> DateTime<Utc> {
+    epoch() + TimeDelta::milliseconds(millis)
 }
 
 fn alive(secs: i64) -> SyncStamp {
@@ -813,6 +1095,11 @@ fn set_title(snapshot: &mut SyncSnapshot, title: &str, stamp: SyncStamp) {
 fn set_fact_stamp(snapshot: &mut SyncSnapshot, id: FactId, stamp: SyncStamp) {
     let fact = snapshot.facts.iter_mut().find(|f| f.fact.id == id).unwrap();
     fact.stamp = stamp;
+}
+
+fn set_recorded_at(snapshot: &mut SyncSnapshot, id: FactId, at: DateTime<Utc>) {
+    let fact = snapshot.facts.iter_mut().find(|f| f.fact.id == id).unwrap();
+    fact.fact.recorded_at = at;
 }
 
 fn set_fact_note(snapshot: &mut SyncSnapshot, id: FactId, note: &str, stamp: SyncStamp) {
