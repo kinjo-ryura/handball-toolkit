@@ -8,7 +8,7 @@
 //! | 両方にあり、`updated_at` がまったく同じで中身が違う | 聞く（`SameTime`） |
 //! | 両方とも消してある | 新しい方の削除 |
 //! | 片方で消してある | 消した時刻が相手の最後の変更より後なら消す。前なら聞く（`DeletedThenChanged`） |
-//! | 両方の直しを合わせた試合が規則に合わない | 聞く（`MergedMatchInvalid`）。答えた側の試合を丸ごと採る |
+//! | 両方の直しを合わせた試合が規則に合わない | 聞く（`MergedMatchInvalid`）。答えた側の試合を丸ごと採る。片方で消した試合を残すと答えていたら、聞かずに生きている側を丸ごと採る |
 //!
 //! **聞いて選ばれた版は `now` で書き直す**。次の同期でどの端末と比べても選ばれた版が新しいので、
 //! 同じ結果になる。
@@ -181,6 +181,13 @@ pub fn reconcile(
             continue;
         }
         if !merged_match_has_issues(merged_match, &merged_facts, &players) {
+            continue;
+        }
+        // 片方で消してある試合が生きているのは、`DeletedThenChanged` で残すと答えたとき。生きている側の
+        // 版を選んだのと同じなので、聞かずにその側を丸ごと採る（聞いて消した側を選ぶと、残すと答えた
+        // 試合が消える — handball-project#510）。
+        if let Some(alive) = alive_side_against_deletion(*id, &local_side, &remote_side) {
+            replacements.push((*id, alive));
             continue;
         }
         let record = SyncRecordRef::Match { id: *id };
@@ -581,6 +588,20 @@ impl<'a> SideView<'a> {
                     .get(&merged.fact.id)
                     .is_some_and(|own| fact_content_equal(own, merged))
             })
+    }
+}
+
+/// 片方の端末だけで試合を消してあるとき、消していない側。
+fn alive_side_against_deletion(
+    id: MatchId,
+    local: &SideView<'_>,
+    remote: &SideView<'_>,
+) -> Option<SyncSide> {
+    let deleted = |view: &SideView<'_>| view.matches.get(&id).map(|m| m.stamp.is_deleted());
+    match (deleted(local), deleted(remote)) {
+        (Some(true), Some(false)) => Some(SyncSide::Remote),
+        (Some(false), Some(true)) => Some(SyncSide::Local),
+        _ => None,
     }
 }
 

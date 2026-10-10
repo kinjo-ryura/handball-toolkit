@@ -3,9 +3,13 @@
 //! 試合ファイル（SAMPLE_DTO_V2）で受け取った写しは、試合・fact・チーム・選手とも元の端末と別の ID を
 //! 持つ。そのまま記録ごとに比べると、全部が「片方にしか無い」になり、同じ試合が 2 つ並ぶ。
 //!
-//! - **同じ試合の見分け方**: fact の「記録した秒と種類」の組を 1 つでも共有するか。取り込みは
-//!   `recorded_at` を残す（試合ファイルは秒までしか書かないので、秒に切り捨てて比べる）。
-//!   記録した瞬間の時刻なので、別の試合で偶然そろうことはまず無い。fact の無い試合は、日付（秒）と
+//! - **同じ試合の見分け方**: fact の「記録した時刻と種類」（印）が、印の少ない側の半分以上で
+//!   一致するか。取り込みは `recorded_at` を残すが、試合ファイルは秒までしか書かない（切り捨て）ので、
+//!   写しの時刻は秒ちょうどになる。印が一致するのは、種類と秒が同じで、ミリ秒まで同じか、片方が
+//!   秒ちょうどのとき。端末で記録した時刻はミリ秒まで持つので、同じ試合を 2 台で別々に記録しても
+//!   （前半開始を同じ秒に押しても）ミリ秒が食い違って一致しない。半分以上を求めるのは、別の人の記録の
+//!   試合ファイル（秒ちょうど）が手元の記録と偶然同じ秒に当たることがあるため。写しなら、どちらかで
+//!   足したり消したりしていても、少ない側の印のほとんどが一致する。fact の無い試合は、日付（秒）と
 //!   両チームの名前で見る
 //! - **1 つにするのは、まだ同期していない端末をまたぐ写しの組だけ**:
 //!   - どちらかの ID が両方の端末にある（同期済みの試合に、後から試合ファイルで写しが届いた）→
@@ -14,6 +18,8 @@
 //!   - 端末をまたぐ写しが組をなす → 中身が同じなら小さい方の ID に黙ってまとめ、違えば
 //!     [`super::SyncQuestionKind::CopiesDiffer`] で聞いて、答えた側を残す
 //! - **チームと選手**: 組にした試合のホーム同士・アウェイ同士で、名前が同じチームを 1 つにする。
+//!   つながったチームは向きを見ずに 1 つの組にし、組ごとに行き先を 1 つ選ぶ（2 台が互いに試合ファイルを
+//!   送り合っていると、組ごとに残す側が逆になるため — `Edits::team_merges`）。
 //!   選手は背番号と名前が同じ人をまとめ、残りはまとめた先のチームへ移す。名前の違うチーム
 //!   （取り込みで既存の別名のチームに紐付けたもの）はまとめない
 //!
@@ -90,6 +96,7 @@ pub(crate) fn pair_copies(
         }
 
         let Some((l, r, identical)) = best_pair(&local_members, &remote_members, &views) else {
+            duplicates.push(ids.into_iter().collect());
             continue;
         };
         let record = SyncRecordRef::Match { id: l.id.min(r.id) };
@@ -183,10 +190,49 @@ pub(crate) fn pair_copies(
 struct Node {
     side: SyncSide,
     id: MatchId,
-    /// fact の「記録した秒と種類」の組。
-    prints: BTreeSet<(i64, String)>,
+    /// fact の印: 「記録した秒と種類」→ その秒の中のミリ秒（0 は秒ちょうど）。
+    prints: BTreeMap<(i64, String), BTreeSet<u32>>,
+    /// 印の数（ミリ秒まで数える）。
+    print_count: usize,
     /// fact の無い試合だけ、日付（秒）と両チームの名前。
     empty_key: Option<(i64, String, String)>,
+}
+
+/// 2 つの試合が同じ試合に見えるか。見えるなら、一致する印の数（fact の無い試合どうしは 0）。
+///
+/// 印が一致するのは種類と秒が同じで、ミリ秒まで同じか、片方が秒ちょうど（試合ファイルで受け取った
+/// 写し）のとき。一致する印が、印の少ない側の半分以上あれば同じ試合とみなす（モジュールの doc）。
+fn linked(a: &Node, b: &Node) -> Option<usize> {
+    if let (Some(x), Some(y)) = (&a.empty_key, &b.empty_key) {
+        return (x == y).then_some(0);
+    }
+    let shared: usize = a
+        .prints
+        .iter()
+        .filter_map(|(key, a_millis)| b.prints.get(key).map(|b_millis| (a_millis, b_millis)))
+        .map(|(a_millis, b_millis)| matched_prints(a_millis, b_millis))
+        .sum();
+    let fewer = a.print_count.min(b.print_count);
+    (shared > 0 && shared * 2 >= fewer).then_some(shared)
+}
+
+/// 同じ秒・同じ種類の印どうしで、1 対 1 に一致させられる最大の数。
+///
+/// ミリ秒が同じ印どうしは一致する。秒ちょうど（0）の印は、相手のどの印とも一致できる。
+fn matched_prints(a: &BTreeSet<u32>, b: &BTreeSet<u32>) -> usize {
+    let (a_whole, b_whole) = (a.contains(&0), b.contains(&0));
+    let exact = a.iter().filter(|m| **m != 0 && b.contains(m)).count();
+    // ミリ秒の同じ相手が無い、秒ちょうどでない印の数。
+    let a_rest = a.len() - usize::from(a_whole) - exact;
+    let b_rest = b.len() - usize::from(b_whole) - exact;
+    let whole = match (a_whole, b_whole) {
+        // 秒ちょうどどうしで 1 つ、または両方がそれぞれ相手の残りと 1 つずつ。
+        (true, true) => 1 + usize::from(a_rest > 0 && b_rest > 0),
+        (true, false) => usize::from(b_rest > 0),
+        (false, true) => usize::from(a_rest > 0),
+        (false, false) => 0,
+    };
+    exact + whole
 }
 
 fn kind_key(fact: &MatchFact) -> String {
@@ -202,11 +248,11 @@ fn kind_key(fact: &MatchFact) -> String {
     }
 }
 
-/// 同じ試合に見える試合をまとめる（同じ ID・印を 1 つでも共有・fact の無い試合の日付とチーム名）。
+/// 同じ試合に見える試合をまとめる（同じ ID・[`linked`]・fact の無い試合の日付とチーム名）。
 fn clusters(nodes: &[Node]) -> Vec<Vec<usize>> {
     let mut parent: Vec<usize> = (0..nodes.len()).collect();
     let mut first_by_id: BTreeMap<MatchId, usize> = BTreeMap::new();
-    let mut first_by_print: BTreeMap<&(i64, String), usize> = BTreeMap::new();
+    let mut by_print: BTreeMap<&(i64, String), Vec<usize>> = BTreeMap::new();
     let mut first_by_empty: BTreeMap<&(i64, String, String), usize> = BTreeMap::new();
     for (i, node) in nodes.iter().enumerate() {
         if let Some(&j) = first_by_id.get(&node.id) {
@@ -214,18 +260,25 @@ fn clusters(nodes: &[Node]) -> Vec<Vec<usize>> {
         } else {
             first_by_id.insert(node.id, i);
         }
-        for print in &node.prints {
-            if let Some(&j) = first_by_print.get(print) {
-                union(&mut parent, i, j);
-            } else {
-                first_by_print.insert(print, i);
-            }
+        for key in node.prints.keys() {
+            by_print.entry(key).or_default().push(i);
         }
         if let Some(key) = &node.empty_key {
             if let Some(&j) = first_by_empty.get(key) {
                 union(&mut parent, i, j);
             } else {
                 first_by_empty.insert(key, i);
+            }
+        }
+    }
+    // 秒と種類を共有する試合の組だけを確かめる。
+    let mut checked: BTreeSet<(usize, usize)> = BTreeSet::new();
+    for members in by_print.values() {
+        for (k, &i) in members.iter().enumerate() {
+            for &j in &members[k + 1..] {
+                if checked.insert((i, j)) && linked(&nodes[i], &nodes[j]).is_some() {
+                    union(&mut parent, i, j);
+                }
             }
         }
     }
@@ -252,11 +305,13 @@ fn union(parent: &mut [usize], a: usize, b: usize) {
     }
 }
 
-/// 組の良さ: 共有する印の数 → 中身が同じか → ID が小さいか（`Reverse` で小さい方を大きく見せる）。
+/// 組の良さ: 一致する印の数 → 中身が同じか → ID が小さいか（`Reverse` で小さい方を大きく見せる）。
 type PairScore = (usize, bool, std::cmp::Reverse<(MatchId, MatchId)>);
 
-/// 端末をまたいで組にする 2 つ。印を最も多く共有する組、同じなら中身が同じ組、さらに同じなら
-/// ID の小さい組。戻り値の最後は「中身が同じか」。
+/// 端末をまたいで組にする 2 つ。同じ試合に見える組（[`linked`]）のうち、印を最も多く共有する組、
+/// 同じなら中身が同じ組、さらに同じなら ID の小さい組。戻り値の最後は「中身が同じか」。
+///
+/// 同じ端末の写しを介して 1 つにまとまった試合どうしは、直接には同じ試合に見えないことがあるので組にしない。
 fn best_pair<'n>(
     local_members: &[&'n Node],
     remote_members: &[&'n Node],
@@ -265,7 +320,9 @@ fn best_pair<'n>(
     let mut best: Option<(PairScore, &Node, &Node)> = None;
     for &l in local_members {
         for &r in remote_members {
-            let shared = l.prints.intersection(&r.prints).count();
+            let Some(shared) = linked(l, r) else {
+                continue;
+            };
             let identical = copies_identical(views.get(l.side), l.id, views.get(r.side), r.id);
             let score = (shared, identical, std::cmp::Reverse((l.id, r.id)));
             if best.as_ref().is_none_or(|(current, _, _)| score > *current) {
@@ -428,13 +485,15 @@ impl<'a> SideView<'a> {
         self.matches
             .values()
             .map(|m| {
-                let prints: BTreeSet<(i64, String)> = self
-                    .live_facts
-                    .get(&m.match_.id)
-                    .into_iter()
-                    .flatten()
-                    .map(|f| (f.fact.recorded_at.timestamp(), kind_key(&f.fact)))
-                    .collect();
+                let mut prints: BTreeMap<(i64, String), BTreeSet<u32>> = BTreeMap::new();
+                for f in self.live_facts.get(&m.match_.id).into_iter().flatten() {
+                    let at = f.fact.recorded_at;
+                    prints
+                        .entry((at.timestamp(), kind_key(&f.fact)))
+                        .or_default()
+                        .insert(at.timestamp_subsec_millis());
+                }
+                let print_count: usize = prints.values().map(BTreeSet::len).sum();
                 let empty_key = prints.is_empty().then(|| {
                     (
                         m.match_.date.timestamp(),
@@ -450,6 +509,7 @@ impl<'a> SideView<'a> {
                     side: self.side,
                     id: m.match_.id,
                     prints,
+                    print_count,
                     empty_key,
                 }
             })
@@ -501,19 +561,61 @@ impl Edits {
             .or_default() += 1;
     }
 
-    /// まとめるチームの行き先。票の最も多い先、同じなら ID の小さい先。
+    /// まとめるチームの行き先。
+    ///
+    /// 票は「消す写しのチーム → 残す写しのチーム」の向きを持つが、向きのまま行き先にすると、2 台が
+    /// 互いに試合ファイルを送り合っていたとき（組ごとに残す側が逆になる）`A → B` と `B → A` が両方でき、
+    /// 両方のチームを消して付け替え合う。参照のある両方を `revive_referenced`（`reconcile.rs`）が戻すので、
+    /// 同じ名前のチームが 2 つ残る（handball-project#510）。
+    ///
+    /// そこで向きを捨て、票でつながったチームを 1 つの組にして、組ごとに行き先を 1 つ選ぶ: 残す側として
+    /// 票を最も多く受けたチーム、同じなら ID の小さいチーム。組のほかのチームはすべてそこへまとめる
+    /// （両方の端末にある同じ ID のチームは同じチームなので、まとめない）。
     fn team_merges(&self) -> BTreeMap<(SyncSide, TeamId), (SyncSide, TeamId)> {
-        self.team_votes
+        let teams: Vec<(SyncSide, TeamId)> = self
+            .team_votes
             .iter()
-            .filter_map(|(from, votes)| {
-                votes
-                    .iter()
-                    .max_by(|(a_to, a_count), (b_to, b_count)| {
-                        a_count.cmp(b_count).then_with(|| b_to.1.cmp(&a_to.1))
-                    })
-                    .map(|(to, _)| (*from, *to))
-            })
-            .collect()
+            .flat_map(|(from, votes)| std::iter::once(*from).chain(votes.keys().copied()))
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        let index: BTreeMap<(SyncSide, TeamId), usize> = teams
+            .iter()
+            .enumerate()
+            .map(|(i, team)| (*team, i))
+            .collect();
+        let mut parent: Vec<usize> = (0..teams.len()).collect();
+        let mut received: Vec<usize> = vec![0; teams.len()];
+        for (from, votes) in &self.team_votes {
+            for (to, count) in votes {
+                union(&mut parent, index[from], index[to]);
+                received[index[to]] += count;
+            }
+        }
+        let mut groups: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+        for i in 0..teams.len() {
+            let root = find(&mut parent, i);
+            groups.entry(root).or_default().push(i);
+        }
+
+        let mut merges: BTreeMap<(SyncSide, TeamId), (SyncSide, TeamId)> = BTreeMap::new();
+        for members in groups.values() {
+            let Some(&target) = members.iter().max_by(|&&a, &&b| {
+                received[a]
+                    .cmp(&received[b])
+                    .then_with(|| teams[b].1.cmp(&teams[a].1))
+                    .then_with(|| teams[b].0.cmp(&teams[a].0))
+            }) else {
+                continue;
+            };
+            let to = teams[target];
+            for &i in members {
+                if teams[i].1 != to.1 {
+                    merges.insert(teams[i], to);
+                }
+            }
+        }
+        merges
     }
 }
 
