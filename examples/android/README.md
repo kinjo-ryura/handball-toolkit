@@ -46,7 +46,7 @@ UI は plain View、エラー表示は素の文字列、依存は最小に絞っ
 
 ```sh
 mkdir -p app/libs
-gh release download v0.13.0 --pattern '*.aar' --dir app/libs
+gh release download v0.14.0 --pattern '*.aar' --dir app/libs
 ```
 
 ```sh
@@ -59,7 +59,7 @@ adb shell am start -n com.example.handballshell/.MainActivity
 
 ```sh
 ./scripts/build_aar.sh                                              # リポジトリルートから
-cp target/aar/handball-toolkit-0.13.0.aar examples/android/app/libs/
+cp target/aar/handball-toolkit-0.14.0.aar examples/android/app/libs/
 ```
 
 `app/libs/` と `local.properties` はコミットしない。
@@ -79,7 +79,7 @@ AGP / Gradle / KSP / Room の組み合わせ、`.aar` の API とサンプルの
 | Kotlin | 2.4.20 | ルートの `build.gradle.kts` に `apply false` で宣言して版を決める（AGP 9.x が既定で引くのは 2.2.10） |
 | KSP | 2.3.12 | 2.3 系から Kotlin と版が連動しない。AGP 9 の built-in Kotlin には 2.3.1 以上が要る |
 | Room | 2.8.5 | |
-| handball-toolkit | 0.13.0 | `app/libs/handball-toolkit-0.13.0.aar`。コア crate の version に従う（ずれると CI が落ちる — 下記） |
+| handball-toolkit | 0.14.0 | `app/libs/handball-toolkit-0.14.0.aar`。コア crate の version に従う（ずれると CI が落ちる — 下記） |
 | JNA | 5.19.1（`@aar`） | 生成コードが `Native.register` で使う。**`.aar` は依存情報を運ばない**ので利用側で宣言する |
 | compileSdk / targetSdk | 36 | `buildToolsVersion = "37.0.0"` を明示（nix の SDK には 1 つしか無い） |
 | minSdk | **24** | 下記参照 |
