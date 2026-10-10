@@ -8,6 +8,8 @@
 //!   1 つにする。同じ試合を 2 台で別々に記録したものはまとめない
 //! - 端末ごとの値（左右配置・写真・端末内動画の参照）は比べず、保存する端末の値を残す
 //! - 時刻はミリ秒に丸めて比べる（端末との往復で ns の桁がずれても問いを出さない）
+//! - 一覧（`changes`）は、それぞれの端末で見える中身が変わるものだけを数える。削除の記録・時刻・端末ごとの
+//!   値だけの差と、同じ中身の写しをまとめることは数えない。まとめた写し・チーム・選手は 1 行に見せる
 //! - 運ぶ形は版を先に見る。f64 も時刻もそのまま往復する
 
 mod fixtures;
@@ -18,10 +20,11 @@ use handball_toolkit::entities::{Match, Player, PlayerPhoto, Team};
 use handball_toolkit::facts::{MatchFact, MatchFactPayload, PlayEventKind};
 use handball_toolkit::ids::{FactId, MatchId, PlayerId, TeamId};
 use handball_toolkit::sync::{
-    LocalVideoIdentity, SYNC_FORMAT_VERSION, SyncAnswer, SyncFact, SyncMatch, SyncPayload,
+    LocalVideoIdentity, SYNC_FORMAT_VERSION, SyncAnswer, SyncChangeKind, SyncChanges,
+    SyncDeviceChanges, SyncFact, SyncMatch, SyncMatchChange, SyncMatchField, SyncPayload,
     SyncPayloadError, SyncPlayer, SyncQuestion, SyncQuestionKind, SyncReconcileResult,
-    SyncRecordRef, SyncSide, SyncSnapshot, SyncStamp, SyncTeam, decode_sync_payload,
-    encode_sync_payload, materialize, reconcile,
+    SyncRecordRef, SyncSide, SyncSnapshot, SyncStamp, SyncTeam, SyncTeamChange,
+    decode_sync_payload, encode_sync_payload, materialize, reconcile,
 };
 use uuid::Uuid;
 
@@ -783,6 +786,259 @@ fn copies_exchanged_both_ways_leave_one_team_and_player_per_name() {
     }
 }
 
+// ── 一覧 ──
+
+/// それぞれの端末に、相手から入るものだけが出る。試合のタイトルを直した側には相手が足した記録が、
+/// 記録を足した側には相手が直したタイトルが出る。
+#[test]
+fn changes_list_what_each_device_receives() {
+    let w = World::new();
+    let mut local = w.snapshot(alive(1));
+    let mut remote = w.snapshot(alive(1));
+    set_title(&mut local, "決勝", alive(10));
+    let extra = goal(FactId(Uuid::from_u128(30)), &w, 900.0);
+    remote.facts.push(w.fact(&extra, alive(20)));
+
+    let changes = changes_of(reconcile(&local, &remote, &[], at(100)));
+
+    assert_eq!(
+        changes.local,
+        SyncDeviceChanges {
+            matches: vec![SyncMatchChange {
+                facts_added: 1,
+                ..match_change(w.match_.id, SyncChangeKind::Updated)
+            }],
+            teams: vec![],
+        }
+    );
+    assert_eq!(
+        changes.remote,
+        SyncDeviceChanges {
+            matches: vec![SyncMatchChange {
+                fields: vec![SyncMatchField::Title],
+                ..match_change(w.match_.id, SyncChangeKind::Updated)
+            }],
+            teams: vec![],
+        }
+    );
+}
+
+#[test]
+fn identical_devices_have_nothing_to_change() {
+    let w = World::new();
+
+    let changes = changes_of(reconcile(
+        &w.snapshot(alive(1)),
+        &w.snapshot(alive(1)),
+        &[],
+        at(100),
+    ));
+
+    assert!(changes.is_empty());
+}
+
+/// 見える中身の変わらない差（削除の記録だけ・時刻だけ・端末ごとの値）は数えない。両方とも空なら
+/// 「すべて最新です」で、保存しない（handball-project#520）。
+#[test]
+fn differences_nobody_can_see_are_not_changes() {
+    let w = World::new();
+    let mut local = w.snapshot(alive(1));
+    let mut remote = w.snapshot(alive(1));
+    // 端末ごとの値: 左右配置と写真。
+    local.matches[0].match_.is_home_on_left = false;
+    remote.players[0].player.photo = Some(PlayerPhoto {
+        storage_key: "alice.jpg".to_owned(),
+    });
+    // 削除の記録だけ: この端末に無かった記録を、相手は足して消してある。
+    let gone = goal(FactId(Uuid::from_u128(30)), &w, 900.0);
+    remote.facts.push(w.fact(&gone, deleted(20)));
+    // 時刻だけ: 同じ名前のまま、相手で保存し直した。
+    remote.teams[0].stamp = alive(30);
+
+    let changes = changes_of(reconcile(&local, &remote, &[], at(100)));
+
+    assert!(changes.is_empty(), "{changes:?}");
+}
+
+/// 片方にしか無い試合・チームは「追加」（記録と選手の数つき）、消した試合は相手で「削除」。
+#[test]
+fn added_and_removed_records_are_listed() {
+    let w = World::new();
+    let mut local = w.snapshot(alive(1));
+    local.matches[0].stamp = deleted(30);
+    let mut remote = w.snapshot(alive(1));
+    let south = TeamId(Uuid::from_u128(200));
+    let (scorer, keeper) = (
+        PlayerId(Uuid::from_u128(201)),
+        PlayerId(Uuid::from_u128(202)),
+    );
+    let second = MatchId(Uuid::from_u128(40));
+    let (second_match, second_facts) = timer_match_records(
+        second,
+        (south, w.home.id),
+        scorer,
+        [(41, at(500)), (42, at(700))],
+        alive(5),
+    );
+    remote.matches.push(second_match);
+    remote.facts.extend(second_facts);
+    remote.teams.push(SyncTeam {
+        team: Team {
+            id: south,
+            name: "South".to_owned(),
+        },
+        stamp: alive(5),
+    });
+    for (id, name, number) in [(scorer, "Carol", 10), (keeper, "Dave", 1)] {
+        remote.players.push(SyncPlayer {
+            player: Player {
+                id,
+                team_id: south,
+                name: name.to_owned(),
+                jersey_number: Some(number),
+                photo: None,
+            },
+            stamp: alive(5),
+        });
+    }
+
+    let changes = changes_of(reconcile(&local, &remote, &[], at(100)));
+
+    assert_eq!(
+        changes.local,
+        SyncDeviceChanges {
+            matches: vec![SyncMatchChange {
+                facts_added: 2,
+                ..match_change(second, SyncChangeKind::Added)
+            }],
+            teams: vec![SyncTeamChange {
+                players_added: 2,
+                ..team_change(south, SyncChangeKind::Added)
+            }],
+        }
+    );
+    assert_eq!(
+        changes.remote,
+        SyncDeviceChanges {
+            matches: vec![match_change(w.match_.id, SyncChangeKind::Removed)],
+            teams: vec![],
+        }
+    );
+}
+
+/// 記録（fact）の足す・消す・変わるは、試合の「更新」に数で入る。
+#[test]
+fn fact_changes_are_counted_on_their_match() {
+    let w = World::new();
+    let mut local = w.snapshot(alive(1));
+    let mut remote = w.snapshot(alive(1));
+    set_fact_stamp(&mut local, w.goal.id, deleted(30));
+    let extra = goal(FactId(Uuid::from_u128(30)), &w, 900.0);
+    remote.facts.push(w.fact(&extra, alive(20)));
+
+    let changes = changes_of(reconcile(&local, &remote, &[], at(100)));
+
+    assert_eq!(
+        changes.remote.matches,
+        vec![SyncMatchChange {
+            facts_removed: 1,
+            ..match_change(w.match_.id, SyncChangeKind::Updated)
+        }]
+    );
+
+    let local = w.snapshot(alive(1));
+    let mut remote = w.snapshot(alive(1));
+    set_fact_note(&mut remote, w.goal.id, "速攻", alive(20));
+
+    let changes = changes_of(reconcile(&local, &remote, &[], at(100)));
+
+    assert_eq!(
+        changes.local.matches,
+        vec![SyncMatchChange {
+            facts_changed: 1,
+            ..match_change(w.match_.id, SyncChangeKind::Updated)
+        }]
+    );
+    assert!(changes.remote.is_empty());
+}
+
+/// チームの名前と選手の変化は、チーム 1 行にまとめる。
+#[test]
+fn team_rename_and_new_player_are_one_team_row() {
+    let w = World::new();
+    let local = w.snapshot(alive(1));
+    let mut remote = w.snapshot(alive(1));
+    remote.teams[0].team.name = "Home FC".to_owned();
+    remote.teams[0].stamp = alive(10);
+    remote.players.push(SyncPlayer {
+        player: Player {
+            id: PlayerId(Uuid::from_u128(4)),
+            team_id: w.home.id,
+            name: "Bob".to_owned(),
+            jersey_number: Some(9),
+            photo: None,
+        },
+        stamp: alive(10),
+    });
+
+    let changes = changes_of(reconcile(&local, &remote, &[], at(100)));
+
+    assert_eq!(
+        changes.local,
+        SyncDeviceChanges {
+            matches: vec![],
+            teams: vec![SyncTeamChange {
+                renamed: true,
+                players_added: 1,
+                ..team_change(w.home.id, SyncChangeKind::Updated)
+            }],
+        }
+    );
+    assert!(changes.remote.is_empty());
+}
+
+/// 同じ中身の写しを 1 つにまとめても、見える試合・チーム・選手は変わらない（ID だけが変わる）。
+#[test]
+fn merging_identical_copies_is_not_a_change() {
+    let w = World::new();
+    let local = w.snapshot(alive(1));
+    let remote = MatchFileCopy::new(&w).snapshot(alive(2));
+
+    let changes = changes_of(reconcile(&local, &remote, &[], at(100)));
+
+    assert!(changes.is_empty(), "{changes:?}");
+}
+
+/// 中身の違う写しで相手の写しを残すと、この端末には「更新（写しが置き換わる）」の 1 行だけが出る。
+/// 写しのチームと選手は、名前の同じチームと選手に読み替えるので、チームの行は出ない。
+#[test]
+fn copy_replaced_by_the_other_devices_copy_is_one_row() {
+    let w = World::new();
+    let local = w.snapshot(alive(1));
+    let copy = MatchFileCopy::new(&w);
+    let mut remote = copy.snapshot(alive(2));
+    set_fact_note(&mut remote, copy.goal, "速攻", alive(3));
+    let answer = SyncAnswer {
+        kind: SyncQuestionKind::CopiesDiffer,
+        record: SyncRecordRef::Match { id: w.match_.id },
+        keep: SyncSide::Remote,
+    };
+
+    let changes = changes_of(reconcile(&local, &remote, &[answer], at(100)));
+
+    assert_eq!(
+        changes.local,
+        SyncDeviceChanges {
+            matches: vec![SyncMatchChange {
+                copy_replaced: true,
+                ..match_change(copy.match_id, SyncChangeKind::Updated)
+            }],
+            teams: vec![],
+        }
+    );
+    assert!(changes.remote.is_empty(), "{:?}", changes.remote);
+}
+
 // ── 運ぶ形 ──
 
 #[test]
@@ -997,8 +1253,41 @@ fn merged_with_duplicates(
         SyncReconcileResult::Merged {
             snapshot,
             duplicates,
+            ..
         } => (snapshot, duplicates),
         SyncReconcileResult::Questions { questions } => panic!("問いが出た: {questions:?}"),
+    }
+}
+
+fn changes_of(result: SyncReconcileResult) -> SyncChanges {
+    match result {
+        SyncReconcileResult::Merged { changes, .. } => changes,
+        SyncReconcileResult::Questions { questions } => panic!("問いが出た: {questions:?}"),
+    }
+}
+
+/// 数の無い、試合 1 つの変化。
+fn match_change(id: MatchId, kind: SyncChangeKind) -> SyncMatchChange {
+    SyncMatchChange {
+        match_id: id,
+        kind,
+        fields: vec![],
+        facts_added: 0,
+        facts_removed: 0,
+        facts_changed: 0,
+        copy_replaced: false,
+    }
+}
+
+/// 数の無い、チーム 1 つの変化。
+fn team_change(id: TeamId, kind: SyncChangeKind) -> SyncTeamChange {
+    SyncTeamChange {
+        team_id: id,
+        kind,
+        renamed: false,
+        players_added: 0,
+        players_removed: 0,
+        players_changed: 0,
     }
 }
 

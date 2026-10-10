@@ -12,6 +12,8 @@
 //!
 //! **聞いて選ばれた版は `now` で書き直す**。次の同期でどの端末と比べても選ばれた版が新しいので、
 //! 同じ結果になる。
+//!
+//! そろえた中身と一緒に、それぞれの端末で何が変わるか（一覧 — `changes`）を返す。
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -23,6 +25,7 @@ use crate::ids::{FactId, MatchId, PlayerId, TeamId};
 use crate::persistence_order::persistence_ordered;
 use crate::validators::{RosterContext, validate_fact_log, validate_match, validate_match_fact};
 
+use super::changes::{SyncChanges, device_changes};
 use super::compare::{
     fact_content_equal, match_content_equal, player_content_equal, team_content_equal,
 };
@@ -42,10 +45,12 @@ pub enum SyncReconcileResult {
     /// 答えた後に別の問い（`MergedMatchInvalid`）が出ることがある — 返らなくなるまで繰り返す。
     Questions { questions: Vec<SyncQuestion> },
     /// そろえた中身（端末ごとの値は入れたまま）。両方の端末が [`super::materialize`] して保存する。
-    /// `duplicates` は、同じ試合に見えるがまとめなかった組（利用者に知らせる）。
+    /// `duplicates` は、同じ試合に見えるがまとめなかった組（利用者に知らせる）。`changes` は、保存すると
+    /// それぞれの端末で何が変わるか（どちらも空なら「すべて最新です」— 保存しない。ADR 0007 決定 8）。
     Merged {
         snapshot: SyncSnapshot,
         duplicates: Vec<SyncDuplicateGroup>,
+        changes: SyncChanges,
     },
 }
 
@@ -74,7 +79,8 @@ pub fn reconcile(
     now: DateTime<Utc>,
 ) -> SyncReconcileResult {
     // 時刻をミリ秒に丸めてから比べる（`normalize` の doc — 端末との往復で ns の桁がずれる）。
-    let (local, remote) = (normalized(local), normalized(remote));
+    // 突き合わせる前の記録は、一覧（`changes`）の比べる元にも使う。
+    let (before_local, before_remote) = (normalized(local), normalized(remote));
     let now = round_to_millis(now);
     let answers: Answers = answers
         .iter()
@@ -82,7 +88,7 @@ pub fn reconcile(
         .collect();
 
     // ID の違う写しを先に 1 つにする（突き合わせ）。聞くことがあれば、記録ごとの比較より先に聞く。
-    let pairing = pair_copies(&local, &remote, &answers, now);
+    let pairing = pair_copies(&before_local, &before_remote, &answers, now);
     if !pairing.questions.is_empty() {
         return questions_result(pairing.questions);
     }
@@ -213,14 +219,20 @@ pub fn reconcile(
         replace_whole_match(id, kept, other, &mut matches, &mut facts, now);
     }
 
+    let snapshot = SyncSnapshot {
+        matches: matches.into_values().collect(),
+        teams: teams.into_values().collect(),
+        players: players.into_values().collect(),
+        facts: facts.into_values().collect(),
+    };
+    let changes = SyncChanges {
+        local: device_changes(&before_local, &snapshot, &pairing.local_merges),
+        remote: device_changes(&before_remote, &snapshot, &pairing.remote_merges),
+    };
     SyncReconcileResult::Merged {
-        snapshot: SyncSnapshot {
-            matches: matches.into_values().collect(),
-            teams: teams.into_values().collect(),
-            players: players.into_values().collect(),
-            facts: facts.into_values().collect(),
-        },
+        snapshot,
         duplicates,
+        changes,
     }
 }
 
