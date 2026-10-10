@@ -71,7 +71,7 @@ dependencies {
     // CI はいまのソースから組んだ .aar を handball-toolkit-<toolkitVersion>.aar の名前で置いて
     // このサンプルをビルドするので、版を上げてここを直し忘れると CI が落ちる
     // （CI がビルドしていなかった間、ここは 0.2.0 のまま 0.11.0 までずれていた — handball-project#412）。
-    implementation(files("libs/handball-toolkit-0.12.0.aar"))
+    implementation(files("libs/handball-toolkit-0.13.0.aar"))
 
     // .aar ファイル単体は依存情報を運ばない（運ぶのは Maven の POM で、ローカルファイル
     // 参照では POM が介在しない）。そのため利用側がこの 2 つを自分で宣言する必要がある。
