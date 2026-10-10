@@ -1,6 +1,6 @@
 //! そろえた中身を、この端末に保存する形へ戻す（ADR 0007 決定 2）。
 //!
-//! そろえた中身（または上書きで合わせる側の中身）には、相手の端末の値がそのまま入っている。
+//! そろえた中身には、相手の端末の値がそのまま入っている。
 //! 端末ごとの値は、この端末に同じ記録があればこの端末の値を残す:
 //!
 //! - 試合の左右配置（`is_home_on_left`）— 見方の設定
@@ -18,8 +18,8 @@ use super::compare::same_local_video;
 use super::normalize::normalized;
 use super::{LocalVideoIdentity, SyncMatch, SyncSnapshot};
 
-/// この端末に保存する中身。**店の全記録をこれと同じにする** — ここに無い記録は消す
-/// （上書きで、合わせられる側にしか無かった記録）。
+/// この端末に保存する中身。**店の全記録をこれと同じにする** — ここに無い記録は消す。
+/// そろえた中身は、採らなかった記録も削除の記録として持つ（`reconcile`）。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
@@ -38,7 +38,7 @@ pub struct VideoRelink {
     pub identity: LocalVideoIdentity,
 }
 
-/// `incoming`（そろえた中身、または上書きで合わせる側の中身）を、`local`（この端末の今の全記録）の
+/// `incoming`（そろえた中身）を、`local`（この端末の今の全記録）の
 /// 端末ごとの値で戻す。
 pub fn materialize(incoming: &SyncSnapshot, local: &SyncSnapshot) -> SyncApplyPlan {
     let mut snapshot = normalized(incoming);
