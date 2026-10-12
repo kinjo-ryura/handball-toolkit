@@ -16,6 +16,10 @@
 //! 見せる単位は試合とチーム。記録（fact）の変化は試合の「更新」に、選手の変化はチームの「更新」に
 //! 入れて数を添える。
 //!
+//! 試合と一緒にこの端末へ入るチーム（と選手）は、チームの行にせず、その試合の行に数で入れる
+//! （handball-project#528）。試合を足すとそのチームも入るのに、別の物が入るように見えたため。
+//! チームの行は、試合と関係なく変わるとき（名前の変更・選手の増減・どの試合にも参照されずに入る・削除）だけ出す。
+//!
 //! 突き合わせ（`pairing`）でまとめた写し・チーム・選手は、消す側の ID を残す側の ID に読み替えてから
 //! 比べる。読み替えないと、同じ試合やチームが「削除」と「追加」の 2 行に見える。
 
@@ -76,6 +80,12 @@ pub struct SyncMatchChange {
     /// `Updated` のとき、この端末の写しが、中身の違う相手の写しに置き換わる（`CopiesDiffer` の答え）。
     /// 項目と記録の数は数えない — 写しどうしは記録の ID が違い、どの記録が同じかを決められない。
     pub copy_replaced: bool,
+    /// この試合と一緒にこの端末へ入るチーム（この端末に無く、この試合がホームかアウェイに持つ）の数。
+    /// 複数の試合が持つチームは、一覧で最初の（日付の新しい）試合だけに数える。`Removed` は 0。
+    /// ここに数えたチームは、チームの一覧（[`SyncDeviceChanges::teams`]）に出さない。
+    pub teams_added: u32,
+    /// `teams_added` のチームの選手の数。
+    pub team_players_added: u32,
 }
 
 /// チーム 1 つの変化。
@@ -102,7 +112,7 @@ pub struct SyncTeamChange {
 pub struct SyncDeviceChanges {
     /// 試合の日付の新しい順。
     pub matches: Vec<SyncMatchChange>,
-    /// 名前順。
+    /// 名前順。試合と一緒に入るチームは含めない（その試合の `teams_added` に数える）。
     pub teams: Vec<SyncTeamChange>,
 }
 
@@ -177,10 +187,41 @@ pub(crate) fn device_changes(
     merges: &IdMerges,
 ) -> SyncDeviceChanges {
     let (before, after) = (Live::new(before), Live::new(after));
-    SyncDeviceChanges {
-        matches: match_changes(&before, &after, merges),
-        teams: team_changes(&before, &after, merges),
-    }
+    let mut matches = match_changes(&before, &after, merges);
+    let mut teams = team_changes(&before, &after, merges);
+    attach_added_teams(&mut matches, &mut teams, &after);
+    SyncDeviceChanges { matches, teams }
+}
+
+/// この端末へ入るチームを、それを持つ試合の行に寄せ、チームの一覧から外す（handball-project#528）。
+///
+/// 寄せる先は、追加か更新でこの端末に入る試合のうち、一覧で最初に（日付の新しい順で）そのチームを
+/// ホームかアウェイに持つ試合 1 つ。複数の試合に数えると、チームと選手の数の合計が実際に入る数より
+/// 多くなる。どの試合も持たないチームはチームの行に残す。
+fn attach_added_teams(
+    matches: &mut [SyncMatchChange],
+    teams: &mut Vec<SyncTeamChange>,
+    after: &Live<'_>,
+) {
+    teams.retain(|team| {
+        if team.kind != SyncChangeKind::Added {
+            return true;
+        }
+        let carrier = matches.iter_mut().find(|change| {
+            change.kind != SyncChangeKind::Removed
+                && after.matches.get(&change.match_id).is_some_and(|m| {
+                    m.match_.home_team_id == team.team_id || m.match_.away_team_id == team.team_id
+                })
+        });
+        let Some(carrier) = carrier else {
+            return true;
+        };
+        carrier.teams_added = carrier.teams_added.saturating_add(1);
+        carrier.team_players_added = carrier
+            .team_players_added
+            .saturating_add(team.players_added);
+        false
+    });
 }
 
 /// 片方の全記録のうち、消されていないもの（fact は、消されていない試合のものだけ）。
@@ -361,6 +402,8 @@ fn empty_match_change(id: MatchId, kind: SyncChangeKind) -> SyncMatchChange {
         facts_removed: 0,
         facts_changed: 0,
         copy_replaced: false,
+        teams_added: 0,
+        team_players_added: 0,
     }
 }
 

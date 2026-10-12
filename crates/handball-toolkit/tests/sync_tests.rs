@@ -860,7 +860,8 @@ fn differences_nobody_can_see_are_not_changes() {
     assert!(changes.is_empty(), "{changes:?}");
 }
 
-/// 片方にしか無い試合・チームは「追加」（記録と選手の数つき）、消した試合は相手で「削除」。
+/// 片方にしか無い試合は「追加」（記録の数つき）、消した試合は相手で「削除」。試合と一緒に入るチームは
+/// チームの行にせず、試合の行にチームと選手の数で入る（handball-project#528）。
 #[test]
 fn added_and_removed_records_are_listed() {
     let w = World::new();
@@ -909,12 +910,11 @@ fn added_and_removed_records_are_listed() {
         SyncDeviceChanges {
             matches: vec![SyncMatchChange {
                 facts_added: 2,
+                teams_added: 1,
+                team_players_added: 2,
                 ..match_change(second, SyncChangeKind::Added)
             }],
-            teams: vec![SyncTeamChange {
-                players_added: 2,
-                ..team_change(south, SyncChangeKind::Added)
-            }],
+            teams: vec![],
         }
     );
     assert_eq!(
@@ -924,6 +924,155 @@ fn added_and_removed_records_are_listed() {
             teams: vec![],
         }
     );
+}
+
+/// 新しいチームを複数の試合が持つときは、一覧で最初の（日付の新しい）試合だけに数える。数の合計が、
+/// 実際に入るチームと選手の数と合う。選手のいないチームもチームとして数える（handball-project#528）。
+#[test]
+fn team_added_with_matches_is_counted_on_the_newest_match_only() {
+    let w = World::new();
+    let local = w.snapshot(alive(1));
+    let mut remote = w.snapshot(alive(1));
+    let (south, north) = (TeamId(Uuid::from_u128(200)), TeamId(Uuid::from_u128(210)));
+    let (scorer, keeper) = (
+        PlayerId(Uuid::from_u128(201)),
+        PlayerId(Uuid::from_u128(202)),
+    );
+    let (newer, older) = (MatchId(Uuid::from_u128(40)), MatchId(Uuid::from_u128(45)));
+    let (mut newer_match, newer_facts) = timer_match_records(
+        newer,
+        (south, north),
+        scorer,
+        [(41, at(500)), (42, at(700))],
+        alive(5),
+    );
+    newer_match.match_.date = at(86_400);
+    let (older_match, older_facts) = timer_match_records(
+        older,
+        (south, w.home.id),
+        scorer,
+        [(46, at(300)), (47, at(400))],
+        alive(5),
+    );
+    remote.matches.extend([newer_match, older_match]);
+    remote.facts.extend(newer_facts);
+    remote.facts.extend(older_facts);
+    for (id, name) in [(south, "South"), (north, "North")] {
+        remote.teams.push(SyncTeam {
+            team: Team {
+                id,
+                name: name.to_owned(),
+            },
+            stamp: alive(5),
+        });
+    }
+    for (id, name, number) in [(scorer, "Carol", 10), (keeper, "Dave", 1)] {
+        remote.players.push(SyncPlayer {
+            player: Player {
+                id,
+                team_id: south,
+                name: name.to_owned(),
+                jersey_number: Some(number),
+                photo: None,
+            },
+            stamp: alive(5),
+        });
+    }
+
+    let changes = changes_of(reconcile(&local, &remote, &[], at(100)));
+
+    assert_eq!(
+        changes.local,
+        SyncDeviceChanges {
+            matches: vec![
+                SyncMatchChange {
+                    facts_added: 2,
+                    teams_added: 2,
+                    team_players_added: 2,
+                    ..match_change(newer, SyncChangeKind::Added)
+                },
+                SyncMatchChange {
+                    facts_added: 2,
+                    ..match_change(older, SyncChangeKind::Added)
+                },
+            ],
+            teams: vec![],
+        }
+    );
+    assert!(changes.remote.is_empty(), "{:?}", changes.remote);
+}
+
+/// 試合の更新でホームかアウェイが新しいチームに替わるときも、そのチームは試合の行に数える。
+#[test]
+fn team_added_by_a_match_update_is_counted_on_that_match() {
+    let w = World::new();
+    let local = w.snapshot(alive(1));
+    let mut remote = w.snapshot(alive(1));
+    let south = TeamId(Uuid::from_u128(200));
+    remote.matches[0].match_.away_team_id = south;
+    remote.matches[0].stamp = alive(10);
+    remote.teams.push(SyncTeam {
+        team: Team {
+            id: south,
+            name: "South".to_owned(),
+        },
+        stamp: alive(10),
+    });
+
+    let changes = changes_of(reconcile(&local, &remote, &[], at(100)));
+
+    assert_eq!(
+        changes.local,
+        SyncDeviceChanges {
+            matches: vec![SyncMatchChange {
+                fields: vec![SyncMatchField::Teams],
+                teams_added: 1,
+                ..match_change(w.match_.id, SyncChangeKind::Updated)
+            }],
+            teams: vec![],
+        }
+    );
+    assert!(changes.remote.is_empty(), "{:?}", changes.remote);
+}
+
+/// どの試合も持たずに入るチームは、チームの行に出る。
+#[test]
+fn team_added_without_a_match_stays_a_team_row() {
+    let w = World::new();
+    let local = w.snapshot(alive(1));
+    let mut remote = w.snapshot(alive(1));
+    let south = TeamId(Uuid::from_u128(200));
+    remote.teams.push(SyncTeam {
+        team: Team {
+            id: south,
+            name: "South".to_owned(),
+        },
+        stamp: alive(5),
+    });
+    remote.players.push(SyncPlayer {
+        player: Player {
+            id: PlayerId(Uuid::from_u128(201)),
+            team_id: south,
+            name: "Carol".to_owned(),
+            jersey_number: Some(10),
+            photo: None,
+        },
+        stamp: alive(5),
+    });
+
+    let changes = changes_of(reconcile(&local, &remote, &[], at(100)));
+
+    assert_eq!(
+        changes.local,
+        SyncDeviceChanges {
+            matches: vec![],
+            teams: vec![SyncTeamChange {
+                players_added: 1,
+                ..team_change(south, SyncChangeKind::Added)
+            }],
+        }
+    );
+    assert!(changes.remote.is_empty(), "{:?}", changes.remote);
 }
 
 /// 記録（fact）の足す・消す・変わるは、試合の「更新」に数で入る。
@@ -1276,6 +1425,8 @@ fn match_change(id: MatchId, kind: SyncChangeKind) -> SyncMatchChange {
         facts_removed: 0,
         facts_changed: 0,
         copy_replaced: false,
+        teams_added: 0,
+        team_players_added: 0,
     }
 }
 
