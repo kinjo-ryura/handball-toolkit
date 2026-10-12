@@ -2,7 +2,7 @@
 
 ## Status
 
-accepted（2026-10-09。handball-project#506）。2026-10-10 にシェルが「上書き」を外した（handball-project#518 — 下の「実装追記」）。2026-10-10 に一覧（決定 8）を足した（handball-project#520）
+accepted（2026-10-09。handball-project#506）。2026-10-10 にシェルが「上書き」を外した（handball-project#518 — 下の「実装追記」）。2026-10-10 に一覧（決定 8）を足した（handball-project#520）。2026-10-12 に試合と一緒に入るチームを試合の行に寄せた（handball-project#528 — 決定 8）
 
 ## 文脈
 
@@ -150,6 +150,14 @@ ID を振り直して**別の試合**として取り込むので、送り直す�
 - 単位は試合とチーム。それぞれ追加 / 更新 / 削除。記録（fact）の変化は試合の更新に、選手の変化は
   チームの更新に、足す・消す・変わる数で入る。試合の更新は、変わる項目（タイトル・日付・チーム・
   記録の方法と動画・出場選手）も返す
+- **試合と一緒にその端末へ入るチームは、チームの行にせず試合の行に数で入れる**（handball-project#528）。
+  試合の追加・更新で入るチーム（その端末に無く、試合がホームかアウェイに持つ）は、試合の
+  `teams_added` / `team_players_added` に数え、チームの一覧から外す。チームの行は、試合と関係なく
+  変わるとき（名前の変更・選手の増減・どの試合にも持たれずに入る・削除）だけ残る
+  - 複数の試合が持つチームは、一覧で最初の（日付の新しい）試合 1 つだけに数える。全部の試合に数えると、
+    数の合計が実際に入るチームと選手より多くなる
+  - 採らなかった形: 寄せる先をシェルで決める — どのチームをどの試合に寄せるかは一覧の中身そのもので、
+    シェルごとに決めると食い違う
 - **数えるのは、利用者に見える中身が変わるときだけ**。数えない差: 削除の記録だけ（その端末で
   見えていなかった記録を、消した記録として受け取る）・時刻だけ（中身が同じで `updated_at` だけが違う）・
   端末ごとの値（決定 2 の表）・消えている試合の記録・同じ中身の写しを 1 つにまとめること（ID だけが
@@ -188,6 +196,11 @@ ID を振り直して**別の試合**として取り込むので、送り直す�
   `changes: SyncChanges` を足した（型 `SyncChanges` / `SyncDeviceChanges` / `SyncMatchChange` /
   `SyncTeamChange` / `SyncChangeKind` / `SyncMatchField`）。運ぶ形（`SyncPayload`）と `SYNC_FORMAT_VERSION`
   は変わらない（一覧は運ばない）。テストは `tests/sync_tests.rs` の「一覧」
+- **試合と一緒に入るチームを試合の行に寄せた（handball-project#528 — 決定 8）**。FFI の形が変わった:
+  `SyncMatchChange` に `teams_added` / `team_players_added` を足し、`SyncDeviceChanges::teams` から
+  そのチームを外した。運ぶ形と `SYNC_FORMAT_VERSION` は変わらない。テストは `tests/sync_tests.rs` の
+  `team_added_with_matches_is_counted_on_the_newest_match_only`・`team_added_by_a_match_update_is_counted_on_that_match`・
+  `team_added_without_a_match_stays_a_team_row`
 
 ## 再判定の条件
 
