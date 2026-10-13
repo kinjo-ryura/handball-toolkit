@@ -125,9 +125,9 @@
     },
     {
       "name": "async-trait",
-      "version": "0.1.91",
+      "version": "0.1.92",
       "origin": "registry",
-      "sourceUrl": "https://crates.io/crates/async-trait/0.1.91",
+      "sourceUrl": "https://crates.io/crates/async-trait/0.1.92",
       "licenseIndexes": [
         0
       ]
@@ -395,36 +395,36 @@
     },
     {
       "name": "serde",
-      "version": "1.0.228",
+      "version": "1.0.229",
       "origin": "registry",
-      "sourceUrl": "https://crates.io/crates/serde/1.0.228",
+      "sourceUrl": "https://crates.io/crates/serde/1.0.229",
       "licenseIndexes": [
         0
       ]
     },
     {
       "name": "serde_core",
-      "version": "1.0.228",
+      "version": "1.0.229",
       "origin": "registry",
-      "sourceUrl": "https://crates.io/crates/serde_core/1.0.228",
+      "sourceUrl": "https://crates.io/crates/serde_core/1.0.229",
       "licenseIndexes": [
         0
       ]
     },
     {
       "name": "serde_derive",
-      "version": "1.0.228",
+      "version": "1.0.229",
       "origin": "registry",
-      "sourceUrl": "https://crates.io/crates/serde_derive/1.0.228",
+      "sourceUrl": "https://crates.io/crates/serde_derive/1.0.229",
       "licenseIndexes": [
         0
       ]
     },
     {
       "name": "serde_json",
-      "version": "1.0.150",
+      "version": "1.0.151",
       "origin": "registry",
-      "sourceUrl": "https://crates.io/crates/serde_json/1.0.150",
+      "sourceUrl": "https://crates.io/crates/serde_json/1.0.151",
       "licenseIndexes": [
         0
       ]
@@ -549,63 +549,63 @@
     },
     {
       "name": "uniffi",
-      "version": "0.32.0",
+      "version": "0.32.2",
       "origin": "registry",
-      "sourceUrl": "https://crates.io/crates/uniffi/0.32.0",
+      "sourceUrl": "https://crates.io/crates/uniffi/0.32.2",
       "licenseIndexes": [
         20
       ]
     },
     {
       "name": "uniffi_core",
-      "version": "0.32.0",
+      "version": "0.32.2",
       "origin": "registry",
-      "sourceUrl": "https://crates.io/crates/uniffi_core/0.32.0",
+      "sourceUrl": "https://crates.io/crates/uniffi_core/0.32.2",
       "licenseIndexes": [
         20
       ]
     },
     {
       "name": "uniffi_internal_macros",
-      "version": "0.32.0",
+      "version": "0.32.2",
       "origin": "registry",
-      "sourceUrl": "https://crates.io/crates/uniffi_internal_macros/0.32.0",
+      "sourceUrl": "https://crates.io/crates/uniffi_internal_macros/0.32.2",
       "licenseIndexes": [
         20
       ]
     },
     {
       "name": "uniffi_macros",
-      "version": "0.32.0",
+      "version": "0.32.2",
       "origin": "registry",
-      "sourceUrl": "https://crates.io/crates/uniffi_macros/0.32.0",
+      "sourceUrl": "https://crates.io/crates/uniffi_macros/0.32.2",
       "licenseIndexes": [
         20
       ]
     },
     {
       "name": "uniffi_meta",
-      "version": "0.32.0",
+      "version": "0.32.2",
       "origin": "registry",
-      "sourceUrl": "https://crates.io/crates/uniffi_meta/0.32.0",
+      "sourceUrl": "https://crates.io/crates/uniffi_meta/0.32.2",
       "licenseIndexes": [
         20
       ]
     },
     {
       "name": "uniffi_pipeline",
-      "version": "0.32.0",
+      "version": "0.32.2",
       "origin": "registry",
-      "sourceUrl": "https://crates.io/crates/uniffi_pipeline/0.32.0",
+      "sourceUrl": "https://crates.io/crates/uniffi_pipeline/0.32.2",
       "licenseIndexes": [
         20
       ]
     },
     {
       "name": "uuid",
-      "version": "1.23.4",
+      "version": "1.27.0",
       "origin": "registry",
-      "sourceUrl": "https://crates.io/crates/uuid/1.23.4",
+      "sourceUrl": "https://crates.io/crates/uuid/1.27.0",
       "licenseIndexes": [
         18
       ]

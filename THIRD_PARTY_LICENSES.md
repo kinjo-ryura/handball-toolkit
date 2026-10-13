@@ -13,7 +13,7 @@ handball-toolkit 0.15.0 の配布物（iOS / macOS の staticlib・Android の `
 | ライブラリ | バージョン | ライセンス | 入手先 |
 | --- | --- | --- | --- |
 | anyhow | 1.0.103 | [MIT](#license-0) | [ソース](https://crates.io/crates/anyhow/1.0.103) |
-| async-trait | 0.1.91 | [MIT](#license-0) | [ソース](https://crates.io/crates/async-trait/0.1.91) |
+| async-trait | 0.1.92 | [MIT](#license-0) | [ソース](https://crates.io/crates/async-trait/0.1.92) |
 | bitflags | 2.13.0 | [MIT](#license-1) | [ソース](https://crates.io/crates/bitflags/2.13.0) |
 | bumpalo | 3.20.3 | [MIT](#license-2) | [ソース](https://crates.io/crates/bumpalo/3.20.3) |
 | bytes | 1.12.1 | [MIT](#license-3) | [ソース](https://crates.io/crates/bytes/1.12.1) |
@@ -43,10 +43,10 @@ handball-toolkit 0.15.0 の配布物（iOS / macOS の staticlib・Android の `
 | quote | 1.0.46 | [MIT](#license-0) | [ソース](https://crates.io/crates/quote/1.0.46) |
 | rustix | 1.1.4 | [MIT](#license-0) | [ソース](https://crates.io/crates/rustix/1.1.4) |
 | semver | 1.0.28 | [MIT](#license-0) | [ソース](https://crates.io/crates/semver/1.0.28) |
-| serde | 1.0.228 | [MIT](#license-0) | [ソース](https://crates.io/crates/serde/1.0.228) |
-| serde_core | 1.0.228 | [MIT](#license-0) | [ソース](https://crates.io/crates/serde_core/1.0.228) |
-| serde_derive | 1.0.228 | [MIT](#license-0) | [ソース](https://crates.io/crates/serde_derive/1.0.228) |
-| serde_json | 1.0.150 | [MIT](#license-0) | [ソース](https://crates.io/crates/serde_json/1.0.150) |
+| serde | 1.0.229 | [MIT](#license-0) | [ソース](https://crates.io/crates/serde/1.0.229) |
+| serde_core | 1.0.229 | [MIT](#license-0) | [ソース](https://crates.io/crates/serde_core/1.0.229) |
+| serde_derive | 1.0.229 | [MIT](#license-0) | [ソース](https://crates.io/crates/serde_derive/1.0.229) |
+| serde_json | 1.0.151 | [MIT](#license-0) | [ソース](https://crates.io/crates/serde_json/1.0.151) |
 | serde_spanned | 1.1.1 | [MIT](#license-15) | [ソース](https://crates.io/crates/serde_spanned/1.1.1) |
 | siphasher | 1.0.3 | [MIT](#license-5) | [ソース](https://crates.io/crates/siphasher/1.0.3) |
 | static_assertions | 1.1.0 | [MIT](#license-16) | [ソース](https://crates.io/crates/static_assertions/1.1.0) |
@@ -60,13 +60,13 @@ handball-toolkit 0.15.0 の配布物（iOS / macOS の staticlib・Android の `
 | toml_parser | 1.1.2+spec-1.1.0 | [MIT](#license-15) | [ソース](https://crates.io/crates/toml_parser/1.1.2+spec-1.1.0) |
 | toml_writer | 1.1.2+spec-1.1.0 | [MIT](#license-15) | [ソース](https://crates.io/crates/toml_writer/1.1.2+spec-1.1.0) |
 | unicode-ident | 1.0.24 | [MIT](#license-0)・[Unicode-3.0](#license-21) | [ソース](https://crates.io/crates/unicode-ident/1.0.24) |
-| uniffi | 0.32.0 | [MPL-2.0](#license-20) | [ソース](https://crates.io/crates/uniffi/0.32.0) |
-| uniffi_core | 0.32.0 | [MPL-2.0](#license-20) | [ソース](https://crates.io/crates/uniffi_core/0.32.0) |
-| uniffi_internal_macros | 0.32.0 | [MPL-2.0](#license-20) | [ソース](https://crates.io/crates/uniffi_internal_macros/0.32.0) |
-| uniffi_macros | 0.32.0 | [MPL-2.0](#license-20) | [ソース](https://crates.io/crates/uniffi_macros/0.32.0) |
-| uniffi_meta | 0.32.0 | [MPL-2.0](#license-20) | [ソース](https://crates.io/crates/uniffi_meta/0.32.0) |
-| uniffi_pipeline | 0.32.0 | [MPL-2.0](#license-20) | [ソース](https://crates.io/crates/uniffi_pipeline/0.32.0) |
-| uuid | 1.23.4 | [MIT](#license-18) | [ソース](https://crates.io/crates/uuid/1.23.4) |
+| uniffi | 0.32.2 | [MPL-2.0](#license-20) | [ソース](https://crates.io/crates/uniffi/0.32.2) |
+| uniffi_core | 0.32.2 | [MPL-2.0](#license-20) | [ソース](https://crates.io/crates/uniffi_core/0.32.2) |
+| uniffi_internal_macros | 0.32.2 | [MPL-2.0](#license-20) | [ソース](https://crates.io/crates/uniffi_internal_macros/0.32.2) |
+| uniffi_macros | 0.32.2 | [MPL-2.0](#license-20) | [ソース](https://crates.io/crates/uniffi_macros/0.32.2) |
+| uniffi_meta | 0.32.2 | [MPL-2.0](#license-20) | [ソース](https://crates.io/crates/uniffi_meta/0.32.2) |
+| uniffi_pipeline | 0.32.2 | [MPL-2.0](#license-20) | [ソース](https://crates.io/crates/uniffi_pipeline/0.32.2) |
+| uuid | 1.27.0 | [MIT](#license-18) | [ソース](https://crates.io/crates/uuid/1.27.0) |
 | wasm-bindgen | 0.2.121 | [MIT](#license-4) | [ソース](https://crates.io/crates/wasm-bindgen/0.2.121) |
 | wasm-bindgen-macro | 0.2.121 | [MIT](#license-4) | [ソース](https://crates.io/crates/wasm-bindgen-macro/0.2.121) |
 | wasm-bindgen-macro-support | 0.2.121 | [MIT](#license-4) | [ソース](https://crates.io/crates/wasm-bindgen-macro-support/0.2.121) |
@@ -78,7 +78,7 @@ handball-toolkit 0.15.0 の配布物（iOS / macOS の staticlib・Android の `
 
 ### <a id="license-0"></a>MIT License（MIT）
 
-適用: anyhow 1.0.103、async-trait 0.1.91、camino 1.2.4、cargo-platform 0.3.3、cargo_metadata 0.23.1、fastrand 2.4.1、itoa 1.0.18、linux-raw-sys 0.12.1、once_cell 1.21.4、proc-macro2 1.0.106、quote 1.0.46、rustix 1.1.4、semver 1.0.28、serde 1.0.228、serde_core 1.0.228、serde_derive 1.0.228、serde_json 1.0.150、syn 2.0.118、syn 3.0.0、thiserror 2.0.18、thiserror-impl 2.0.18、unicode-ident 1.0.24、zmij 1.0.21
+適用: anyhow 1.0.103、async-trait 0.1.92、camino 1.2.4、cargo-platform 0.3.3、cargo_metadata 0.23.1、fastrand 2.4.1、itoa 1.0.18、linux-raw-sys 0.12.1、once_cell 1.21.4、proc-macro2 1.0.106、quote 1.0.46、rustix 1.1.4、semver 1.0.28、serde 1.0.229、serde_core 1.0.229、serde_derive 1.0.229、serde_json 1.0.151、syn 2.0.118、syn 3.0.0、thiserror 2.0.18、thiserror-impl 2.0.18、unicode-ident 1.0.24、zmij 1.0.21
 
 ```
 Permission is hereby granted, free of charge, to any
@@ -630,7 +630,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### <a id="license-18"></a>MIT License（MIT）
 
-適用: uuid 1.23.4
+適用: uuid 1.27.0
 
 ```
 Copyright (c) 2014 The Rust Project Developers
@@ -688,7 +688,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### <a id="license-20"></a>Mozilla Public License 2.0（MPL-2.0）
 
-適用: uniffi 0.32.0、uniffi_core 0.32.0、uniffi_internal_macros 0.32.0、uniffi_macros 0.32.0、uniffi_meta 0.32.0、uniffi_pipeline 0.32.0
+適用: uniffi 0.32.2、uniffi_core 0.32.2、uniffi_internal_macros 0.32.2、uniffi_macros 0.32.2、uniffi_meta 0.32.2、uniffi_pipeline 0.32.2
 
 ```
 Mozilla Public License Version 2.0
