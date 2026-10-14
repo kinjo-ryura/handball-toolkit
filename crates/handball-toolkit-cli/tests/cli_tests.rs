@@ -46,8 +46,60 @@ fn corpus_ok_has_no_findings() {
         "指摘なしのはず: {:#?}",
         report.findings
     );
-    // index + match + highlight index + highlight = 4 ファイル
-    assert_eq!(report.checked_files, 4);
+    // index + match 2 件（1 件は大会の一覧にだけ載る）+ highlight index + highlight
+    // + 大会 index + 大会の一覧 = 7 ファイル
+    assert_eq!(report.checked_files, 7);
+}
+
+/// 大会の一覧（`competitions/{id}.json`）に載った本体は `index.json` に無くても orphan に
+/// ならず、index と同じ転記整合（スコア / hasVideo / date / チーム名）を受ける
+/// （handball-project#566）。corpus-ok が 0 件なのは上で見ているので、ここでは
+/// 「大会の一覧だけに載る本体が突合の対象に入っている」ことを、その本体を壊した
+/// 一時コーパスで固定する。
+#[test]
+fn competition_listed_match_is_checked_against_its_body() {
+    // dev-dependency を増やさないため、std だけで一時コーパスを作る。
+    let dir = std::env::temp_dir().join(format!(
+        "handball-toolkit-cli-competition-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    copy_dir(&fixture("corpus-ok"), &dir);
+    // 大会の一覧の転記（homeScore 1 / awayScore 0）と食い違うよう goal を消す。
+    let body = dir.join("matches/2026-01-03-tigers-vs-hawks.json");
+    let mut dto: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&body).unwrap()).unwrap();
+    dto["facts"].as_array_mut().unwrap().remove(1);
+    std::fs::write(&body, serde_json::to_string(&dto).unwrap()).unwrap();
+
+    let mut report = RunReport::default();
+    validate_corpus(&dir, &mut report);
+    let _ = std::fs::remove_dir_all(&dir);
+    let codes = finding_codes(&report);
+    assert!(
+        codes.contains(&(
+            "scoreMismatch".to_owned(),
+            "2026-01-03-tigers-vs-hawks.json".to_owned()
+        )),
+        "大会の一覧の転記も本体と突き合わせるはず: {codes:#?}"
+    );
+    assert!(
+        !codes.iter().any(|(code, _)| code == "orphanMatchFile"),
+        "大会の一覧に載った本体は orphan ではない: {codes:#?}"
+    );
+}
+
+fn copy_dir(from: &Path, to: &Path) {
+    for entry in std::fs::read_dir(from).expect("read_dir") {
+        let entry = entry.expect("entry");
+        let target = to.join(entry.file_name());
+        if entry.path().is_dir() {
+            std::fs::create_dir_all(&target).expect("create_dir_all");
+            copy_dir(&entry.path(), &target);
+        } else {
+            std::fs::copy(entry.path(), &target).expect("copy");
+        }
+    }
 }
 
 #[test]
@@ -82,6 +134,17 @@ fn corpus_bad_reports_expected_findings() {
         // `unexpectedAnchorEnd` は play だけの検査になった（#220 で possession を外した）。
         // この 1 件が唯一の証拠。
         ("unexpectedAnchorEnd", "with-phase.json"),
+        // 大会（competitions/。handball-project#566）。index に同じ id が 2 つ / id に `..` と `/` /
+        // 一覧ファイルが無い id / 大会 index に無い一覧ファイル。
+        ("duplicateCompetitionID", "index.json"),
+        ("unsafeCompetitionID", "index.json"),
+        ("missingCompetitionFile", "no-file.json"),
+        ("orphanCompetitionFile", "stray.json"),
+        // bad-cup.json の 2 件目は index.json にも載っている slug。1 件目はチーム名の転記が無く、
+        // 本体も無い（missingMatchFile は index.json 側の 1 件と同じ code で別ファイル）。
+        ("slugListedTwice", "bad-cup.json"),
+        ("missingTeamName", "bad-cup.json"),
+        ("missingMatchFile", "2026-02-05-no-names.json"),
     ];
     for (code, file) in expect {
         assert!(

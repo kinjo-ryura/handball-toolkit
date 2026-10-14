@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 2,
+  "competitions": [
+    {
+      "id": "test-cup-2026",
+      "title": "テストカップ 2026",
+      "description": "大会の fixture（本体は matches/ を共有し、index.json には載せない）"
+    }
+  ]
+}

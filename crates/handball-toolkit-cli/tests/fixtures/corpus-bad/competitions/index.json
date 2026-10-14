@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "competitions": [
+    {
+      "id": "bad-cup",
+      "title": "Bad Cup"
+    },
+    {
+      "id": "bad-cup",
+      "title": "同じ id がもう 1 つ"
+    },
+    {
+      "id": "no-file",
+      "title": "一覧ファイルが無い"
+    },
+    {
+      "id": "../escape",
+      "title": "パスに埋められない id"
+    }
+  ]
+}

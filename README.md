@@ -239,8 +239,9 @@ gh release create v0.15.1 target/aar/handball-toolkit-0.15.1.aar \
 配信されている試合 JSON を、コア自身の validators で検証する。
 
 ```bash
-# v2 ルートを一括検証（index ↔ ファイル突合 + スコア / factCount / hasVideo / date の転記整合
-#                    + index の date 降順 / slug 先頭日付 / factID 重複 / play の anchor end）
+# v2 ルートを一括検証（index ↔ ファイル突合 + スコア / factCount / hasVideo / date / チーム名の転記整合
+#                    + index の date 降順 / slug 先頭日付 / factID 重複 / play の anchor end
+#                    + 大会 competitions/ の一覧と本体の突合）
 cargo run -p handball-toolkit-cli -- validate ../handball-sample-matches/v2
 
 # 単体ファイル。--json で機械可読出力

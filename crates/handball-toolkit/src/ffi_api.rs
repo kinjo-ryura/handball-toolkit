@@ -23,9 +23,9 @@ use crate::projection::{
     SummaryProjection, TimeSegment, TimelineProjection,
 };
 use crate::sample_dto::{
-    self, SampleFactDtoV2, SampleHighlightIndexDtoV2, SampleIndexDtoV2,
-    SampleMatchConfigurationDtoV2, SampleMatchConversionResult, SampleMatchDecodeErrorV2,
-    SampleMatchDtoV2, SampleTeamDtoV2,
+    self, SampleCompetitionIndexDtoV2, SampleFactDtoV2, SampleHighlightIndexDtoV2,
+    SampleIndexDtoV2, SampleMatchConfigurationDtoV2, SampleMatchConversionResult,
+    SampleMatchDecodeErrorV2, SampleMatchDtoV2, SampleTeamDtoV2,
 };
 use crate::sample_import::{self, ExistingSnapshot, ImportDecisions, TeamOption};
 use crate::validation::DomainValidationIssue;
@@ -368,6 +368,15 @@ pub fn parse_sample_index(json: String) -> Result<SampleIndexDtoV2, SampleDtoErr
 pub fn parse_sample_highlight_index(
     json: String,
 ) -> Result<SampleHighlightIndexDtoV2, SampleDtoError> {
+    serde_json::from_str(&json).map_err(invalid_json)
+}
+
+/// `/v2/competitions/index.json` の parse（handball-project#566）。大会ごとの試合一覧
+/// （`/v2/competitions/{id}.json`）は `/v2/index.json` と同じ形なので `parse_sample_index` で読む。
+#[uniffi::export]
+pub fn parse_sample_competition_index(
+    json: String,
+) -> Result<SampleCompetitionIndexDtoV2, SampleDtoError> {
     serde_json::from_str(&json).map_err(invalid_json)
 }
 
