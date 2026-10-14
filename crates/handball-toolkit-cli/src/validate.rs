@@ -13,8 +13,8 @@ use handball_toolkit::facts::{ControlFact, MatchFact, MatchFactPayload};
 use handball_toolkit::persistence_order::persistence_ordered;
 use handball_toolkit::projection::SummaryProjection;
 use handball_toolkit::sample_dto::{
-    SCHEMA_VERSION_CURRENT, SampleFactAnchorDtoV2, SampleHighlightIndexDtoV2, SampleIndexDtoV2,
-    SampleMatchDtoV2, convert,
+    SCHEMA_VERSION_CURRENT, SampleCompetitionIndexDtoV2, SampleFactAnchorDtoV2,
+    SampleHighlightIndexDtoV2, SampleIndexDtoV2, SampleMatchDtoV2, convert,
 };
 use handball_toolkit::validation::DomainValidationIssue;
 use handball_toolkit::validators::{
@@ -37,7 +37,8 @@ pub struct DerivedMatchInfo {
 }
 
 /// トップレベルキーで形状を自動判別して検証する（単一ファイルモード）。
-/// `facts` = 試合本体 / `matches` = 試合 index / `highlights` = ハイライト index。
+/// `facts` = 試合本体 / `matches` = 試合 index（大会ごとの一覧も同じ形）/
+/// `highlights` = ハイライト index / `competitions` = 大会 index。
 pub fn validate_file(path: &Path, report: &mut RunReport) {
     let label = path.display().to_string();
     let Some(text) = read_file(path, report) else {
@@ -71,6 +72,15 @@ pub fn validate_file(path: &Path, report: &mut RunReport) {
     } else if keys.is_some_and(|map| map.contains_key("highlights")) {
         match serde_json::from_str::<SampleHighlightIndexDtoV2>(&text) {
             Ok(index) => validate_highlight_index_dto(&label, &index, report),
+            Err(error) => report.findings.push(Finding::new(
+                &label,
+                Stage::Decode,
+                json_issue(&error.to_string()),
+            )),
+        }
+    } else if keys.is_some_and(|map| map.contains_key("competitions")) {
+        match serde_json::from_str::<SampleCompetitionIndexDtoV2>(&text) {
+            Ok(index) => validate_competition_index_dto(&label, &index, report),
             Err(error) => report.findings.push(Finding::new(
                 &label,
                 Stage::Decode,
@@ -241,6 +251,26 @@ pub fn validate_highlight_index_dto(
             .collect::<Vec<_>>(),
         report,
     );
+}
+
+/// `/v2/competitions/index.json` の検証（schemaVersion / id 重複）。id がファイル名に
+/// 使える字種か（と `index` の予約）は corpus 側がパスに埋める直前に見る。
+pub fn validate_competition_index_dto(
+    label: &str,
+    index: &SampleCompetitionIndexDtoV2,
+    report: &mut RunReport,
+) {
+    check_schema_version(label, index.schema_version, report);
+    let mut seen = BTreeSet::new();
+    for competition in &index.competitions {
+        if !seen.insert(competition.id.as_str()) {
+            report.findings.push(Finding::new(
+                label,
+                Stage::Corpus,
+                corpus_issue("duplicateCompetitionID", json!({"id": competition.id})),
+            ));
+        }
+    }
 }
 
 /// index 配列そのものに掛かる検査。matches / highlights は要素型が違うだけで

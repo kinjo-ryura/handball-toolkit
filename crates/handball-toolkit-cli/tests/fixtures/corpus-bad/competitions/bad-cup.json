@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "matches": [
+    {
+      "slug": "2026-02-05-no-names",
+      "displayName": "No Names",
+      "date": "2026-02-05T10:00:00Z",
+      "homeScore": 0,
+      "awayScore": 0,
+      "hasVideo": false
+    },
+    {
+      "slug": "2026-02-01-bad-score",
+      "displayName": "index.json にも載っている",
+      "date": "2026-02-01T10:00:00Z",
+      "homeScore": 5,
+      "awayScore": 5,
+      "hasVideo": true,
+      "homeTeamName": "Tigers",
+      "awayTeamName": "Falcons"
+    }
+  ]
+}

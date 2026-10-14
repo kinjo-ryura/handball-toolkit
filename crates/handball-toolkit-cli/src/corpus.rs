@@ -4,16 +4,22 @@
 //! 転記フィールドの整合（homeScore / awayScore = goal 集計、hasVideo、factCount、
 //! homeTeamName / awayTeamName、date）を検証する。index が読めない場合は突合を
 //! 諦め、見つかった本体ファイルの個別検証だけ行う（per-file の保証は維持する）。
+//!
+//! 大会（`competitions/`。handball-project#566）は `index.json` と本体 `matches/` を
+//! 共有するもう 1 組の一覧なので、matches 側の突合に合流させる: 本体は `index.json` か
+//! 1 つの大会のどちらか一方にだけ載る（`slugListedTwice`）、どこにも載らない本体は
+//! `orphanMatchFile`、大会の一覧の項目はチーム名の転記が必須（`missingTeamName`）。
 
-use std::collections::BTreeSet;
+use std::collections::btree_map::Entry;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde_json::json;
 
 use handball_toolkit::sample_dto::{
-    SampleHighlightIndexDtoV2, SampleHighlightSummaryV2, SampleIndexDtoV2, SampleMatchDtoV2,
-    SampleMatchSummaryV2,
+    SampleCompetitionIndexDtoV2, SampleHighlightIndexDtoV2, SampleHighlightSummaryV2,
+    SampleIndexDtoV2, SampleMatchDtoV2, SampleMatchSummaryV2,
 };
 
 use crate::report::{Finding, RunReport, Stage, corpus_issue, json_issue};
@@ -40,11 +46,86 @@ fn validate_match_side(root: &Path, report: &mut RunReport) {
         return;
     };
 
-    let mut checked_slugs: BTreeSet<&str> = BTreeSet::new();
-    for entry in &entries {
+    // 本体がどの一覧に載っているか（slug → 最初に載っていた一覧）。index.json と大会の
+    // 一覧をまたいだ重複と、どこにも載らない本体（orphan）の判定に使う。
+    let mut listed_in: BTreeMap<String, PathBuf> = BTreeMap::new();
+    check_listed_matches(
+        &index_path,
+        &entries,
+        &matches_dir,
+        false,
+        &mut listed_in,
+        report,
+    );
+    for (list_path, list_entries) in read_competition_lists(root, report) {
+        check_listed_matches(
+            &list_path,
+            &list_entries,
+            &matches_dir,
+            true,
+            &mut listed_in,
+            report,
+        );
+    }
+
+    for file in json_files(&matches_dir) {
+        if !listed_in.contains_key(slug_of(&file)) {
+            report.findings.push(Finding::new(
+                &file.display().to_string(),
+                Stage::Corpus,
+                corpus_issue("orphanMatchFile", json!({})),
+            ));
+        }
+    }
+}
+
+/// 1 つの一覧（`index.json` か大会の `competitions/{id}.json`）の項目を本体と突き合わせる。
+///
+/// `requires_team_names` は大会の一覧で true。大会の一覧はアプリが本体を取らずに行を組む
+/// （SCHEMA.md「大会」）ので、チーム名の転記が無いと行にチーム名が出ない。
+fn check_listed_matches(
+    list_path: &Path,
+    entries: &[SampleMatchSummaryV2],
+    matches_dir: &Path,
+    requires_team_names: bool,
+    listed_in: &mut BTreeMap<String, PathBuf>,
+    report: &mut RunReport,
+) {
+    let list_label = list_path.display().to_string();
+    let mut seen_here: BTreeSet<&str> = BTreeSet::new();
+    for entry in entries {
         if !is_safe_slug(&entry.slug) {
-            report_unsafe_slug(&index_path, &entry.slug, report);
+            report_unsafe_slug(list_path, &entry.slug, report);
             continue;
+        }
+        // 同じ一覧内の重複 slug は index 検証（duplicateSlug）で指摘済み。
+        // 同一ファイルの二重検証を避ける。
+        if !seen_here.insert(&entry.slug) {
+            continue;
+        }
+        match listed_in.entry(entry.slug.clone()) {
+            Entry::Occupied(first) => {
+                report.findings.push(Finding::new(
+                    &list_label,
+                    Stage::Corpus,
+                    corpus_issue(
+                        "slugListedTwice",
+                        json!({"slug": entry.slug, "alsoIn": first.get().display().to_string()}),
+                    ),
+                ));
+                continue;
+            }
+            Entry::Vacant(vacant) => {
+                vacant.insert(list_path.to_path_buf());
+            }
+        }
+        if requires_team_names && (entry.home_team_name.is_none() || entry.away_team_name.is_none())
+        {
+            report.findings.push(Finding::new(
+                &list_label,
+                Stage::Corpus,
+                corpus_issue("missingTeamName", json!({"slug": entry.slug})),
+            ));
         }
         let file = matches_dir.join(format!("{}.json", entry.slug));
         let label = file.display().to_string();
@@ -56,31 +137,93 @@ fn validate_match_side(root: &Path, report: &mut RunReport) {
             ));
             continue;
         }
-        // 重複 slug は index 検証で指摘済み。同一ファイルの二重検証を避ける。
-        if !checked_slugs.insert(&entry.slug) {
-            continue;
-        }
         let Some(dto) = validate::read_match_file(&file, report) else {
             continue;
         };
         let derived = validate::validate_match_dto(&label, &dto, report);
         check_match_consistency(&label, entry, &dto, derived.as_ref(), report);
     }
+}
 
-    let listed_slugs: BTreeSet<&str> = entries.iter().map(|entry| entry.slug.as_str()).collect();
-    for file in json_files(&matches_dir) {
-        if !listed_slugs.contains(slug_of(&file)) {
-            report.findings.push(Finding::new(
-                &file.display().to_string(),
-                Stage::Corpus,
-                corpus_issue("orphanMatchFile", json!({})),
-            ));
+/// `competitions/` を読み、大会ごとの試合一覧（ファイルパスと項目）を返す。
+///
+/// ディレクトリが無ければ大会を配信していないコーパスとして空を返す。大会 index が
+/// 読めないときは `missingIndex` / decode の指摘を積んだうえで、置いてある一覧ファイルを
+/// そのまま使う（本体の突合まで諦めると、大会の本体が全部 orphan に化ける）。
+fn read_competition_lists(
+    root: &Path,
+    report: &mut RunReport,
+) -> Vec<(PathBuf, Vec<SampleMatchSummaryV2>)> {
+    let dir = root.join("competitions");
+    if !dir.is_dir() {
+        return Vec::new();
+    }
+    let index_path = dir.join("index.json");
+    let index_label = index_path.display().to_string();
+
+    let mut lists = Vec::new();
+    let mut listed_ids: BTreeSet<String> = BTreeSet::new();
+    if let Some(index) = read_index::<SampleCompetitionIndexDtoV2>(&index_path, report) {
+        validate::validate_competition_index_dto(&index_label, &index, report);
+        for competition in &index.competitions {
+            // id はそのままファイル名になる。slug と同じ字種に限り、`index` は予約する。
+            if !is_safe_slug(&competition.id) || competition.id == "index" {
+                report.findings.push(Finding::new(
+                    &index_label,
+                    Stage::Corpus,
+                    corpus_issue("unsafeCompetitionID", json!({"id": competition.id})),
+                ));
+                continue;
+            }
+            // 重複 id は index 検証（duplicateCompetitionID）で指摘済み。
+            if !listed_ids.insert(competition.id.clone()) {
+                continue;
+            }
+            let file = dir.join(format!("{}.json", competition.id));
+            if !file.is_file() {
+                report.findings.push(Finding::new(
+                    &file.display().to_string(),
+                    Stage::Corpus,
+                    corpus_issue("missingCompetitionFile", json!({"id": competition.id})),
+                ));
+                continue;
+            }
+            if let Some(list) = read_competition_list(&file, report) {
+                lists.push((file, list));
+            }
         }
     }
+
+    for file in json_files(&dir) {
+        if file.file_name().is_some_and(|name| name == "index.json") {
+            continue;
+        }
+        if listed_ids.contains(slug_of(&file)) {
+            continue;
+        }
+        report.findings.push(Finding::new(
+            &file.display().to_string(),
+            Stage::Corpus,
+            corpus_issue("orphanCompetitionFile", json!({})),
+        ));
+        // 大会 index に載っていなくても、本体の突合には使う（上の doc）。
+        if let Some(list) = read_competition_list(&file, report) {
+            lists.push((file, list));
+        }
+    }
+    lists
+}
+
+/// 大会の試合一覧は `/v2/index.json` と同じ形（SCHEMA.md）なので、同じ検査を掛ける。
+fn read_competition_list(file: &Path, report: &mut RunReport) -> Option<Vec<SampleMatchSummaryV2>> {
+    let list = read_index::<SampleIndexDtoV2>(file, report)?;
+    validate::validate_match_index_dto(&file.display().to_string(), &list, report);
+    Some(list.matches)
 }
 
 /// index との転記整合（SCHEMA.md: homeScore / awayScore は goal 集計の転記、
-/// hasVideo は `.video` / `.videoHighlight` のとき true）。
+/// hasVideo は `.video` / `.videoHighlight` のとき true、homeTeamName / awayTeamName は
+/// 書いてあれば本体チーム名）。
 fn check_match_consistency(
     label: &str,
     entry: &SampleMatchSummaryV2,
@@ -125,6 +268,23 @@ fn check_match_consistency(
                 json!({"index": entry.has_video, "body": derived.has_video}),
             ),
         ));
+    }
+    for (side, index_name, body_name) in [
+        ("home", &entry.home_team_name, &derived.home_team_name),
+        ("away", &entry.away_team_name, &derived.away_team_name),
+    ] {
+        if let Some(index_name) = index_name
+            && index_name != body_name
+        {
+            report.findings.push(Finding::new(
+                label,
+                Stage::Corpus,
+                corpus_issue(
+                    "teamNameMismatch",
+                    json!({"side": side, "index": index_name, "body": body_name}),
+                ),
+            ));
+        }
     }
 }
 

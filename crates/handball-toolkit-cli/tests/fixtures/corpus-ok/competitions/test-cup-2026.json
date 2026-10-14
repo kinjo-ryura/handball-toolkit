@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "matches": [
+    {
+      "slug": "2026-01-03-tigers-vs-hawks",
+      "displayName": "Tigers vs Hawks",
+      "description": "大会の試合（タイマーモード）",
+      "date": "2026-01-03T10:00:00Z",
+      "homeScore": 1,
+      "awayScore": 0,
+      "hasVideo": false,
+      "homeTeamName": "Tigers",
+      "awayTeamName": "Hawks"
+    }
+  ]
+}

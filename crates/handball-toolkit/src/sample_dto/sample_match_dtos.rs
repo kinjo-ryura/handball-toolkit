@@ -37,7 +37,7 @@ pub struct SampleIndexDtoV2 {
     pub matches: Vec<SampleMatchSummaryV2>,
 }
 
-/// `/v2/index.json` の `matches[]` 要素。
+/// `/v2/index.json` と `/v2/competitions/{id}.json` の `matches[]` 要素。
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
@@ -51,6 +51,47 @@ pub struct SampleMatchSummaryV2 {
     pub home_score: i64,
     pub away_score: i64,
     pub has_video: bool,
+    /// 本体のチーム名の転記（handball-project#566）。**optional** — 大会の一覧
+    /// （`/v2/competitions/{id}.json`）では必須で、本体を取らずに行を組むために使う。
+    /// `/v2/index.json` の既存の項目には無い（旧アプリは本体から名前を引く）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub home_team_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub away_team_name: Option<String>,
+}
+
+// ── Competitions（大会）──
+
+/// `/v2/competitions/index.json` トップレベル構造（handball-project#566）。
+///
+/// 大会は「注目の試合」（`/v2/index.json`）とは別に配信する試合のまとまり。本体は
+/// `/v2/matches/{slug}.json` を共有し、1 つの本体は `/v2/index.json` か 1 つの大会の
+/// どちらか一方にだけ載る。大会の試合一覧は `/v2/competitions/{id}.json` で、形は
+/// `/v2/index.json` と同じ（`SampleIndexDtoV2`）。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[serde(rename_all = "camelCase")]
+pub struct SampleCompetitionIndexDtoV2 {
+    pub schema_version: i64,
+    pub competitions: Vec<SampleCompetitionSummaryV2>,
+}
+
+/// `/v2/competitions/index.json` の `competitions[]` 要素。
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[serde(rename_all = "camelCase")]
+pub struct SampleCompetitionSummaryV2 {
+    /// `competitions/{id}.json` のファイル名（拡張子除く）と完全一致。slug と同じ字種
+    /// （英数字と `-`）で、`index` は予約語。
+    pub id: String,
+    /// 画面に出す大会名（例: `"リーグH 2026-27"`）。
+    pub title: String,
+    /// 1 文の説明。無ければ省く。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub description: Option<String>,
 }
 
 /// `/v2/highlights/index.json` トップレベル構造。

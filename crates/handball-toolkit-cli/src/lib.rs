@@ -6,9 +6,11 @@
 //! 構造化エラー（`{scope, code, params}` ワイヤ形式）をそのまま表示・出力する。
 //!
 //! - 単一ファイル: トップレベルキーで形状を自動判別（`facts` = 試合本体 /
-//!   `matches` = 試合 index / `highlights` = ハイライト index）
+//!   `matches` = 試合 index（大会の一覧も同じ形）/ `highlights` = ハイライト index /
+//!   `competitions` = 大会 index）
 //! - ディレクトリ（v2 ルート）: index ↔ ファイルの突合と SCHEMA.md 由来の
-//!   整合チェック（スコア転記 / factCount / hasVideo / date）を含む一括検証
+//!   整合チェック（スコア転記 / factCount / hasVideo / date / チーム名）を含む一括検証。
+//!   大会（`competitions/`）の一覧は `index.json` と本体を共有するので突合に合流させる
 //!
 //! SCHEMA.md の不変条件のうち、コアの validators が見ない「配列・ファイル群と
 //! しての整合」は CLI 側で検査する（`corpus` scope）。index の slug 重複 /
