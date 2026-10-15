@@ -47,15 +47,17 @@ fn corpus_ok_has_no_findings() {
         report.findings
     );
     // index + match 2 件（1 件は大会の一覧にだけ載る）+ highlight index + highlight
-    // + 大会 index + 大会の一覧 = 7 ファイル
-    assert_eq!(report.checked_files, 7);
+    // + 大会 index + 大会の一覧 3 本（部門を持つ大会の 2 部門 + 部門を持たない大会。
+    // handball-project#578）= 9 ファイル
+    assert_eq!(report.checked_files, 9);
 }
 
 /// 大会の一覧（`competitions/{id}.json`）に載った本体は `index.json` に無くても orphan に
 /// ならず、index と同じ転記整合（スコア / hasVideo / date / チーム名）を受ける
 /// （handball-project#566）。corpus-ok が 0 件なのは上で見ているので、ここでは
 /// 「大会の一覧だけに載る本体が突合の対象に入っている」ことを、その本体を壊した
-/// 一時コーパスで固定する。
+/// 一時コーパスで固定する。その本体は部門の一覧（`test-league-2026-men.json`。
+/// handball-project#578）に載っているので、部門の一覧が突合に入っていることの証拠も兼ねる。
 #[test]
 fn competition_listed_match_is_checked_against_its_body() {
     // dev-dependency を増やさないため、std だけで一時コーパスを作る。
@@ -154,6 +156,12 @@ fn corpus_bad_reports_expected_findings() {
         ("unsafeTableID", "bad-cup.json"),
         ("tableWithoutColumns", "bad-cup.json"),
         ("unexpectedTables", "index.json"),
+        // 大会の部門（handball-project#578）。部門が空の大会 / 一覧ファイルが無い部門 /
+        // 部門を持つ大会の id の一覧ファイル（一覧は部門ごとなので名簿のどこからも引かれない）。
+        // 大会と部門をまたいだ id の重複と字種は `corpus_bad_pins_competition_division_details`。
+        ("emptyCompetitionDivisions", "index.json"),
+        ("missingCompetitionFile", "no-division-file.json"),
+        ("orphanCompetitionFile", "bad-league.json"),
     ];
     for (code, file) in expect {
         assert!(
@@ -177,6 +185,46 @@ fn corpus_bad_reports_expected_findings() {
     assert_eq!(
         negative_clock.fact_id.as_deref(),
         Some("44444444-4444-4444-4444-444444444444")
+    );
+}
+
+/// 大会の部門（handball-project#578）の指摘を params まで固定する。
+///
+/// - 大会と部門の id は名簿全体で 1 つの名前空間（部門の id `bad-cup` は部門を持たない大会の
+///   `bad-cup` と重なる）。大会どうしの重複と同じ code なので、id ごとの件数で区別する
+/// - 部門の id もファイル名になるので字種を見る
+#[test]
+fn corpus_bad_pins_competition_division_details() {
+    let mut report = RunReport::default();
+    validate_corpus(&fixture("corpus-bad"), &mut report);
+
+    let ids_of = |code: &str| -> Vec<String> {
+        report
+            .findings
+            .iter()
+            .filter(|finding| {
+                finding.issue.get("code").and_then(|value| value.as_str()) == Some(code)
+            })
+            .filter_map(|finding| finding.issue["params"]["id"].as_str().map(str::to_owned))
+            .collect()
+    };
+
+    let duplicates = ids_of("duplicateCompetitionID");
+    assert_eq!(
+        duplicates.iter().filter(|id| *id == "bad-cup").count(),
+        2,
+        "大会どうしの重複 1 件 + 部門と大会の重複 1 件のはず: {duplicates:#?}"
+    );
+    assert!(
+        ids_of("unsafeCompetitionID").contains(&"bad league".to_owned()),
+        "部門の id の字種も見るはず: {:#?}",
+        report.findings
+    );
+    assert_eq!(ids_of("emptyCompetitionDivisions"), vec!["empty-league"]);
+    assert!(
+        ids_of("missingCompetitionFile").contains(&"no-division-file".to_owned()),
+        "部門の一覧ファイルは部門の id で引くはず: {:#?}",
+        report.findings
     );
 }
 

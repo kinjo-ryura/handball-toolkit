@@ -154,7 +154,7 @@ fn check_listed_matches(
     }
 }
 
-/// `competitions/` を読み、大会ごとの試合一覧（ファイルパスと項目）を返す。
+/// `competitions/` を読み、大会ごと（部門を持つ大会は部門ごと）の試合一覧（ファイルパスと項目）を返す。
 ///
 /// ディレクトリが無ければ大会を配信していないコーパスとして空を返す。大会 index が
 /// 読めないときは `missingIndex` / decode の指摘を積んだうえで、置いてある一覧ファイルを
@@ -175,30 +175,32 @@ fn read_competition_lists(
     if let Some(index) = read_index::<SampleCompetitionIndexDtoV2>(&index_path, report) {
         validate::validate_competition_index_dto(&index_label, &index, report);
         for competition in &index.competitions {
-            // id はそのままファイル名になる。slug と同じ字種に限り、`index` は予約する。
-            if !validate::is_safe_slug(&competition.id) || competition.id == "index" {
-                report.findings.push(Finding::new(
-                    &index_label,
-                    Stage::Corpus,
-                    corpus_issue("unsafeCompetitionID", json!({"id": competition.id})),
-                ));
-                continue;
+            // 部門を持つ大会（handball-project#578）の id はファイル名にならないが、アプリが
+            // 識別子として持つので字種は部門と揃える。一覧ファイルは部門の id で引く。
+            if competition.divisions.is_some() {
+                check_competition_id(&index_label, &competition.id, report);
             }
-            // 重複 id は index 検証（duplicateCompetitionID）で指摘済み。
-            if !listed_ids.insert(competition.id.clone()) {
-                continue;
-            }
-            let file = dir.join(format!("{}.json", competition.id));
-            if !file.is_file() {
-                report.findings.push(Finding::new(
-                    &file.display().to_string(),
-                    Stage::Corpus,
-                    corpus_issue("missingCompetitionFile", json!({"id": competition.id})),
-                ));
-                continue;
-            }
-            if let Some(list) = read_competition_list(&file, report) {
-                lists.push((file, list));
+            for id in competition.listing_ids() {
+                // id はそのままファイル名になる。slug と同じ字種に限り、`index` は予約する。
+                if !check_competition_id(&index_label, id, report) {
+                    continue;
+                }
+                // 重複 id は index 検証（duplicateCompetitionID）で指摘済み。
+                if !listed_ids.insert(id.to_string()) {
+                    continue;
+                }
+                let file = dir.join(format!("{id}.json"));
+                if !file.is_file() {
+                    report.findings.push(Finding::new(
+                        &file.display().to_string(),
+                        Stage::Corpus,
+                        corpus_issue("missingCompetitionFile", json!({"id": id})),
+                    ));
+                    continue;
+                }
+                if let Some(list) = read_competition_list(&file, report) {
+                    lists.push((file, list));
+                }
             }
         }
     }
@@ -221,6 +223,19 @@ fn read_competition_lists(
         }
     }
     lists
+}
+
+/// 大会・部門の id が使える形か。使えなければ `unsafeCompetitionID` を積んで false。
+fn check_competition_id(label: &str, id: &str, report: &mut RunReport) -> bool {
+    if validate::is_safe_competition_id(id) {
+        return true;
+    }
+    report.findings.push(Finding::new(
+        label,
+        Stage::Corpus,
+        corpus_issue("unsafeCompetitionID", json!({"id": id})),
+    ));
+    false
 }
 
 /// 大会の試合一覧は `/v2/index.json` と同じ形（SCHEMA.md）なので、同じ検査を掛ける。

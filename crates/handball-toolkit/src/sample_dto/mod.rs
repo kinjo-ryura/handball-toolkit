@@ -19,15 +19,15 @@ pub use sample_match_converter::{
     SampleMatchConversionResult, convert, decode_configuration, decode_fact, required_id_count,
 };
 pub use sample_match_dtos::{
-    SCHEMA_VERSION_CURRENT, SampleCompetitionIndexDtoV2, SampleCompetitionSummaryV2,
-    SampleControlFactDtoV2, SampleFactAnchorDtoV2, SampleFactDtoV2, SampleFactPayloadDtoV2,
-    SampleGeneratorDtoV2, SampleHighlightIndexDtoV2, SampleHighlightSummaryV2, SampleIndexDtoV2,
-    SampleMatchClockDtoV2, SampleMatchConfigurationDtoV2, SampleMatchDecodeErrorV2,
-    SampleMatchDtoV2, SampleMatchHeaderV2, SampleMatchSummaryV2, SamplePhaseStartPayloadDtoV2,
-    SamplePlayFactDtoV2, SamplePlayerDtoV2, SamplePossessionFactDtoV2, SampleStoppagePayloadDtoV2,
-    SampleTableAlignV2, SampleTableColumnV2, SampleTableV2, SampleTeamDtoV2, SampleTeamsDtoV2,
-    SampleTimerConfigurationDtoV2, SampleVideoClockDtoV2, SampleVideoConfigurationDtoV2,
-    SampleVideoSourceDtoV2,
+    SCHEMA_VERSION_CURRENT, SampleCompetitionDivisionV2, SampleCompetitionIndexDtoV2,
+    SampleCompetitionSummaryV2, SampleControlFactDtoV2, SampleFactAnchorDtoV2, SampleFactDtoV2,
+    SampleFactPayloadDtoV2, SampleGeneratorDtoV2, SampleHighlightIndexDtoV2,
+    SampleHighlightSummaryV2, SampleIndexDtoV2, SampleMatchClockDtoV2,
+    SampleMatchConfigurationDtoV2, SampleMatchDecodeErrorV2, SampleMatchDtoV2, SampleMatchHeaderV2,
+    SampleMatchSummaryV2, SamplePhaseStartPayloadDtoV2, SamplePlayFactDtoV2, SamplePlayerDtoV2,
+    SamplePossessionFactDtoV2, SampleStoppagePayloadDtoV2, SampleTableAlignV2, SampleTableColumnV2,
+    SampleTableV2, SampleTeamDtoV2, SampleTeamsDtoV2, SampleTimerConfigurationDtoV2,
+    SampleVideoClockDtoV2, SampleVideoConfigurationDtoV2, SampleVideoSourceDtoV2,
 };
 pub use sample_match_encoder::encode_sample_match;
 pub use sample_match_exporter::{default_slug, export_match};
