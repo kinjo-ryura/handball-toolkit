@@ -1,6 +1,6 @@
 //! 移植元: アプリ層 `SampleMatches/V2/SampleMatchDTOsV2.swift`。
 //!
-//! V2 sample 配信 DTO（`/v2/` path のための schema）。`SAMPLE_DTO_V2.md` 準拠。
+//! V2 sample 配信 DTO（handball-match-data の配信 JSON の schema）。`SAMPLE_DTO_V2.md` 準拠。
 //!
 //! V1 schema との主な差分:
 //! - `MatchConfiguration` は tagged union（`kind` discriminator + sub-payload）
@@ -28,7 +28,7 @@ pub const SCHEMA_VERSION_CURRENT: i64 = 2;
 
 // ── Index ──
 
-/// `/v2/index.json` トップレベル構造。大会の一覧（`/v2/competitions/{id}.json`）も同じ形で、
+/// `matches/index.json` トップレベル構造。大会の一覧（`competitions/{id}.json`）も同じ形で、
 /// 大会だけが `tables` を持つ（handball-project#567）。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
@@ -37,13 +37,13 @@ pub struct SampleIndexDtoV2 {
     pub schema_version: i64,
     pub matches: Vec<SampleMatchSummaryV2>,
     /// 大会ごとの表（順位表・得点ランキング・星取表など）。**大会の一覧だけ**が持ち、
-    /// `/v2/index.json` には無い（検証 CLI の `unexpectedTables`）。
+    /// `matches/index.json` には無い（検証 CLI の `unexpectedTables`）。
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub tables: Option<Vec<SampleTableV2>>,
 }
 
-/// `/v2/index.json` と `/v2/competitions/{id}.json` の `matches[]` 要素。
+/// `matches/index.json` と `competitions/{id}.json` の `matches[]` 要素。
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
@@ -58,8 +58,8 @@ pub struct SampleMatchSummaryV2 {
     pub away_score: i64,
     pub has_video: bool,
     /// 本体のチーム名の転記（handball-project#566）。**optional** — 大会の一覧
-    /// （`/v2/competitions/{id}.json`）では必須で、本体を取らずに行を組むために使う。
-    /// `/v2/index.json` の既存の項目には無い（旧アプリは本体から名前を引く）。
+    /// （`competitions/{id}.json`）では必須で、本体を取らずに行を組むために使う。
+    /// `matches/index.json` の既存の項目には無い（旧アプリは本体から名前を引く）。
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub home_team_name: Option<String>,
@@ -87,7 +87,7 @@ pub struct SampleMatchSummaryV2 {
 
 // ── Tables（大会の表）──
 
-/// 大会の一覧（`/v2/competitions/{id}.json`）の `tables[]` 要素（handball-project#567）。
+/// 大会の一覧（`competitions/{id}.json`）の `tables[]` 要素（handball-project#567）。
 ///
 /// 順位表・得点ランキング・星取表のような大会ごとの表を、**列の意味を持たない汎用の表**として
 /// 配信する。アプリは題・列見出し・寄せ・セルの文字列をそのまま描くだけで、表の種類が増えても
@@ -147,12 +147,12 @@ pub enum SampleTableAlignV2 {
 
 // ── Competitions（大会）──
 
-/// `/v2/competitions/index.json` トップレベル構造（handball-project#566）。
+/// `competitions/index.json` トップレベル構造（handball-project#566）。
 ///
-/// 大会は「注目の試合」（`/v2/index.json`）とは別に配信する試合のまとまり。本体は
-/// `/v2/matches/{slug}.json` を共有し、1 つの本体は `/v2/index.json` か 1 つの大会の
-/// どちらか一方にだけ載る。大会の試合一覧は `/v2/competitions/{id}.json` で、形は
-/// `/v2/index.json` と同じ（`SampleIndexDtoV2`）。
+/// 大会は「注目の試合」（`matches/index.json`）とは別に配信する試合のまとまり。本体は
+/// `matches/{slug}.json` を共有し、1 つの本体は `matches/index.json` か 1 つの大会の
+/// どちらか一方にだけ載る。大会の試合一覧は `competitions/{id}.json` で、形は
+/// `matches/index.json` と同じ（`SampleIndexDtoV2`）。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
@@ -161,7 +161,7 @@ pub struct SampleCompetitionIndexDtoV2 {
     pub competitions: Vec<SampleCompetitionSummaryV2>,
 }
 
-/// `/v2/competitions/index.json` の `competitions[]` 要素。アプリはこの 1 つにバナーを 1 本出す。
+/// `competitions/index.json` の `competitions[]` 要素。アプリはこの 1 つにバナーを 1 本出す。
 ///
 /// **部門**（男子・女子・年代など。handball-project#578）を持つ大会は、順位表と節が部門ごとに
 /// 別なので、試合一覧のファイルを部門ごとに持つ（`competitions/{部門の id}.json`）。部門を持たない
@@ -209,7 +209,7 @@ impl SampleCompetitionSummaryV2 {
     }
 }
 
-/// `/v2/highlights/index.json` トップレベル構造。
+/// `highlights/index.json` トップレベル構造。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
@@ -218,7 +218,7 @@ pub struct SampleHighlightIndexDtoV2 {
     pub highlights: Vec<SampleHighlightSummaryV2>,
 }
 
-/// `/v2/highlights/index.json` の `highlights[]` 要素。
+/// `highlights/index.json` の `highlights[]` 要素。
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
@@ -237,7 +237,7 @@ pub struct SampleHighlightSummaryV2 {
 
 // ── Match body ──
 
-/// `/v2/matches/{slug}.json` および `/v2/highlights/{slug}.json` の本体。
+/// `matches/{slug}.json` および `highlights/{slug}.json` の本体。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
@@ -445,7 +445,7 @@ pub struct SampleControlFactDtoV2 {
 /// ポゼッション開始（handball-project#154）。
 ///
 /// 判別子（`kind`）を持たない — ポゼッションの fact は「開始」1 種類だけで、2 つ目が出た時点で
-/// どのみちスキーマ変更になるため、空の判別子を先置きしない（`v2/SCHEMA.md` 参照）。
+/// どのみちスキーマ変更になるため、空の判別子を先置きしない（handball-match-data の `SCHEMA.md` 参照）。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]

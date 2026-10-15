@@ -351,19 +351,19 @@ fn invalid_json(error: serde_json::Error) -> SampleDtoError {
     }
 }
 
-/// 配信 JSON → DTO（`/v2/matches/{slug}.json` / `/v2/highlights/{slug}.json` の本体）。
+/// 配信 JSON → DTO（`matches/{slug}.json` / `highlights/{slug}.json` の本体）。
 #[uniffi::export]
 pub fn parse_sample_match(json: String) -> Result<SampleMatchDtoV2, SampleDtoError> {
     serde_json::from_str(&json).map_err(invalid_json)
 }
 
-/// `/v2/index.json` の parse。
+/// `matches/index.json` の parse。
 #[uniffi::export]
 pub fn parse_sample_index(json: String) -> Result<SampleIndexDtoV2, SampleDtoError> {
     serde_json::from_str(&json).map_err(invalid_json)
 }
 
-/// `/v2/highlights/index.json` の parse。
+/// `highlights/index.json` の parse。
 #[uniffi::export]
 pub fn parse_sample_highlight_index(
     json: String,
@@ -371,8 +371,8 @@ pub fn parse_sample_highlight_index(
     serde_json::from_str(&json).map_err(invalid_json)
 }
 
-/// `/v2/competitions/index.json` の parse（handball-project#566）。大会ごとの試合一覧
-/// （`/v2/competitions/{id}.json`）は `/v2/index.json` と同じ形なので `parse_sample_index` で読む。
+/// `competitions/index.json` の parse（handball-project#566）。大会ごとの試合一覧
+/// （`competitions/{id}.json`）は `matches/index.json` と同じ形なので `parse_sample_index` で読む。
 #[uniffi::export]
 pub fn parse_sample_competition_index(
     json: String,
@@ -455,7 +455,7 @@ pub fn export_sample_match(
 }
 
 /// `sample_dto::encode_sample_match`（Swift JSONEncoder 互換のバイト出力 — share sheet /
-/// handball-sample-matches への投入用）。
+/// handball-match-data への投入用）。
 #[uniffi::export]
 pub fn encode_sample_match(dto: SampleMatchDtoV2) -> String {
     sample_dto::encode_sample_match(&dto)

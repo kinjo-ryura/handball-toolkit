@@ -222,7 +222,7 @@ pub fn validate_match_dto(
     })
 }
 
-/// `/v2/index.json` の検証（schemaVersion / slug 重複 / date 降順 / slug 先頭日付）。
+/// 「注目の試合」の一覧（`matches/index.json`）の検証（schemaVersion / slug 重複 / date 降順 / slug 先頭日付）。
 pub fn validate_match_index_dto(label: &str, index: &SampleIndexDtoV2, report: &mut RunReport) {
     check_schema_version(label, index.schema_version, report);
     check_index_entries(
@@ -275,7 +275,7 @@ fn check_team_short_names(label: &str, entries: &[SampleMatchSummaryV2], report:
     }
 }
 
-/// `/v2/highlights/index.json` の検証（matches 側と同じ配列レベル検査）。
+/// `highlights/index.json` の検証（matches 側と同じ配列レベル検査）。
 pub fn validate_highlight_index_dto(
     label: &str,
     index: &SampleHighlightIndexDtoV2,
@@ -297,7 +297,7 @@ pub fn validate_highlight_index_dto(
     );
 }
 
-/// `/v2/competitions/index.json` の検証（schemaVersion / id 重複 / 空の部門）。id がファイル名に
+/// `competitions/index.json` の検証（schemaVersion / id 重複 / 空の部門）。id がファイル名に
 /// 使える字種か（と `index` の予約）は corpus 側がパスに埋める直前に見る。
 ///
 /// 大会と部門（handball-project#578）の id は**名簿全体で 1 つの名前空間**にする。部門の id は
@@ -509,7 +509,7 @@ fn check_round_groups(label: &str, entries: &[IndexEntry<'_>], report: &mut RunR
 /// 「新しい順が崩れていない」ことだけを見る）。
 ///
 /// 大会の一覧は配信側が節 / 回戦の順に並べる（handball-project#567）ので、降順を見るのは
-/// **同じ `round` の中だけ**。`round` の無い `/v2/index.json` とハイライト index では
+/// **同じ `round` の中だけ**。`round` の無い `matches/index.json` とハイライト index では
 /// 従来どおり一覧全体が対象になる。
 fn check_date_descending(label: &str, entries: &[IndexEntry<'_>], report: &mut RunReport) {
     for pair in entries.windows(2) {
@@ -607,7 +607,7 @@ fn check_duplicate_fact_ids(label: &str, dto: &SampleMatchDtoV2, report: &mut Ru
 /// 検査はコアではなく CLI に置いた。`SampleMatchDecodeErrorV2` は FFI 境界の
 /// uniffi Enum で、variant 追加は ERROR_CODES.md・各シェルの網羅分岐・Android の
 /// 文言 2 ロケールへ波及する。供給経路は配信前にこの CLI を必ず通る
-/// （sample-matches の CI）ため、error（exit 1）で止めれば risk は塞げる。
+/// （handball-match-data の CI）ため、error（exit 1）で止めれば risk は塞げる。
 fn check_unexpected_anchor_end(label: &str, dto: &SampleMatchDtoV2, report: &mut RunReport) {
     for (index, fact) in dto.facts.iter().enumerate() {
         // どの sub-payload を読むかは converter と同じく `kind` で決める。

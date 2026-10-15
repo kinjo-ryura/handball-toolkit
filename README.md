@@ -4,7 +4,7 @@
 
 試合は **fact の追記専用ログ**として保存される — ゴールが決まった、phase が始まった、時計が止まった。それ以外のすべて（スコア、タイムライン、選手別スタッツ、UI が今どの操作を出してよいか）は、そのログから純粋関数で**導出**される。コアが所有するのはその導出と、「その fact を追記してよいか」を判定するルールだけで、それ以外は何も持たない。
 
-単一のコアが iOS / Android / Web / CLI に供給される。[handball-sample-matches](https://github.com/kinjo-ryura/handball-sample-matches) が配信するスキーマの型付き実装であり、[HandballRecorder](https://github.com/kinjo-ryura/HandballRecorder) を動かしているコアでもある。
+単一のコアが iOS / Android / Web / CLI に供給される。[handball-match-data](https://github.com/kinjo-ryura/handball-match-data) が配信するスキーマの型付き実装であり、[HandballRecorder](https://github.com/kinjo-ryura/HandballRecorder) を動かしているコアでもある。
 
 ## 設計不変条件
 
@@ -90,7 +90,7 @@ persistence_order::sort_by_persistence_order(&mut facts);
 import init, { requiredIdCount, buildMatchView } from './handball_toolkit_wasm.js';
 await init();
 
-const json = await (await fetch('.../v2/matches/foo.json')).text();
+const json = await (await fetch('.../matches/foo.json')).text();
 // コアは UUID を生成しないので、シェルが事前生成して渡す
 const ids = Array.from({ length: requiredIdCount(json) }, () => crypto.randomUUID());
 const view = JSON.parse(buildMatchView('foo', json, ids));
@@ -253,7 +253,7 @@ cargo run -p handball-toolkit-cli -- validate --json path/to/match.json
 
 exit code は `0` = error なし（warning のみは 0）/ `1` = error あり / `2` = 使い方・パス誤り。severity は CLI 所有のレイヤ概念で、コアの構造化エラー（severity を持たず一律 blocking）とは別物。
 
-この CLI は [handball-sample-matches](https://github.com/kinjo-ryura/handball-sample-matches) の CI（`.github/workflows/validate.yml`）から push / PR ごとに走り、配信 JSON の破損をそこで止める。CI は**この repo の main** を checkout してビルドするので、コア側で validators を強化すれば配信データの検証もそのまま追随する（逆に、既存の配信データが引っかかる規則を足すと向こうの CI が赤くなる）。手元実行は昇格前の事前確認や `--json` での調査に使う。
+この CLI は [handball-match-data](https://github.com/kinjo-ryura/handball-match-data) の CI（`.github/workflows/validate.yml`）から push / PR ごとに走り、配信 JSON の破損をそこで止める。CI は**この repo の main** を checkout してビルドするので、コア側で validators を強化すれば配信データの検証もそのまま追随する（逆に、既存の配信データが引っかかる規則を足すと向こうの CI が赤くなる）。手元実行は昇格前の事前確認や `--json` での調査に使う。
 
 ## 構成
 
@@ -288,10 +288,10 @@ direnv を使わない場合は `nix develop` で同じシェルに入れる。f
 このコアは Swift 実装の移植であり、**移植元が仕様の正典**。正しさは 3 か所で固定している。
 
 - **移植テスト** — 移植元のテストから 1:1 で写した 140 件
-- **ゴールデンパリティ** — `handball-sample-matches` の実試合 JSON を両実装に通し、projection 出力が bit 単位で一致することを検証する。コーパス件数は `tests/golden_parity_tests.rs` の assert が正で、これが列挙漏れの検知も兼ねる
+- **ゴールデンパリティ** — `handball-match-data` の実試合 JSON を両実装に通し、projection 出力が bit 単位で一致することを検証する。コーパス件数は `tests/golden_parity_tests.rs` の assert が正で、これが列挙漏れの検知も兼ねる
 - **ワイヤ形式テスト** — シェルが文言表を引くキー `(scope, code)` を専用テストで固定する。改名は breaking change だから
 
-`crates/handball-toolkit/tests/golden/inputs/` のフィクスチャは [handball-sample-matches](https://github.com/kinjo-ryura/handball-sample-matches) の配信データのコピーで、どのコミットから生成したかは `tests/golden/README.md` に記録がある。中身は試合の事実（スコア・時刻・イベント）で、テスト fixture としてのみ同梱している。
+`crates/handball-toolkit/tests/golden/inputs/` のフィクスチャは [handball-match-data](https://github.com/kinjo-ryura/handball-match-data) の配信データのコピーで、どのコミットから生成したかは `tests/golden/README.md` に記録がある。中身は試合の事実（スコア・時刻・イベント）で、テスト fixture としてのみ同梱している。
 
 ## ドキュメント
 

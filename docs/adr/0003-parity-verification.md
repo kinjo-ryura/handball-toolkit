@@ -24,6 +24,8 @@ Swift 側にはスナップショット/ゴールデンテスト資産は存在�
 | `handball-sample-matches/pdf-matches/`（gitignore 済みローカル） | 可変 | `.timer` | JHA / JHL の PDF インポート産。**公開コーパスに `.timer` 試合が無い gap をここで補う**（ローカル実行専用の拡張コーパス） |
 
 - 公開 8 件のゴールデンは handball-toolkit の `tests/golden/` にコミットする（入力 JSON のコピー + 期待出力）
+
+追記（2026-10-15、handball-project#591）: 配信は handball-match-data へ移り、`v2/` を外した root の `matches/`・`highlights/` に置かれるようになった。コーパスの入力は同リポの同名ファイルと byte 同一（出所の commit は `tests/golden/README.md`）。上の表のパスは決定時のもの。
 - `.timer` の公開サンプル追加（gap の恒久解消）は別 Issue 候補とする
 
 追記（2026-07-12、P8 完走時）: `pdf-matches/` の既存 JSON は**旧 V2 形式**（captureMethod / phaseRules / phase 相対秒。jha-pdf-importer が現行スキーマ未対応）だったため、一時スクリプト `scripts/migrate_pdf_matches_legacy.py` で現行 SAMPLE_DTO_V2 へ移行して使用した（jha 2 件。PhaseStart 合成 + 累積秒化 + timeoutStarted → stoppage）。恒久対応（importer の現行スキーマ化）は別 Issue 候補。
@@ -97,5 +99,5 @@ Issue #49 の「パリティ検証の完走」= 公開コーパス 8 件 + ロ�
 ## 参照
 
 - ADR 0001（境界 API 目録）/ ADR 0002（構造化エラー）
-- [handball-sample-matches の `v2/SCHEMA.md`](https://github.com/kinjo-ryura/handball-sample-matches/blob/main/v2/SCHEMA.md) — コーパスの schema 正典（配信 JSON の `v2/` と同じ repo）
+- [handball-match-data の `SCHEMA.md`](https://github.com/kinjo-ryura/handball-match-data/blob/main/SCHEMA.md) — コーパスの schema 正典（配信 JSON と同じ repo。2026-10-15 までは handball-sample-matches の `v2/SCHEMA.md`）
 - handball-project#49「パリティ検証（移植の安全網）」
