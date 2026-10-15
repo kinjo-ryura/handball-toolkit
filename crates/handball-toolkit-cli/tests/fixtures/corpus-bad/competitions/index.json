@@ -16,6 +16,20 @@
     {
       "id": "../escape",
       "title": "パスに埋められない id"
+    },
+    {
+      "id": "bad-league",
+      "title": "部門を持つ大会（この id の一覧ファイルは置かない）",
+      "divisions": [
+        { "id": "bad-cup", "title": "他の大会と同じ id" },
+        { "id": "bad league", "title": "パスに埋められない id" },
+        { "id": "no-division-file", "title": "一覧ファイルが無い" }
+      ]
+    },
+    {
+      "id": "empty-league",
+      "title": "部門が空",
+      "divisions": []
     }
   ]
 }

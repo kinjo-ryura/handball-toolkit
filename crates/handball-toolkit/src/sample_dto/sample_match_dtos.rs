@@ -133,13 +133,17 @@ pub struct SampleCompetitionIndexDtoV2 {
     pub competitions: Vec<SampleCompetitionSummaryV2>,
 }
 
-/// `/v2/competitions/index.json` の `competitions[]` 要素。
+/// `/v2/competitions/index.json` の `competitions[]` 要素。アプリはこの 1 つにバナーを 1 本出す。
+///
+/// **部門**（男子・女子・年代など。handball-project#578）を持つ大会は、順位表と節が部門ごとに
+/// 別なので、試合一覧のファイルを部門ごとに持つ（`competitions/{部門の id}.json`）。部門を持たない
+/// 大会は大会の id がそのまま一覧ファイルの名前になる。
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct SampleCompetitionSummaryV2 {
-    /// `competitions/{id}.json` のファイル名（拡張子除く）と完全一致。slug と同じ字種
-    /// （英数字と `-`）で、`index` は予約語。
+    /// 大会の識別子。部門を持たなければ `competitions/{id}.json` のファイル名（拡張子除く）と
+    /// 完全一致。slug と同じ字種（英数字と `-`）で、`index` は予約語。部門の id とも重ならない。
     pub id: String,
     /// 画面に出す大会名（例: `"リーグH 2026-27"`）。
     pub title: String,
@@ -147,6 +151,34 @@ pub struct SampleCompetitionSummaryV2 {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub description: Option<String>,
+    /// 部門。配列順がアプリの切替の順。無ければ部門を持たない大会で、空の配列は書かない
+    /// （検証 CLI の `emptyCompetitionDivisions`）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub divisions: Option<Vec<SampleCompetitionDivisionV2>>,
+}
+
+/// `competitions[].divisions[]` 要素（handball-project#578）。部門 1 つが試合一覧 1 つ・表 1 組になる。
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[serde(rename_all = "camelCase")]
+pub struct SampleCompetitionDivisionV2 {
+    /// `competitions/{id}.json` のファイル名（拡張子除く）と完全一致。字種と予約語は大会の id と
+    /// 同じで、名簿の中の大会と部門の id 全体で一意。
+    pub id: String,
+    /// 切替に出す部門名（例: `"男子"`）。大会名は繰り返さない。
+    pub title: String,
+}
+
+impl SampleCompetitionSummaryV2 {
+    /// この大会の試合一覧ファイルの id（`competitions/{id}.json`）。部門があれば部門の id を
+    /// 配列順に、無ければ大会の id 1 つ。
+    pub fn listing_ids(&self) -> Vec<&str> {
+        match &self.divisions {
+            Some(divisions) => divisions.iter().map(|d| d.id.as_str()).collect(),
+            None => vec![self.id.as_str()],
+        }
+    }
 }
 
 /// `/v2/highlights/index.json` トップレベル構造。

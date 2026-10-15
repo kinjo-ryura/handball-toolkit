@@ -264,8 +264,12 @@ pub fn validate_highlight_index_dto(
     );
 }
 
-/// `/v2/competitions/index.json` の検証（schemaVersion / id 重複）。id がファイル名に
+/// `/v2/competitions/index.json` の検証（schemaVersion / id 重複 / 空の部門）。id がファイル名に
 /// 使える字種か（と `index` の予約）は corpus 側がパスに埋める直前に見る。
+///
+/// 大会と部門（handball-project#578）の id は**名簿全体で 1 つの名前空間**にする。部門の id は
+/// 一覧ファイルの名前で、部門を持たない大会の id も同じ置き場のファイル名になるので、片方だけで
+/// 一意にしても同じファイルを 2 つの項目が指しうる。
 pub fn validate_competition_index_dto(
     label: &str,
     index: &SampleCompetitionIndexDtoV2,
@@ -274,14 +278,31 @@ pub fn validate_competition_index_dto(
     check_schema_version(label, index.schema_version, report);
     let mut seen = BTreeSet::new();
     for competition in &index.competitions {
-        if !seen.insert(competition.id.as_str()) {
+        let divisions = competition.divisions.as_deref().unwrap_or_default();
+        if competition.divisions.is_some() && divisions.is_empty() {
             report.findings.push(Finding::new(
                 label,
                 Stage::Corpus,
-                corpus_issue("duplicateCompetitionID", json!({"id": competition.id})),
+                corpus_issue("emptyCompetitionDivisions", json!({"id": competition.id})),
             ));
         }
+        let ids = std::iter::once(competition.id.as_str())
+            .chain(divisions.iter().map(|division| division.id.as_str()));
+        for id in ids {
+            if !seen.insert(id) {
+                report.findings.push(Finding::new(
+                    label,
+                    Stage::Corpus,
+                    corpus_issue("duplicateCompetitionID", json!({"id": id})),
+                ));
+            }
+        }
     }
+}
+
+/// 大会・部門の id が一覧ファイルの名前に使えるか（slug と同じ字種で、`index` は名簿の予約）。
+pub(crate) fn is_safe_competition_id(id: &str) -> bool {
+    is_safe_slug(id) && id != "index"
 }
 
 /// index 配列の検査に要る項目だけを抜いたもの。matches / highlights は要素型が違うだけで

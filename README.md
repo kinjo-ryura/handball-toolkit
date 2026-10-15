@@ -241,7 +241,7 @@ gh release create v0.17.0 target/aar/handball-toolkit-0.17.0.aar \
 ```bash
 # v2 ルートを一括検証（index ↔ ファイル突合 + スコア / factCount / hasVideo / date / チーム名の転記整合
 #                    + index の date 降順 / slug 先頭日付 / factID 重複 / play の anchor end
-#                    + 大会 competitions/ の一覧と本体の突合・節（round）の並び・表（tables）の形）
+#                    + 大会 competitions/ の一覧（部門を持つ大会は部門ごと）と本体の突合・節（round）の並び・表（tables）の形）
 cargo run -p handball-toolkit-cli -- validate ../handball-sample-matches/v2
 
 # 単体ファイル。--json で機械可読出力

@@ -2,9 +2,18 @@
   "schemaVersion": 2,
   "competitions": [
     {
+      "id": "test-league-2026",
+      "title": "テストリーグ 2026",
+      "description": "部門を持つ大会の fixture（一覧ファイルは部門ごと。本体は matches/ を共有し、index.json には載せない）",
+      "divisions": [
+        { "id": "test-league-2026-men", "title": "男子" },
+        { "id": "test-league-2026-women", "title": "女子" }
+      ]
+    },
+    {
       "id": "test-cup-2026",
       "title": "テストカップ 2026",
-      "description": "大会の fixture（本体は matches/ を共有し、index.json には載せない）"
+      "description": "部門を持たない大会の fixture（大会の id がそのまま一覧ファイルの名前）"
     }
   ]
 }
