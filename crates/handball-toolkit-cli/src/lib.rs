@@ -8,7 +8,8 @@
 //! - 単一ファイル: トップレベルキーで形状を自動判別（`facts` = 試合本体 /
 //!   `matches` = 試合 index（大会の一覧も同じ形）/ `highlights` = ハイライト index /
 //!   `competitions` = 大会 index）
-//! - ディレクトリ（v2 ルート）: index ↔ ファイルの突合と SCHEMA.md 由来の
+//! - ディレクトリ（配信データのルート。一覧は `matches/index.json` か root の `index.json`）:
+//!   index ↔ ファイルの突合と SCHEMA.md 由来の
 //!   整合チェック（スコア転記 / factCount / hasVideo / date / チーム名）を含む一括検証。
 //!   大会（`competitions/`）の一覧は `index.json` と本体を共有するので突合に合流させる
 //!

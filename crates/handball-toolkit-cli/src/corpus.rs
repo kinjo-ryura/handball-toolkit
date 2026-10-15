@@ -1,4 +1,4 @@
-//! v2 ルートディレクトリの一括検証。
+//! 配信データのルートディレクトリの一括検証。一覧の置き場は 2 つの構成を読む（`match_index_path`）。
 //!
 //! index ↔ ファイルの突合（missing / orphan / slug 重複）と、SCHEMA.md が定義する
 //! 転記フィールドの整合（homeScore / awayScore = goal 集計、hasVideo、factCount、
@@ -32,8 +32,23 @@ pub fn validate_corpus(root: &Path, report: &mut RunReport) {
 
 // ── matches 側 ──
 
+/// 「注目の試合」の一覧の置き場。配信データの構成は 2 つあり、本体と同じ `matches/` の中
+/// （`matches/index.json`。3 つの一覧が `matches/` / `highlights/` / `competitions/` に揃う形）と、
+/// root 直下（`index.json`。版の名前のディレクトリ `v2/` を root にする形）を読む
+/// （handball-project#588）。`matches/index.json` があればそれを、無ければ root 直下を読む。
+/// どちらも無いときの `missingIndex` は `matches/index.json` を指す。
+fn match_index_path(root: &Path) -> PathBuf {
+    let nested = root.join("matches").join("index.json");
+    let legacy = root.join("index.json");
+    if !nested.is_file() && legacy.is_file() {
+        legacy
+    } else {
+        nested
+    }
+}
+
 fn validate_match_side(root: &Path, report: &mut RunReport) {
-    let index_path = root.join("index.json");
+    let index_path = match_index_path(root);
     let matches_dir = root.join("matches");
 
     let listed = read_index::<SampleIndexDtoV2>(&index_path, report).map(|index| {
@@ -50,8 +65,9 @@ fn validate_match_side(root: &Path, report: &mut RunReport) {
         index.matches
     });
 
+    // `matches/index.json` は一覧なので、本体として読まない。
     let Some(entries) = listed else {
-        validate_all_bodies(&matches_dir, &[], report);
+        validate_all_bodies(&matches_dir, &["index.json"], report);
         return;
     };
 
@@ -78,6 +94,9 @@ fn validate_match_side(root: &Path, report: &mut RunReport) {
     }
 
     for file in json_files(&matches_dir) {
+        if file.file_name().is_some_and(|name| name == "index.json") {
+            continue;
+        }
         if !listed_in.contains_key(slug_of(&file)) {
             report.findings.push(Finding::new(
                 &file.display().to_string(),
