@@ -10,5 +10,5 @@ plugins {
     // ここで apply false で宣言しているのは Kotlin Gradle Plugin の版を決めるためだけ —
     // AGP が実行時に引く KGP（AGP 9.x は 2.2.10）よりこちらが新しければ、こちらが使われる。
     // Dependabot もこの行で Kotlin の版を追う。
-    id("org.jetbrains.kotlin.android") version "2.4.20" apply false
+    id("org.jetbrains.kotlin.android") version "2.4.21" apply false
 }
