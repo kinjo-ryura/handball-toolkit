@@ -72,6 +72,17 @@ pub struct SampleMatchSummaryV2 {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub round: Option<String>,
+    /// ホームの短い名前（公式の略称など。handball-project#582。例: `"TMEJ"`）。**optional** —
+    /// アプリは一覧の行で正式名（`home_team_name`）の代わりに出し、無ければ正式名。配信側は
+    /// 正式名と同じ短い名前を書かない。書くなら `home_team_name` も要る（検証 CLI の
+    /// `shortNameWithoutTeamName`）。試合本体のチームには無い（試合画面は正式名のまま）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub home_team_short_name: Option<String>,
+    /// アウェイの短い名前。`home_team_short_name` と同じ規則。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub away_team_short_name: Option<String>,
 }
 
 // ── Tables（大会の表）──
@@ -93,6 +104,23 @@ pub struct SampleTableV2 {
     pub columns: Vec<SampleTableColumnV2>,
     /// 行。各行のセル数は `columns` の数と一致する。セルは表示する文字列そのまま。
     pub rows: Vec<Vec<String>>,
+    /// 凡例（handball-project#582）。セルや列見出しに書いた略した文字（チームの短い名前など）と
+    /// その意味。**optional** — アプリは凡例にある文字と完全に一致するセル・列見出しをタップされたら
+    /// 意味を出す。列の意味は持たない（どのセルがチーム名かはアプリに渡さない）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub legend: Option<Vec<SampleTableLegendEntryV2>>,
+}
+
+/// `tables[].legend[]` 要素（handball-project#582）。
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[serde(rename_all = "camelCase")]
+pub struct SampleTableLegendEntryV2 {
+    /// セル・列見出しに書いた文字（例: `"TMEJ"`）。表の中で一意（検証 CLI の `duplicateLegendText`）。
+    pub text: String,
+    /// 意味（例: `"トヨタ自動車東日本レガロッソ宮城"`）。
+    pub detail: String,
 }
 
 /// `tables[].columns[]` 要素。
