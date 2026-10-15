@@ -37,7 +37,16 @@ fn validate_match_side(root: &Path, report: &mut RunReport) {
     let matches_dir = root.join("matches");
 
     let listed = read_index::<SampleIndexDtoV2>(&index_path, report).map(|index| {
-        validate::validate_match_index_dto(&index_path.display().to_string(), &index, report);
+        let label = index_path.display().to_string();
+        validate::validate_match_index_dto(&label, &index, report);
+        // 表（順位表など）は大会の一覧だけが持つ（SCHEMA.md「表」。handball-project#567）。
+        if index.tables.is_some() {
+            report.findings.push(Finding::new(
+                &label,
+                Stage::Corpus,
+                corpus_issue("unexpectedTables", json!({})),
+            ));
+        }
         index.matches
     });
 
@@ -94,7 +103,7 @@ fn check_listed_matches(
     let list_label = list_path.display().to_string();
     let mut seen_here: BTreeSet<&str> = BTreeSet::new();
     for entry in entries {
-        if !is_safe_slug(&entry.slug) {
+        if !validate::is_safe_slug(&entry.slug) {
             report_unsafe_slug(list_path, &entry.slug, report);
             continue;
         }
@@ -167,7 +176,7 @@ fn read_competition_lists(
         validate::validate_competition_index_dto(&index_label, &index, report);
         for competition in &index.competitions {
             // id はそのままファイル名になる。slug と同じ字種に限り、`index` は予約する。
-            if !is_safe_slug(&competition.id) || competition.id == "index" {
+            if !validate::is_safe_slug(&competition.id) || competition.id == "index" {
                 report.findings.push(Finding::new(
                     &index_label,
                     Stage::Corpus,
@@ -310,7 +319,7 @@ fn validate_highlight_side(root: &Path, report: &mut RunReport) {
 
     let mut checked_slugs: BTreeSet<&str> = BTreeSet::new();
     for entry in &entries {
-        if !is_safe_slug(&entry.slug) {
+        if !validate::is_safe_slug(&entry.slug) {
             report_unsafe_slug(&index_path, &entry.slug, report);
             continue;
         }
@@ -483,16 +492,6 @@ fn slug_of(path: &Path) -> &str {
 /// 規則は配信側（apps-site の `SLUG_PATTERN`）と iOS 側（`IncomingLinkV2.isValidSlug`）と
 /// 同じ: 先頭は英数字、以降は英数字と `-`、1〜64 文字。配信中の全 slug がこの形で、
 /// SCHEMA.md の「先頭 `{yyyy-MM-dd}`」もこの部分集合。
-fn is_safe_slug(slug: &str) -> bool {
-    let mut chars = slug.chars();
-    let Some(first) = chars.next() else {
-        return false;
-    };
-    (1..=64).contains(&slug.len())
-        && first.is_ascii_alphanumeric()
-        && chars.all(|c| c.is_ascii_alphanumeric() || c == '-')
-}
-
 /// 形式外の slug は index の指摘として出す（ファイル側の指摘にすると、存在しないパスを
 /// label に載せることになる）。
 fn report_unsafe_slug(index_path: &Path, slug: &str, report: &mut RunReport) {

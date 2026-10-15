@@ -28,13 +28,19 @@ pub const SCHEMA_VERSION_CURRENT: i64 = 2;
 
 // ── Index ──
 
-/// `/v2/index.json` トップレベル構造。
+/// `/v2/index.json` トップレベル構造。大会の一覧（`/v2/competitions/{id}.json`）も同じ形で、
+/// 大会だけが `tables` を持つ（handball-project#567）。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct SampleIndexDtoV2 {
     pub schema_version: i64,
     pub matches: Vec<SampleMatchSummaryV2>,
+    /// 大会ごとの表（順位表・得点ランキング・星取表など）。**大会の一覧だけ**が持ち、
+    /// `/v2/index.json` には無い（検証 CLI の `unexpectedTables`）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub tables: Option<Vec<SampleTableV2>>,
 }
 
 /// `/v2/index.json` と `/v2/competitions/{id}.json` の `matches[]` 要素。
@@ -60,6 +66,55 @@ pub struct SampleMatchSummaryV2 {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub away_team_name: Option<String>,
+    /// 節 / 回戦の表示ラベル（handball-project#567。例: `"第1節"` / `"準決勝"`）。大会の一覧
+    /// でだけ使い、アプリは一覧の並びのまま**同じラベルが続く行を 1 つのセクション**にまとめる。
+    /// 文言は配信側が組み、アプリは語を足さない。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub round: Option<String>,
+}
+
+// ── Tables（大会の表）──
+
+/// 大会の一覧（`/v2/competitions/{id}.json`）の `tables[]` 要素（handball-project#567）。
+///
+/// 順位表・得点ランキング・星取表のような大会ごとの表を、**列の意味を持たない汎用の表**として
+/// 配信する。アプリは題・列見出し・寄せ・セルの文字列をそのまま描くだけで、表の種類が増えても
+/// 改修しない。中身の計算と並び（順位の決め方）は配信側の tool が持つ。
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[serde(rename_all = "camelCase")]
+pub struct SampleTableV2 {
+    /// 表の識別子（英数字と `-`）。同じ一覧の中で一意。
+    pub id: String,
+    /// 表の題（例: `"順位表"`）。アプリは切替のラベルに出す。
+    pub title: String,
+    /// 列の定義。1 列以上。
+    pub columns: Vec<SampleTableColumnV2>,
+    /// 行。各行のセル数は `columns` の数と一致する。セルは表示する文字列そのまま。
+    pub rows: Vec<Vec<String>>,
+}
+
+/// `tables[].columns[]` 要素。
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[serde(rename_all = "camelCase")]
+pub struct SampleTableColumnV2 {
+    pub title: String,
+    /// 寄せ。省けば `leading`。数値の列は `trailing`。
+    #[serde(default)]
+    pub align: SampleTableAlignV2,
+}
+
+/// 表の列の寄せ。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[serde(rename_all = "camelCase")]
+pub enum SampleTableAlignV2 {
+    #[default]
+    Leading,
+    Trailing,
+    Center,
 }
 
 // ── Competitions（大会）──

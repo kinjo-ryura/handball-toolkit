@@ -145,6 +145,15 @@ fn corpus_bad_reports_expected_findings() {
         ("slugListedTwice", "bad-cup.json"),
         ("missingTeamName", "bad-cup.json"),
         ("missingMatchFile", "2026-02-05-no-names.json"),
+        // 大会の一覧の節と表（handball-project#567）。3 件目の「第2節」は 1 件目と離れている /
+        // 表は 1 つ目の 2 行目のセル数が列と合わず、2 つ目が同じ id、3 つ目の id に空白、
+        // 4 つ目に列が無い。index.json 側は `tables` を持ってはいけない。
+        ("roundNotContiguous", "bad-cup.json"),
+        ("tableRowWidthMismatch", "bad-cup.json"),
+        ("duplicateTableID", "bad-cup.json"),
+        ("unsafeTableID", "bad-cup.json"),
+        ("tableWithoutColumns", "bad-cup.json"),
+        ("unexpectedTables", "index.json"),
     ];
     for (code, file) in expect {
         assert!(
@@ -410,4 +419,100 @@ fn binary_exit_codes_and_json_output() {
         .output()
         .expect("バイナリ実行に失敗");
     assert_eq!(usage.status.code(), Some(2), "{usage:?}");
+}
+
+/// 大会の一覧の節と表の指摘は、どの行・どの表が違反かまで固定する（handball-project#567）。
+#[test]
+fn competition_round_and_table_details_are_pinned() {
+    let mut report = RunReport::default();
+    validate_corpus(&fixture("corpus-bad"), &mut report);
+    let by_code = |code: &str, file: &str| {
+        report
+            .findings
+            .iter()
+            .find(|finding| {
+                finding.issue.get("code").and_then(|value| value.as_str()) == Some(code)
+                    && finding.path.ends_with(file)
+            })
+            .unwrap_or_else(|| panic!("{code} ({file}) が無い: {:#?}", report.findings))
+    };
+
+    // 離れて現れた 2 つ目のまとまりの先頭の行を名指しする（1 つ目の「第2節」は指摘しない）。
+    let round = by_code("roundNotContiguous", "bad-cup.json");
+    assert_eq!(
+        round.issue["params"]["slug"].as_str(),
+        Some("2026-02-03-round-again")
+    );
+    assert_eq!(round.issue["params"]["round"].as_str(), Some("第2節"));
+    assert_eq!(
+        report
+            .findings
+            .iter()
+            .filter(|finding| {
+                finding.issue.get("code").and_then(|value| value.as_str())
+                    == Some("roundNotContiguous")
+            })
+            .count(),
+        1
+    );
+
+    let width = by_code("tableRowWidthMismatch", "bad-cup.json");
+    assert_eq!(width.issue["params"]["id"].as_str(), Some("standings"));
+    assert_eq!(width.issue["params"]["row"].as_u64(), Some(1));
+    assert_eq!(width.issue["params"]["expected"].as_u64(), Some(2));
+    assert_eq!(width.issue["params"]["found"].as_u64(), Some(1));
+}
+
+/// 大会の一覧は配信側が節の順に並べるので、`date` 降順を求めるのは同じ節の中だけ
+/// （handball-project#567）。節をまたいで日付が戻るのは違反ではなく、同じ節の中で
+/// 日付が進むのは従来どおり違反。
+#[test]
+fn date_descending_is_checked_within_a_round_only() {
+    use chrono::{TimeZone, Utc};
+    use handball_toolkit::sample_dto::{SampleIndexDtoV2, SampleMatchSummaryV2};
+    use handball_toolkit_cli::validate::validate_match_index_dto;
+
+    let entry = |slug: &str, day: u32, round: &str| SampleMatchSummaryV2 {
+        slug: slug.to_owned(),
+        display_name: "A vs B".to_owned(),
+        description: None,
+        date: Utc.with_ymd_and_hms(2026, 1, day, 10, 0, 0).unwrap(),
+        home_score: 1,
+        away_score: 0,
+        has_video: false,
+        home_team_name: Some("A".to_owned()),
+        away_team_name: Some("B".to_owned()),
+        round: Some(round.to_owned()),
+    };
+
+    // 第2節（1/3）→ 第1節（1/5・延期分が後の日付）。一覧全体では昇順の箇所があるが違反ではない。
+    let ordered_by_round = SampleIndexDtoV2 {
+        schema_version: 2,
+        matches: vec![
+            entry("2026-01-03-a-vs-b", 3, "第2節"),
+            entry("2026-01-05-a-vs-b", 5, "第1節"),
+            entry("2026-01-01-a-vs-b", 1, "第1節"),
+        ],
+        tables: None,
+    };
+    let mut report = RunReport::default();
+    validate_match_index_dto("list.json", &ordered_by_round, &mut report);
+    assert!(report.findings.is_empty(), "{:#?}", report.findings);
+
+    // 同じ節の中で日付が進むのは違反。
+    let ascending_in_round = SampleIndexDtoV2 {
+        schema_version: 2,
+        matches: vec![
+            entry("2026-01-01-a-vs-b", 1, "第1節"),
+            entry("2026-01-05-a-vs-b", 5, "第1節"),
+        ],
+        tables: None,
+    };
+    let mut report = RunReport::default();
+    validate_match_index_dto("list.json", &ascending_in_round, &mut report);
+    let codes: Vec<_> = finding_codes(&report)
+        .into_iter()
+        .map(|(code, _)| code)
+        .collect();
+    assert_eq!(codes, vec!["indexNotDateDescending".to_owned()]);
 }

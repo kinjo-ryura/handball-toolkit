@@ -7,7 +7,8 @@
       "date": "2026-02-05T10:00:00Z",
       "homeScore": 0,
       "awayScore": 0,
-      "hasVideo": false
+      "hasVideo": false,
+      "round": "第2節"
     },
     {
       "slug": "2026-02-01-bad-score",
@@ -17,7 +18,51 @@
       "awayScore": 5,
       "hasVideo": true,
       "homeTeamName": "Tigers",
-      "awayTeamName": "Falcons"
+      "awayTeamName": "Falcons",
+      "round": "第1節"
+    },
+    {
+      "slug": "2026-02-03-round-again",
+      "displayName": "第2節が離れてもう 1 回現れる",
+      "date": "2026-02-03T10:00:00Z",
+      "homeScore": 0,
+      "awayScore": 0,
+      "hasVideo": false,
+      "homeTeamName": "Tigers",
+      "awayTeamName": "Hawks",
+      "round": "第2節"
+    }
+  ],
+  "tables": [
+    {
+      "id": "standings",
+      "title": "2 行目のセル数が列と合わない",
+      "columns": [
+        { "title": "順位", "align": "trailing" },
+        { "title": "チーム" }
+      ],
+      "rows": [
+        ["1", "Tigers"],
+        ["2"]
+      ]
+    },
+    {
+      "id": "standings",
+      "title": "同じ id がもう 1 つ",
+      "columns": [{ "title": "チーム" }],
+      "rows": []
+    },
+    {
+      "id": "bad id",
+      "title": "id に空白",
+      "columns": [{ "title": "チーム" }],
+      "rows": []
+    },
+    {
+      "id": "no-columns",
+      "title": "列が無い",
+      "columns": [],
+      "rows": [["1"]]
     }
   ]
 }

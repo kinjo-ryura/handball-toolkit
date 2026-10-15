@@ -14,7 +14,7 @@ use handball_toolkit::persistence_order::persistence_ordered;
 use handball_toolkit::projection::SummaryProjection;
 use handball_toolkit::sample_dto::{
     SCHEMA_VERSION_CURRENT, SampleCompetitionIndexDtoV2, SampleFactAnchorDtoV2,
-    SampleHighlightIndexDtoV2, SampleIndexDtoV2, SampleMatchDtoV2, convert,
+    SampleHighlightIndexDtoV2, SampleIndexDtoV2, SampleMatchDtoV2, SampleTableV2, convert,
 };
 use handball_toolkit::validation::DomainValidationIssue;
 use handball_toolkit::validators::{
@@ -229,10 +229,17 @@ pub fn validate_match_index_dto(label: &str, index: &SampleIndexDtoV2, report: &
         &index
             .matches
             .iter()
-            .map(|entry| (entry.slug.as_str(), entry.date))
+            .map(|entry| IndexEntry {
+                slug: entry.slug.as_str(),
+                date: entry.date,
+                round: entry.round.as_deref(),
+            })
             .collect::<Vec<_>>(),
         report,
     );
+    if let Some(tables) = &index.tables {
+        validate_tables(label, tables, report);
+    }
 }
 
 /// `/v2/highlights/index.json` の検証（matches 側と同じ配列レベル検査）。
@@ -247,7 +254,11 @@ pub fn validate_highlight_index_dto(
         &index
             .highlights
             .iter()
-            .map(|entry| (entry.slug.as_str(), entry.date))
+            .map(|entry| IndexEntry {
+                slug: entry.slug.as_str(),
+                date: entry.date,
+                round: None,
+            })
             .collect::<Vec<_>>(),
         report,
     );
@@ -273,12 +284,83 @@ pub fn validate_competition_index_dto(
     }
 }
 
-/// index 配列そのものに掛かる検査。matches / highlights は要素型が違うだけで
-/// 不変条件は同じ（SCHEMA.md）ので、`(slug, date)` に落として共有する。
-fn check_index_entries(label: &str, entries: &[(&str, DateTime<Utc>)], report: &mut RunReport) {
-    check_duplicate_slugs(label, entries.iter().map(|(slug, _)| *slug), report);
+/// index 配列の検査に要る項目だけを抜いたもの。matches / highlights は要素型が違うだけで
+/// 不変条件は同じ（SCHEMA.md）ので、ここに落として検査を共有する。
+struct IndexEntry<'a> {
+    slug: &'a str,
+    date: DateTime<Utc>,
+    /// 節 / 回戦のラベル（大会の一覧だけ。handball-project#567）。
+    round: Option<&'a str>,
+}
+
+/// index 配列そのものに掛かる検査。
+fn check_index_entries(label: &str, entries: &[IndexEntry<'_>], report: &mut RunReport) {
+    check_duplicate_slugs(label, entries.iter().map(|entry| entry.slug), report);
+    check_round_groups(label, entries, report);
     check_date_descending(label, entries, report);
     check_slug_date_prefix(label, entries, report);
+}
+
+/// 大会の表（`tables[]`。SCHEMA.md「表」。handball-project#567）の形。
+///
+/// 見るのは形だけ — id が一覧の中で一意でファイル名に使える字種か、列が 1 つ以上あるか、
+/// 各行のセル数が列の数と合うか。中身（順位の決め方・数字の正しさ）は配信側の tool の
+/// 責務で、ここでは見ない（アプリも列の意味を知らずにそのまま描く）。
+pub fn validate_tables(label: &str, tables: &[SampleTableV2], report: &mut RunReport) {
+    let mut seen = BTreeSet::new();
+    for table in tables {
+        if !is_safe_slug(&table.id) {
+            report.findings.push(Finding::new(
+                label,
+                Stage::Corpus,
+                corpus_issue("unsafeTableID", json!({"id": table.id})),
+            ));
+        } else if !seen.insert(table.id.as_str()) {
+            report.findings.push(Finding::new(
+                label,
+                Stage::Corpus,
+                corpus_issue("duplicateTableID", json!({"id": table.id})),
+            ));
+        }
+        if table.columns.is_empty() {
+            report.findings.push(Finding::new(
+                label,
+                Stage::Corpus,
+                corpus_issue("tableWithoutColumns", json!({"id": table.id})),
+            ));
+            // 列が無ければ行の幅は比べられない（全部の行が違反になって本題が埋もれる）。
+            continue;
+        }
+        for (row_index, row) in table.rows.iter().enumerate() {
+            if row.len() != table.columns.len() {
+                report.findings.push(Finding::new(
+                    label,
+                    Stage::Corpus,
+                    corpus_issue(
+                        "tableRowWidthMismatch",
+                        json!({
+                            "id": table.id,
+                            "row": row_index,
+                            "expected": table.columns.len(),
+                            "found": row.len(),
+                        }),
+                    ),
+                ));
+            }
+        }
+    }
+}
+
+/// slug・大会の id・表の id に共通の字種（SCHEMA.md）: 英数字と `-` で 1〜64 文字、先頭は英数字。
+/// パス区切りや `..` を弾き、そのままファイル名に埋められることを保証する（handball-project#285）。
+pub(crate) fn is_safe_slug(slug: &str) -> bool {
+    let mut chars = slug.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    (1..=64).contains(&slug.len())
+        && first.is_ascii_alphanumeric()
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '-')
 }
 
 fn check_schema_version(label: &str, found: i64, report: &mut RunReport) {
@@ -311,6 +393,32 @@ fn check_duplicate_slugs<'a>(
     }
 }
 
+/// 同じ `round` は離れて 2 回現れない（SCHEMA.md「大会」。handball-project#567）。
+///
+/// アプリは一覧の並びのまま「同じラベルが続く行」を 1 つのセクションにまとめるので、同じ節が
+/// 離れて現れると同じ見出しのセクションが 2 つできる。ラベルの無い行（`None`）も 1 つの
+/// まとまりとして同じ規則で見る。指摘は離れて現れた 2 つ目のまとまりの先頭の行に 1 件。
+fn check_round_groups(label: &str, entries: &[IndexEntry<'_>], report: &mut RunReport) {
+    let mut seen: BTreeSet<Option<&str>> = BTreeSet::new();
+    let mut current: Option<Option<&str>> = None;
+    for entry in entries {
+        if current == Some(entry.round) {
+            continue;
+        }
+        current = Some(entry.round);
+        if !seen.insert(entry.round) {
+            report.findings.push(Finding::new(
+                label,
+                Stage::Corpus,
+                corpus_issue(
+                    "roundNotContiguous",
+                    json!({"slug": entry.slug, "round": entry.round}),
+                ),
+            ));
+        }
+    }
+}
+
 /// index 配列は `date` 降順（SCHEMA.md）。
 ///
 /// アプリは配列順をそのまま表示に使う（`HighlightStoreV2` は index の順序を保持し
@@ -319,21 +427,27 @@ fn check_duplicate_slugs<'a>(
 ///
 /// 同日の試合が複数あるコーパスは普通なので、同値は違反としない（狭義単調ではなく
 /// 「新しい順が崩れていない」ことだけを見る）。
-fn check_date_descending(label: &str, entries: &[(&str, DateTime<Utc>)], report: &mut RunReport) {
+///
+/// 大会の一覧は配信側が節 / 回戦の順に並べる（handball-project#567）ので、降順を見るのは
+/// **同じ `round` の中だけ**。`round` の無い `/v2/index.json` とハイライト index では
+/// 従来どおり一覧全体が対象になる。
+fn check_date_descending(label: &str, entries: &[IndexEntry<'_>], report: &mut RunReport) {
     for pair in entries.windows(2) {
-        let (previous_slug, previous_date) = pair[0];
-        let (slug, date) = pair[1];
-        if date > previous_date {
+        let (previous, entry) = (&pair[0], &pair[1]);
+        if previous.round != entry.round {
+            continue;
+        }
+        if entry.date > previous.date {
             report.findings.push(Finding::new(
                 label,
                 Stage::Corpus,
                 corpus_issue(
                     "indexNotDateDescending",
                     json!({
-                        "previousSlug": previous_slug,
-                        "previousDate": previous_date.to_rfc3339(),
-                        "slug": slug,
-                        "date": date.to_rfc3339(),
+                        "previousSlug": previous.slug,
+                        "previousDate": previous.date.to_rfc3339(),
+                        "slug": entry.slug,
+                        "date": entry.date.to_rfc3339(),
                     }),
                 ),
             ));
@@ -348,8 +462,8 @@ fn check_date_descending(label: &str, entries: &[(&str, DateTime<Utc>)], report:
 /// 転記ミス（handball-project#115）を捕まえる。日付部は UTC で比較する — 配信
 /// コーパスの `date` は開始時刻不明なら `T00:00:00Z`、分かる場合も日本時間の
 /// 日中で、UTC でも同じ日に収まる。
-fn check_slug_date_prefix(label: &str, entries: &[(&str, DateTime<Utc>)], report: &mut RunReport) {
-    for (slug, date) in entries {
+fn check_slug_date_prefix(label: &str, entries: &[IndexEntry<'_>], report: &mut RunReport) {
+    for IndexEntry { slug, date, .. } in entries {
         let expected = date.format("%Y-%m-%d").to_string();
         // 先頭 10 バイト。日付以外の文字が来る / 短すぎる slug は None になり、
         // 「先頭が日付になっていない」も同じ違反として報告する。
