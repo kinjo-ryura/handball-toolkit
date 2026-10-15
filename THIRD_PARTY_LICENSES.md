@@ -46,7 +46,7 @@ handball-toolkit 0.18.0 の配布物（iOS / macOS の staticlib・Android の `
 | serde | 1.0.229 | [MIT](#license-0) | [ソース](https://crates.io/crates/serde/1.0.229) |
 | serde_core | 1.0.229 | [MIT](#license-0) | [ソース](https://crates.io/crates/serde_core/1.0.229) |
 | serde_derive | 1.0.229 | [MIT](#license-0) | [ソース](https://crates.io/crates/serde_derive/1.0.229) |
-| serde_json | 1.0.151 | [MIT](#license-0) | [ソース](https://crates.io/crates/serde_json/1.0.151) |
+| serde_json | 1.0.154 | [MIT](#license-0) | [ソース](https://crates.io/crates/serde_json/1.0.154) |
 | serde_spanned | 1.1.1 | [MIT](#license-15) | [ソース](https://crates.io/crates/serde_spanned/1.1.1) |
 | siphasher | 1.0.3 | [MIT](#license-5) | [ソース](https://crates.io/crates/siphasher/1.0.3) |
 | static_assertions | 1.1.0 | [MIT](#license-16) | [ソース](https://crates.io/crates/static_assertions/1.1.0) |
@@ -66,7 +66,7 @@ handball-toolkit 0.18.0 の配布物（iOS / macOS の staticlib・Android の `
 | uniffi_macros | 0.32.2 | [MPL-2.0](#license-20) | [ソース](https://crates.io/crates/uniffi_macros/0.32.2) |
 | uniffi_meta | 0.32.2 | [MPL-2.0](#license-20) | [ソース](https://crates.io/crates/uniffi_meta/0.32.2) |
 | uniffi_pipeline | 0.32.2 | [MPL-2.0](#license-20) | [ソース](https://crates.io/crates/uniffi_pipeline/0.32.2) |
-| uuid | 1.27.0 | [MIT](#license-18) | [ソース](https://crates.io/crates/uuid/1.27.0) |
+| uuid | 1.28.0 | [MIT](#license-18) | [ソース](https://crates.io/crates/uuid/1.28.0) |
 | wasm-bindgen | 0.2.121 | [MIT](#license-4) | [ソース](https://crates.io/crates/wasm-bindgen/0.2.121) |
 | wasm-bindgen-macro | 0.2.121 | [MIT](#license-4) | [ソース](https://crates.io/crates/wasm-bindgen-macro/0.2.121) |
 | wasm-bindgen-macro-support | 0.2.121 | [MIT](#license-4) | [ソース](https://crates.io/crates/wasm-bindgen-macro-support/0.2.121) |
@@ -78,7 +78,7 @@ handball-toolkit 0.18.0 の配布物（iOS / macOS の staticlib・Android の `
 
 ### <a id="license-0"></a>MIT License（MIT）
 
-適用: anyhow 1.0.103、async-trait 0.1.92、camino 1.2.4、cargo-platform 0.3.3、cargo_metadata 0.23.1、fastrand 2.4.1、itoa 1.0.18、linux-raw-sys 0.12.1、once_cell 1.21.4、proc-macro2 1.0.106、quote 1.0.46、rustix 1.1.4、semver 1.0.28、serde 1.0.229、serde_core 1.0.229、serde_derive 1.0.229、serde_json 1.0.151、syn 2.0.118、syn 3.0.0、thiserror 2.0.18、thiserror-impl 2.0.18、unicode-ident 1.0.24、zmij 1.0.21
+適用: anyhow 1.0.103、async-trait 0.1.92、camino 1.2.4、cargo-platform 0.3.3、cargo_metadata 0.23.1、fastrand 2.4.1、itoa 1.0.18、linux-raw-sys 0.12.1、once_cell 1.21.4、proc-macro2 1.0.106、quote 1.0.46、rustix 1.1.4、semver 1.0.28、serde 1.0.229、serde_core 1.0.229、serde_derive 1.0.229、serde_json 1.0.154、syn 2.0.118、syn 3.0.0、thiserror 2.0.18、thiserror-impl 2.0.18、unicode-ident 1.0.24、zmij 1.0.21
 
 ```
 Permission is hereby granted, free of charge, to any
@@ -630,7 +630,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### <a id="license-18"></a>MIT License（MIT）
 
-適用: uuid 1.27.0
+適用: uuid 1.28.0
 
 ```
 Copyright (c) 2014 The Rust Project Developers
