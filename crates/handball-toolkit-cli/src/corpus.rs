@@ -257,7 +257,7 @@ fn check_competition_id(label: &str, id: &str, report: &mut RunReport) -> bool {
     false
 }
 
-/// 大会の試合一覧は `/v2/index.json` と同じ形（SCHEMA.md）なので、同じ検査を掛ける。
+/// 大会の試合一覧は「注目の試合」の一覧と同じ形（SCHEMA.md）なので、同じ検査を掛ける。
 fn read_competition_list(file: &Path, report: &mut RunReport) -> Option<Vec<SampleMatchSummaryV2>> {
     let list = read_index::<SampleIndexDtoV2>(file, report)?;
     validate::validate_match_index_dto(&file.display().to_string(), &list, report);
@@ -517,9 +517,9 @@ fn slug_of(path: &Path) -> &str {
 
 /// index 由来の slug を `Path::join` に渡してよいか（handball-project#285）。
 ///
-/// slug は `index.json` から無検証で来る。この CLI は handball-sample-matches の CI が
+/// slug は `index.json` から無検証で来る。この CLI は handball-match-data の CI が
 /// **fork PR の JSON** に対して回すので、slug は攻撃者が書ける入力になる。`..` や `/` を
-/// 含む slug をそのまま `join` すると v2 ルートの外を読みに行く（絶対パスなら `join` が
+/// 含む slug をそのまま `join` すると配信データの root の外を読みに行く（絶対パスなら `join` が
 /// 丸ごと差し替える）。実害は小さい（fork PR は read-only トークン・secrets 無し・
 /// 読んだ先を JSON として decode するだけ）が、入力をパスに埋める箇所は検証してから使う。
 ///

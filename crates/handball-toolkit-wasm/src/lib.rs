@@ -78,7 +78,7 @@ pub struct MatchView {
 
 // ── 純粋関数（host でテストする実体）──
 
-/// 配信 JSON（`/v2/matches/{slug}.json` の本体）を DTO へ。
+/// 配信 JSON（`matches/{slug}.json` の本体）を DTO へ。
 pub fn parse_match(json: &str) -> Result<SampleMatchDtoV2, WasmError> {
     serde_json::from_str(json).map_err(|error| WasmError::InvalidJson {
         message: error.to_string(),

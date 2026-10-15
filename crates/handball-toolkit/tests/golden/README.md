@@ -1,13 +1,13 @@
 # ゴールデンコーパス — Swift 実装をオラクルとするパリティ検証データ
 
-ADR 0003 のゴールデンコーパス。`inputs/` は handball-sample-matches の実試合 JSON のコピー、
+ADR 0003 のゴールデンコーパス。`inputs/` は配信リポ handball-match-data の実試合 JSON のコピー、
 `expected/` は Swift 実装（RecorderDomain）の projection 出力を正規化した期待値。
 Rust 実装の出力が `expected/` と一致することをパリティテスト（P8）で検証する。
 
-> ⚠️ **`inputs/` の 10 件は handball-sample-matches の配信データと byte 同一の複製**で、
-> うち 4 件は実名の選手データを含む。sample-matches 側の仮名化ツールと全文照合は
-> あちらの `v2/` だけを見るので、**選手データを消す・仮名化する判断をしたら両方を直す
-> こと**（handball-project#284。あちらの README「個人情報の扱い」に対応する注記がある）。
+> ⚠️ **`inputs/` の 10 件は handball-match-data の配信データと byte 同一の複製**で、
+> うち 4 件は実名の選手データを含む。配信側の仮名化と全文照合は配信データ
+> （`matches/`・`highlights/`）だけを見るので、**選手データを消す・仮名化する判断をしたら
+> 両方を直すこと**（handball-project#284）。
 
 ## 出所（provenance）
 
@@ -16,6 +16,7 @@ Rust 実装の出力が `expected/` と一致することをパリティテス�
 | オラクル（RecorderDomain） | HandballRecorder **main** `b7cf57e861a9100ee3f721c8c477e2aae062c3f8` |
 | dump ツール | HandballRecorder `parity/oracle-dump` ブランチの `recorder-domain-dump`（Package: `Packages/RecorderDomain`。ブランチは削除済みなので tag `oracle-dump-final` から取り出す） |
 | 入力コーパス | handball-sample-matches `d64d8d5f7b8ec947fae1640a5f6b0fa40900e369`（`v2/matches/` 4 件 = `.video` 2 + `.timer` 2、`v2/highlights/` 6 件） |
+| 同じ 10 件の今の置き場 | handball-match-data `28339445804fab4a4f5e26d0eecc75152051e3ac`（`matches/`・`highlights/`。配信が `v2/` を外した新しいリポへ移ったとき（handball-project#588 / #591）に、byte 同一であることを確かめた） |
 | 生成日 | 2026-07-20（`.timer` 2 件を追加 — handball-project#53。期待値は昇格前に `local/` で生成済みのものを、入力 byte 一致のまま流用したので再 dump していない。highlights は #71 で再生成、`.video` matches は 2026-07-12 生成のまま） |
 
 > ℹ️ **この表のコミットハッシュ・ブランチ名・tag は「出所の記録」であって、読者が辿れる
@@ -53,8 +54,8 @@ Rust 実装の出力が `expected/` と一致することをパリティテス�
 # ../HandballRecorder/ で。main を汚さずに取り出す
 git worktree add /tmp/oracle oracle-dump-final
 cd /tmp/oracle/Packages/RecorderDomain
-swift run recorder-domain-dump --out <出力先>/matches    <handball-sample-matches>/v2/matches/*.json
-swift run recorder-domain-dump --out <出力先>/highlights <handball-sample-matches>/v2/highlights/2026-*.json
+swift run recorder-domain-dump --out <出力先>/matches    <handball-match-data>/matches/<入力の slug>.json
+swift run recorder-domain-dump --out <出力先>/highlights <handball-match-data>/highlights/2026-*.json
 cd - && git worktree remove /tmp/oracle
 ```
 
@@ -115,7 +116,7 @@ standalone clone でも 3 モードすべてのパリティ検証が再現でき
 
 ```bash
 # 1. importer 産の pdf-matches JSON をそのまま入力に置く
-cp <sample-matches>/pdf-matches/jha/<試合>.json \
+cp <importer の出力>/jha/<試合>.json \
   crates/handball-toolkit/tests/golden/local/inputs/timer/<試合>.json
 
 # 2. Swift オラクルで期待値を dump（凍結済み。上の「出所」節と同じく

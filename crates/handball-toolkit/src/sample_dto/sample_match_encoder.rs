@@ -2,7 +2,7 @@
 //! `.withoutEscapingSlashes`）と**バイト一致**する配信 JSON の書き出し。
 //!
 //! バイト正は `tests/golden/export/`（オラクル fixture）。Swift 側 exporter の削除後も
-//! handball-sample-matches の配信ファイル形式を変えないための互換レイヤ。
+//! 配信ファイル（handball-match-data）の形式を変えないための互換レイヤ。
 //! 日時・UUID の文字列表現は DTO 側（`swift_wire`）、本ファイルは整形のみを担う。
 
 use std::io;

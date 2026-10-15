@@ -32,7 +32,7 @@ Nix flake + direnv（rustup 不使用）。初回に `direnv allow` を 1 回、
 Cargo workspace。4 crate 構成:
 
 - `crates/handball-toolkit/` — コア crate（facts / clocks / configuration / entities / validators / projections）。feature `uniffi`（default off）で UniFFI derive と FFI 関数公開（`ffi_api` / `ffi_support`）が有効になる（ADR 0004。wasm / CLI ビルドでは uniffi が依存グラフごと消える）
-- `crates/handball-toolkit-cli/` — sample-matches 配信 JSON（SAMPLE_DTO_V2）の検証 CLI。コアの validators を呼ぶだけの薄いシェル。使い方は README「CLI」
+- `crates/handball-toolkit-cli/` — handball-match-data の配信 JSON（SAMPLE_DTO_V2）の検証 CLI。コアの validators を呼ぶだけの薄いシェル。使い方は README「CLI」
 - `crates/handball-toolkit-ffi/` — FFI パッケージング crate。staticlib 化と uniffi-bindgen CLI（feature `bindgen`）のみを担い、公開面はコア crate の namespace に集約する
 - `crates/handball-toolkit-wasm/` — wasm パッケージング crate。JS 向けの粗粒度エントリとマーシャリングだけを担う。**ID 生成はシェル（JS の `crypto.randomUUID()`）が行う**（設計不変条件 2）ので、この crate も乱数を引かない
 
@@ -93,5 +93,5 @@ Room + 3 trait の 15 メソッド + 最小 UI の参照実装。**公開でき�
   - `AvailableActions.can_record_free_note` を R7 / R8 に合わせて `Playing` のみ true に変更（handball-project#177）
   - `LiveMatchProjection::build_timer_mode` / `build_highlight_mode`（handball-project#354。オラクルは `build_video_mode` しか持たない）
 
-- **移植面のセマンティクスに迷ったら**、凍結オラクルとそのテストを読む。いずれも HandballRecorder の checkout を要し、このリポ単体からは辿れない — 外部の読み手に向けた正典は [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md) と `docs/adr/`、コーパスの schema は [handball-sample-matches の `v2/SCHEMA.md`](https://github.com/kinjo-ryura/handball-sample-matches/blob/main/v2/SCHEMA.md)
-- **パリティ検証**: [handball-sample-matches](https://github.com/kinjo-ryura/handball-sample-matches) の実試合 JSON をゴールデンコーパスに、Swift 実装をオラクルとして projection 出力の一致を検証する（`crates/handball-toolkit/tests/golden/`。期待値は dump 済み）。特に `SegmentResolver` と validation R3–R9 は移植で最も繊細な部分 — 移植面については挙動を「改善」せず一致させる
+- **移植面のセマンティクスに迷ったら**、凍結オラクルとそのテストを読む。いずれも HandballRecorder の checkout を要し、このリポ単体からは辿れない — 外部の読み手に向けた正典は [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md) と `docs/adr/`、コーパスの schema は [handball-match-data の `SCHEMA.md`](https://github.com/kinjo-ryura/handball-match-data/blob/main/SCHEMA.md)
+- **パリティ検証**: [handball-match-data](https://github.com/kinjo-ryura/handball-match-data) の実試合 JSON をゴールデンコーパスに、Swift 実装をオラクルとして projection 出力の一致を検証する（`crates/handball-toolkit/tests/golden/`。期待値は dump 済み）。特に `SegmentResolver` と validation R3–R9 は移植で最も繊細な部分 — 移植面については挙動を「改善」せず一致させる

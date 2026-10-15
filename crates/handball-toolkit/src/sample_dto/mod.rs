@@ -1,6 +1,6 @@
 //! Sample 配信 JSON（SAMPLE_DTO_V2 schema）の型付き実装。移植元: アプリ層 `SampleMatches/V2/`。
 //!
-//! handball-sample-matches の `/v2/` パスで配信される試合 JSON の serde 型と
+//! handball-match-data で配信される試合 JSON の serde 型と
 //! domain 型への converter を提供する（ADR 0003 §2 — パリティ検証のコーパス取込経路であり、
 //! 将来の JSON 検証 CLI・wasm デモの土台）。export 方向（domain → DTO + Swift JSONEncoder
 //! 互換の encode）は ADR 0004 決定 2 による新規実装で、以後 SAMPLE_DTO_V2 schema の変更は

@@ -1,4 +1,4 @@
-//! sample-matches 配信 JSON（SAMPLE_DTO_V2）の検証 CLI（handball-project#58）。
+//! handball-match-data の配信 JSON（SAMPLE_DTO_V2）の検証 CLI（handball-project#58）。
 //!
 //! research doc「CLI / サーバーレス関数」出口の最初の一歩。コアの validators を
 //! そのまま呼ぶだけの薄いシェルであり、コアには一切手を入れない（CLAUDE.md の
