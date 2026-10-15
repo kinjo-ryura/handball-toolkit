@@ -14,7 +14,8 @@ use handball_toolkit::persistence_order::persistence_ordered;
 use handball_toolkit::projection::SummaryProjection;
 use handball_toolkit::sample_dto::{
     SCHEMA_VERSION_CURRENT, SampleCompetitionIndexDtoV2, SampleFactAnchorDtoV2,
-    SampleHighlightIndexDtoV2, SampleIndexDtoV2, SampleMatchDtoV2, SampleTableV2, convert,
+    SampleHighlightIndexDtoV2, SampleIndexDtoV2, SampleMatchDtoV2, SampleMatchSummaryV2,
+    SampleTableV2, convert,
 };
 use handball_toolkit::validation::DomainValidationIssue;
 use handball_toolkit::validators::{
@@ -237,8 +238,40 @@ pub fn validate_match_index_dto(label: &str, index: &SampleIndexDtoV2, report: &
             .collect::<Vec<_>>(),
         report,
     );
+    check_team_short_names(label, &index.matches, report);
     if let Some(tables) = &index.tables {
         validate_tables(label, tables, report);
+    }
+}
+
+/// 一覧の項目の短い名前（`homeTeamShortName` / `awayTeamShortName`。handball-project#582）。
+///
+/// 短い名前は正式名の代わりに出すものなので、正式名の無い項目には書けない（`shortNameWithoutTeamName`。
+/// アプリは正式名が無い行を表示名で組むので、短い名前だけがあると片側だけ略称の行になる）。
+/// 空文字は行の名前が消える（`emptyTeamShortName`）。どの略称を使うかは配信側の対応表の責務で、見ない。
+fn check_team_short_names(label: &str, entries: &[SampleMatchSummaryV2], report: &mut RunReport) {
+    for entry in entries {
+        let sides = [
+            ("home", &entry.home_team_name, &entry.home_team_short_name),
+            ("away", &entry.away_team_name, &entry.away_team_short_name),
+        ];
+        for (side, name, short_name) in sides {
+            let Some(short_name) = short_name else {
+                continue;
+            };
+            let code = if short_name.trim().is_empty() {
+                "emptyTeamShortName"
+            } else if name.is_none() {
+                "shortNameWithoutTeamName"
+            } else {
+                continue;
+            };
+            report.findings.push(Finding::new(
+                label,
+                Stage::Corpus,
+                corpus_issue(code, json!({"slug": entry.slug, "side": side})),
+            ));
+        }
     }
 }
 
@@ -343,6 +376,7 @@ pub fn validate_tables(label: &str, tables: &[SampleTableV2], report: &mut RunRe
                 corpus_issue("duplicateTableID", json!({"id": table.id})),
             ));
         }
+        check_table_legend(label, table, report);
         if table.columns.is_empty() {
             report.findings.push(Finding::new(
                 label,
@@ -369,6 +403,31 @@ pub fn validate_tables(label: &str, tables: &[SampleTableV2], report: &mut RunRe
                 ));
             }
         }
+    }
+}
+
+/// 表の凡例（`legend`。handball-project#582）。アプリは凡例の文字と完全に一致するセルをタップされたら
+/// 意味を出すので、同じ文字が 2 回あると出す意味が決まらない（`duplicateLegendText`）。文字か意味が
+/// 空だとタップしても何も出せない（`emptyLegendEntry`）。凡例の文字が表のどこかに現れるかは見ない
+/// （現れなくても害は無く、表と凡例を別々に組む配信側の tool を縛らない）。
+fn check_table_legend(label: &str, table: &SampleTableV2, report: &mut RunReport) {
+    let Some(legend) = &table.legend else {
+        return;
+    };
+    let mut texts = BTreeSet::new();
+    for entry in legend {
+        let code = if entry.text.trim().is_empty() || entry.detail.trim().is_empty() {
+            "emptyLegendEntry"
+        } else if !texts.insert(entry.text.as_str()) {
+            "duplicateLegendText"
+        } else {
+            continue;
+        };
+        report.findings.push(Finding::new(
+            label,
+            Stage::Corpus,
+            corpus_issue(code, json!({"id": table.id, "text": entry.text})),
+        ));
     }
 }
 

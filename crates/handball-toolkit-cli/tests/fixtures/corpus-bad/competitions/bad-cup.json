@@ -8,7 +8,8 @@
       "homeScore": 0,
       "awayScore": 0,
       "hasVideo": false,
-      "round": "第2節"
+      "round": "第2節",
+      "homeTeamShortName": "NN"
     },
     {
       "slug": "2026-02-01-bad-score",
@@ -30,7 +31,8 @@
       "hasVideo": false,
       "homeTeamName": "Tigers",
       "awayTeamName": "Hawks",
-      "round": "第2節"
+      "round": "第2節",
+      "awayTeamShortName": " "
     }
   ],
   "tables": [
@@ -63,6 +65,17 @@
       "title": "列が無い",
       "columns": [],
       "rows": [["1"]]
+    },
+    {
+      "id": "legend",
+      "title": "凡例の文字が重複し、意味が空のものがある",
+      "columns": [{ "title": "チーム" }],
+      "rows": [["T"], ["H"]],
+      "legend": [
+        { "text": "T", "detail": "Tigers" },
+        { "text": "T", "detail": "Tigers（2 つ目）" },
+        { "text": "H", "detail": "" }
+      ]
     }
   ]
 }

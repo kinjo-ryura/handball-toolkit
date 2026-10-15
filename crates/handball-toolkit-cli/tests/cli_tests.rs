@@ -162,6 +162,13 @@ fn corpus_bad_reports_expected_findings() {
         ("emptyCompetitionDivisions", "index.json"),
         ("missingCompetitionFile", "no-division-file.json"),
         ("orphanCompetitionFile", "bad-league.json"),
+        // 短い名前と表の凡例（handball-project#582）。bad-cup.json の 1 件目は正式名が無いのに短い名前を
+        // 持ち、3 件目のアウェイの短い名前は空白だけ / 5 つ目の表は凡例の文字が重複し、意味が空のものがある。
+        // どの行・どの文字かは `short_name_and_legend_details_are_pinned`。
+        ("shortNameWithoutTeamName", "bad-cup.json"),
+        ("emptyTeamShortName", "bad-cup.json"),
+        ("duplicateLegendText", "bad-cup.json"),
+        ("emptyLegendEntry", "bad-cup.json"),
     ];
     for (code, file) in expect {
         assert!(
@@ -531,6 +538,8 @@ fn date_descending_is_checked_within_a_round_only() {
         home_team_name: Some("A".to_owned()),
         away_team_name: Some("B".to_owned()),
         round: Some(round.to_owned()),
+        home_team_short_name: None,
+        away_team_short_name: None,
     };
 
     // 第2節（1/3）→ 第1節（1/5・延期分が後の日付）。一覧全体では昇順の箇所があるが違反ではない。
@@ -563,4 +572,41 @@ fn date_descending_is_checked_within_a_round_only() {
         .map(|(code, _)| code)
         .collect();
     assert_eq!(codes, vec!["indexNotDateDescending".to_owned()]);
+}
+
+/// 短い名前と表の凡例（handball-project#582）の指摘を、どの項目・どの文字かまで固定する。
+///
+/// - 短い名前の指摘は項目の slug と側（home / away）を名指しする
+/// - 凡例の重複は 2 つ目だけを指摘する（1 つ目は正しい）。意味が空の項目は重複とは別の code
+#[test]
+fn short_name_and_legend_details_are_pinned() {
+    let mut report = RunReport::default();
+    validate_corpus(&fixture("corpus-bad"), &mut report);
+    let all = |code: &str| {
+        report
+            .findings
+            .iter()
+            .filter(|finding| {
+                finding.issue.get("code").and_then(|value| value.as_str()) == Some(code)
+            })
+            .map(|finding| finding.issue["params"].clone())
+            .collect::<Vec<_>>()
+    };
+
+    assert_eq!(
+        all("shortNameWithoutTeamName"),
+        vec![serde_json::json!({"slug": "2026-02-05-no-names", "side": "home"})]
+    );
+    assert_eq!(
+        all("emptyTeamShortName"),
+        vec![serde_json::json!({"slug": "2026-02-03-round-again", "side": "away"})]
+    );
+    assert_eq!(
+        all("duplicateLegendText"),
+        vec![serde_json::json!({"id": "legend", "text": "T"})]
+    );
+    assert_eq!(
+        all("emptyLegendEntry"),
+        vec![serde_json::json!({"id": "legend", "text": "H"})]
+    );
 }
