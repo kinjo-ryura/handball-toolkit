@@ -91,6 +91,60 @@ fn competition_listed_match_is_checked_against_its_body() {
     );
 }
 
+/// corpus-ok を一時ディレクトリへ写し、試合の一覧を root 直下から `matches/index.json` へ移す
+/// （3 つの一覧が `matches/` / `highlights/` / `competitions/` に揃う構成。handball-project#588）。
+fn nested_layout_corpus(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!(
+        "handball-toolkit-cli-{name}-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    copy_dir(&fixture("corpus-ok"), &dir);
+    std::fs::rename(dir.join("index.json"), dir.join("matches/index.json")).expect("rename");
+    dir
+}
+
+/// 一覧を `matches/index.json` に置く構成も、root 直下に置く構成と同じに検証する。
+/// `matches/index.json` を試合の本体として読まない（decode の指摘も orphan も出ない）ことも固定する。
+#[test]
+fn nested_match_index_layout_has_no_findings() {
+    let dir = nested_layout_corpus("nested-ok");
+    let mut report = RunReport::default();
+    validate_corpus(&dir, &mut report);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(
+        report.findings.len(),
+        0,
+        "指摘なしのはず: {:#?}",
+        report.findings
+    );
+    assert_eq!(report.checked_files, 9);
+}
+
+/// 一覧がどちらの置き場にも無ければ、`matches/index.json` を名指して `missingIndex` を出し、
+/// 本体の個別検証だけは続ける（`matches/` の中の一覧ではないファイルを本体として読む）。
+#[test]
+fn missing_match_index_points_to_nested_path() {
+    let dir = nested_layout_corpus("nested-missing");
+    std::fs::remove_file(dir.join("matches/index.json")).expect("remove");
+    let mut report = RunReport::default();
+    validate_corpus(&dir, &mut report);
+    let _ = std::fs::remove_dir_all(&dir);
+    let missing: Vec<&str> = report
+        .findings
+        .iter()
+        .filter(|finding| {
+            finding.issue.get("code").and_then(|v| v.as_str()) == Some("missingIndex")
+        })
+        .map(|finding| finding.path.as_str())
+        .collect();
+    assert_eq!(missing.len(), 1, "{:#?}", report.findings);
+    assert!(
+        Path::new(missing[0]).ends_with("matches/index.json"),
+        "新しい構成の置き場を名指すはず: {missing:?}"
+    );
+}
+
 fn copy_dir(from: &Path, to: &Path) {
     for entry in std::fs::read_dir(from).expect("read_dir") {
         let entry = entry.expect("entry");

@@ -8,8 +8,9 @@ use handball_toolkit_cli::validate::validate_file;
 const USAGE: &str = "\
 usage: handball-toolkit-cli validate [--json] <path>...
 
-  <path> がディレクトリなら v2 ルートとして一括検証する
-  （index.json / matches/*.json / highlights/ を index と突合）。
+  <path> がディレクトリなら配信データのルートとして一括検証する
+  （試合の一覧 matches/index.json — 無ければ root の index.json — と
+  matches/*.json・highlights/・competitions/ を突合）。
   ファイルならトップレベルキーで形状を自動判別して単体検証する
   （facts = 試合本体 / matches = 試合 index / highlights = ハイライト index）。
 
