@@ -7,6 +7,6 @@ plugins {
     // AGP 9 の built-in Kotlin が Kotlin をコンパイルするので、app では apply しない
     // （apply すると AGP がエラーにする）。ここは Kotlin Gradle Plugin の版を決めるためだけに
     // 置いている — 理由は android/build.gradle.kts と同じ（handball-project#412）。
-    id("org.jetbrains.kotlin.android") version "2.4.20" apply false
+    id("org.jetbrains.kotlin.android") version "2.4.21" apply false
     id("com.google.devtools.ksp") version "2.3.12" apply false
 }
