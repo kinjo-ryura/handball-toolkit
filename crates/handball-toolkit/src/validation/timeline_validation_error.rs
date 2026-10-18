@@ -54,6 +54,13 @@ pub enum TimelineValidationError {
     /// matchClock 累積秒の連続性を保つ。overlap も gap も blocking。
     /// `Video` は SegmentResolver の baseline rolling forward で構造的に保証されるため対象外。
     PhaseStartNotContinuousFromPrevious,
+    /// `Video` の 2 つの PhaseStart fact の videoClock range が重なっている（handball-project#626）。
+    ///
+    /// 上の連続性で `Video` を対象外にした理由（rolling forward）が保証するのは matchClock の
+    /// 連続性だけで、videoClock の range の重なりは防がない。重なった区間の記録は
+    /// `SegmentResolver::segment_for_video_elapsed` が先の phase に割り当てるので、後半に
+    /// 記録した得点が前半に入る。**隙間は許す** — 動画にはハーフタイムが映っていることがある。
+    PhasesOverlap,
 
     // ── Stoppage 重複 / phase 外 ──
     /// Stoppage 同士の range overlap 禁止（stopped 区間のネスト禁止）。

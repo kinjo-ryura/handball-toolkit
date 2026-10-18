@@ -7,7 +7,7 @@
 //! - R7 / R8: 単一 anchor fact（play / possession）の anchor の範囲（PhaseStart range の内 / Stoppage range の外）
 //! - R9: configuration × Stoppage 整合
 //! - R11: configuration × title 整合
-//! - phase 順序 / 連続性（shootout 重複 / shootout 最後 / `Timer` regular 連続性）
+//! - phase 順序 / 連続性（shootout 重複 / shootout 最後 / `Timer` regular 連続性 / `Video` range 重複）
 //! - Stoppage 重複 / phase 外
 //!
 //! 個別 fact の value validation は `fact_validator` が担当する。
@@ -82,6 +82,11 @@ pub fn validate_fact_log(facts: &[MatchFact], match_: &Match) -> Vec<DomainValid
     // Timer regular 連続性
     if matches!(configuration, MatchConfiguration::Timer { .. }) {
         issues.extend(validate_timer_phase_continuity(&phase_start_facts));
+    }
+
+    // Video phase 重複（handball-project#626）
+    if matches!(configuration, MatchConfiguration::Video(_)) {
+        issues.extend(validate_video_phases_overlap(&phase_start_facts));
     }
 
     // Stoppage 重複
@@ -245,6 +250,38 @@ fn validate_timer_phase_continuity(
     }
 
     issues
+}
+
+// ── Video phase 重複 ──
+
+/// `Video` の phase の videoClock range `[start, end)` が重ならないこと（handball-project#626）。
+///
+/// 開始順に並べた**隣どうし**だけを見れば足りる: 離れた 2 つが重なるなら、間にある phase は
+/// 開始が前の phase の終わりより手前なので、前の phase と重なっている。
+/// 前の終わりと次の開始が同じ秒（境界の共有）は重なりではない。
+///
+/// videoClock を持たない PhaseStart は飛ばす（`Video` で matchClock 単独の anchor は
+/// `invalidAnchorForConfiguration` が別に拒否する）。
+fn validate_video_phases_overlap(
+    phase_start_facts: &[PhaseStartFact],
+) -> Vec<DomainValidationIssue> {
+    let mut ranges: Vec<(f64, f64)> = phase_start_facts
+        .iter()
+        .filter_map(|fact| {
+            Some((
+                fact.payload.start_anchor.video_elapsed_seconds()?,
+                fact.payload.end_anchor.video_elapsed_seconds()?,
+            ))
+        })
+        .collect();
+    ranges.sort_by(|a, b| a.0.total_cmp(&b.0));
+
+    if ranges.windows(2).any(|pair| pair[1].0 < pair[0].1) {
+        return vec![DomainValidationIssue::Timeline(
+            TimelineValidationError::PhasesOverlap,
+        )];
+    }
+    Vec::new()
 }
 
 // ── Stoppage 重複 ──

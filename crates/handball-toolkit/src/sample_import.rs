@@ -28,7 +28,7 @@ use crate::sample_dto::{
 };
 use crate::validation::DomainValidationIssue;
 use crate::validators;
-use crate::write::{PlayerTeamRef, roster_context_from_players};
+use crate::write::{PlayerTeamRef, phase_overlap_repair_plan, roster_context_from_players};
 
 // ── Targets / Decisions（移植元: MatchMergerV2 の同名型）──
 
@@ -471,6 +471,15 @@ pub fn import_commit_plan(
     // 注: 移植元 Swift（`MatchImporterV2.commit` の for ループ）は整列しない。ここは
     // **意図的にオラクルから乖離**する — 移植元は同じ経路で `.video` を取り込めないため
     // （iOS の公開サンプルは read-only の in-memory repository 経由で、書き込み検証を通らない）。
+    //
+    // 整列の前に、重なった動画モードの phase を直す（handball-project#626）。重なりは
+    // `PhasesOverlap` で拒否されるので、直さないと古い版のアプリで記録した試合ファイルが
+    // 取り込めない。直し方は保存済みの試合と同じ（`phase_overlap_repair_plan`）。
+    for repaired in phase_overlap_repair_plan(&match_, &facts) {
+        if let Some(slot) = facts.iter_mut().find(|fact| fact.id == repaired.id) {
+            *slot = repaired;
+        }
+    }
     sort_by_persistence_order(&mut facts);
 
     let outcome = ImportCommitOutcome {

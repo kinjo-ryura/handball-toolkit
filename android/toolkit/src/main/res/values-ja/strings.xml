@@ -98,6 +98,8 @@
     <string name="handball_toolkit_timeline_shootout_not_last_body">シュートアウトは最後のピリオドです。シュートアウトより後にピリオド開始記録は置けません。</string>
     <string name="handball_toolkit_timeline_phase_start_not_continuous_from_previous_title">ピリオドの開始が直前ピリオドの終了と一致しません</string>
     <string name="handball_toolkit_timeline_phase_start_not_continuous_from_previous_body">新しいピリオドの開始は直前ピリオドの終了と同じ時刻にしてください。</string>
+    <string name="handball_toolkit_timeline_phases_overlap_title">ピリオドが重なっています</string>
+    <string name="handball_toolkit_timeline_phases_overlap_body">動画の上で、ピリオドが他のピリオドと重なっています。前のピリオドを次のピリオドの開始で終わらせてください。</string>
     <string name="handball_toolkit_timeline_stoppages_overlap_title">中断区間が重複しています</string>
     <string name="handball_toolkit_timeline_stoppages_overlap_body">中断区間が他の中断と重なっています。記録を整理してください。</string>
     <string name="handball_toolkit_timeline_stoppage_outside_phase_range_title">ピリオド外の中断記録があります</string>
@@ -126,5 +128,7 @@
     <string name="handball_toolkit_write_phase_duration_change_infeasible_body">この phase の長さは変更できません。タイマーモードの phase を選んでからやり直してください。</string>
     <string name="handball_toolkit_write_phase_duration_clamp_not_permitted_title">短縮すると記録がはみ出します</string>
     <string name="handball_toolkit_write_phase_duration_clamp_not_permitted_body">新しい終了より後ろにある記録を終了時刻へ寄せてよいか確認してから、もう一度お試しください。</string>
+    <string name="handball_toolkit_write_phase_end_infeasible_title">phase を終了できません</string>
+    <string name="handball_toolkit_write_phase_end_infeasible_body">この位置には phase がありません。動画モードの試合で、再生位置を phase の中へ移してからやり直してください。</string>
 
 </resources>

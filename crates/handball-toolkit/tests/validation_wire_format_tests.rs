@@ -90,7 +90,7 @@ fn empty_video_external_id_keeps_swift_case_name() {
 }
 
 #[test]
-fn all_37_cases_round_trip_via_serde() {
+fn all_38_cases_round_trip_via_serde() {
     let team_id = TeamId(Uuid::from_u128(10));
     let player_id = PlayerId(Uuid::from_u128(11));
     let issues: Vec<DomainValidationIssue> = vec![
@@ -139,7 +139,7 @@ fn all_37_cases_round_trip_via_serde() {
             player_id,
             team_id,
         }),
-        // timeline: 12
+        // timeline: 13
         DomainValidationIssue::Timeline(TimelineValidationError::TimerWithFactsMissingPhaseStart),
         DomainValidationIssue::Timeline(TimelineValidationError::VideoWithFactsMissingPhaseStart),
         DomainValidationIssue::Timeline(TimelineValidationError::VideoHighlightContainsPhaseStart),
@@ -154,10 +154,11 @@ fn all_37_cases_round_trip_via_serde() {
         DomainValidationIssue::Timeline(
             TimelineValidationError::PhaseStartNotContinuousFromPrevious,
         ),
+        DomainValidationIssue::Timeline(TimelineValidationError::PhasesOverlap),
         DomainValidationIssue::Timeline(TimelineValidationError::StoppagesOverlap),
         DomainValidationIssue::Timeline(TimelineValidationError::StoppageOutsidePhaseRange),
     ];
-    assert_eq!(issues.len(), 37);
+    assert_eq!(issues.len(), 38);
     for issue in &issues {
         let data = serde_json::to_string(issue).unwrap();
         let decoded: DomainValidationIssue = serde_json::from_str(&data).unwrap();

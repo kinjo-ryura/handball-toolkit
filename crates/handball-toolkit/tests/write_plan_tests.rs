@@ -17,11 +17,14 @@ use handball_toolkit::facts::{
     StoppageKind, StoppagePayload,
 };
 use handball_toolkit::ids::{FactId, MatchId, PlayerId, TeamId};
+use handball_toolkit::projection::SegmentResolver;
+use handball_toolkit::validation::{DomainValidationIssue, TimelineValidationError};
+use handball_toolkit::validators::validate_fact_log;
 use handball_toolkit::write::{
-    NewFactStamp, PhaseDurationChangeError, PlayerTeamRef, VideoMigrationPlanError,
+    NewFactStamp, PhaseDurationChangeError, PhaseEndError, PlayerTeamRef, VideoMigrationPlanError,
     VideoSourceReplacementError, VideoSyncInput, phase_completion_fact, phase_completion_plan,
-    phase_duration_change_plan, roster_context_from_players, video_migration_plan,
-    video_source_replacement_plan,
+    phase_duration_change_plan, phase_end_plan, phase_overlap_repair_plan,
+    roster_context_from_players, video_migration_plan, video_source_replacement_plan,
 };
 use uuid::Uuid;
 
@@ -813,4 +816,322 @@ fn 対象_id_が無ければ拒否する() {
             fact_id: FactId(Uuid::from_u128(999))
         }
     );
+}
+
+// ── 動画モードの phase を途中で終わらせる / 重なりを直す（handball-project#626）──
+
+fn video_match() -> Match {
+    Match {
+        configuration: MatchConfiguration::Video(youtube("abc")),
+        ..timer_match(1800.0)
+    }
+}
+
+fn video_phase_with_id(id: u128, start: f64, end: f64) -> MatchFact {
+    MatchFact {
+        id: FactId(Uuid::from_u128(id)),
+        recorded_at: chrono::DateTime::from_timestamp(1, 0).expect("固定秒は有効"),
+        payload: MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
+            kind: PhaseKind::Regular,
+            start_anchor: FactAnchor::VideoClock(VideoClock {
+                elapsed_seconds: start,
+            }),
+            end_anchor: FactAnchor::VideoClock(VideoClock {
+                elapsed_seconds: end,
+            }),
+        })),
+    }
+}
+
+fn video_goal_with_id(id: u128, seconds: f64) -> MatchFact {
+    MatchFact {
+        id: FactId(Uuid::from_u128(id)),
+        recorded_at: chrono::DateTime::from_timestamp(10, 0).expect("固定秒は有効"),
+        payload: MatchFactPayload::Play(PlayFact {
+            kind: PlayEventKind::Goal,
+            team_id: None,
+            player_id: None,
+            related_player_id: None,
+            anchor: FactAnchor::VideoClock(VideoClock {
+                elapsed_seconds: seconds,
+            }),
+            title: None,
+            note: None,
+        }),
+    }
+}
+
+fn video_stoppage_with_id(id: u128, start: f64, end: f64) -> MatchFact {
+    MatchFact {
+        id: FactId(Uuid::from_u128(id)),
+        recorded_at: chrono::DateTime::from_timestamp(5, 0).expect("固定秒は有効"),
+        payload: MatchFactPayload::Control(ControlFact::Stoppage(StoppagePayload {
+            kind: StoppageKind::Timeout,
+            start_anchor: FactAnchor::VideoClock(VideoClock {
+                elapsed_seconds: start,
+            }),
+            end_anchor: Some(FactAnchor::VideoClock(VideoClock {
+                elapsed_seconds: end,
+            })),
+            note: None,
+        })),
+    }
+}
+
+fn phase_payload(fact: &MatchFact) -> PhaseStartPayload {
+    let MatchFactPayload::Control(ControlFact::PhaseStart(payload)) = &fact.payload else {
+        panic!("PhaseStart fact ではない: {fact:?}");
+    };
+    *payload
+}
+
+/// 置き換えた後の fact 列（同 id を差し替える）。
+fn applied(facts: &[MatchFact], updates: &[MatchFact]) -> Vec<MatchFact> {
+    facts
+        .iter()
+        .map(|fact| {
+            updates
+                .iter()
+                .find(|updated| updated.id == fact.id)
+                .cloned()
+                .unwrap_or_else(|| fact.clone())
+        })
+        .collect()
+}
+
+#[test]
+fn 前半の途中で終わらせると終わりだけがその位置になる() {
+    let facts = vec![video_phase_with_id(1, 0.0, 1800.0)];
+
+    let updated = phase_end_plan(&video_match(), &facts, 195.0).expect("前半の中");
+
+    assert_eq!(updated.id, FactId(Uuid::from_u128(1)));
+    let payload = phase_payload(&updated);
+    assert_eq!(
+        payload.start_anchor,
+        FactAnchor::VideoClock(VideoClock {
+            elapsed_seconds: 0.0
+        })
+    );
+    assert_eq!(
+        payload.end_anchor,
+        FactAnchor::VideoClock(VideoClock {
+            elapsed_seconds: 195.0
+        })
+    );
+}
+
+#[test]
+fn 位置を含む_phase_が無ければ終わらせられない() {
+    let facts = vec![video_phase_with_id(1, 0.0, 1800.0)];
+
+    let error = phase_end_plan(&video_match(), &facts, 2000.0).expect_err("ハーフタイム");
+
+    assert_eq!(
+        error,
+        PhaseEndError::NoPhaseAtPosition {
+            video_elapsed_seconds: 2000.0
+        }
+    );
+}
+
+#[test]
+fn 重なった古い記録では最後に始めた_phase_を終わらせる() {
+    let facts = vec![
+        video_phase_with_id(1, 0.0, 1800.0),
+        video_phase_with_id(2, 195.0, 1995.0),
+    ];
+
+    let updated = phase_end_plan(&video_match(), &facts, 500.0).expect("後半の中");
+
+    assert_eq!(updated.id, FactId(Uuid::from_u128(2)));
+}
+
+#[test]
+fn タイマーモードの_phase_は終わらせられない() {
+    let error = phase_end_plan(&timer_match(1800.0), &二_phase_の試合(), 600.0)
+        .expect_err("タイマーモードは長さで編集する");
+
+    assert_eq!(
+        error,
+        PhaseEndError::NotVideoConfiguration {
+            kind: MatchConfigurationKind::Timer
+        }
+    );
+}
+
+#[test]
+fn both_の_phase_は終わりの試合時計を停止区間を除いて組む() {
+    // 移行ウィザードを通った試合の phase は Both anchor を持つ。終わりも Both でないと
+    // PhaseStartAnchorMismatch になる。
+    let phase = MatchFact {
+        id: FactId(Uuid::from_u128(1)),
+        recorded_at: chrono::DateTime::from_timestamp(1, 0).expect("固定秒は有効"),
+        payload: MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
+            kind: PhaseKind::Regular,
+            start_anchor: FactAnchor::Both {
+                match_clock: MatchClock {
+                    elapsed_seconds: 0.0,
+                },
+                video_clock: VideoClock {
+                    elapsed_seconds: 100.0,
+                },
+            },
+            end_anchor: FactAnchor::Both {
+                match_clock: MatchClock {
+                    elapsed_seconds: 1800.0,
+                },
+                video_clock: VideoClock {
+                    elapsed_seconds: 1960.0,
+                },
+            },
+        })),
+    };
+    let facts = vec![phase, video_stoppage_with_id(2, 300.0, 360.0)];
+
+    let updated = phase_end_plan(&video_match(), &facts, 700.0).expect("phase の中");
+
+    // 100 → 700 の 600 秒から、停止区間の 60 秒を除く。
+    assert_eq!(
+        phase_payload(&updated).end_anchor,
+        FactAnchor::Both {
+            match_clock: MatchClock {
+                elapsed_seconds: 540.0
+            },
+            video_clock: VideoClock {
+                elapsed_seconds: 700.0
+            },
+        }
+    );
+}
+
+#[test]
+fn 重なった前半を後半の開始で終わらせる() {
+    let facts = vec![
+        video_phase_with_id(1, 0.0, 1800.0),
+        video_phase_with_id(2, 195.0, 1995.0),
+    ];
+
+    let plan = phase_overlap_repair_plan(&video_match(), &facts);
+
+    assert_eq!(plan.len(), 1);
+    assert_eq!(plan[0].id, FactId(Uuid::from_u128(1)));
+    assert_eq!(
+        phase_payload(&plan[0]).end_anchor,
+        FactAnchor::VideoClock(VideoClock {
+            elapsed_seconds: 195.0
+        })
+    );
+}
+
+#[test]
+fn 直すと重なった区間の得点は後半に入る() {
+    // 報告された形（handball-project#626）。後半の開始 195 秒の後、209 秒の得点が
+    // 前半の予測の終わり（1800）の内側にあるため前半に割り当てられていた。
+    let facts = vec![
+        video_phase_with_id(1, 0.0, 1800.0),
+        video_phase_with_id(2, 195.0, 1995.0),
+        video_goal_with_id(3, 209.0),
+    ];
+    let phase_of_goal = |facts: &[MatchFact]| {
+        let resolver = SegmentResolver::build(facts);
+        let match_clock = resolver
+            .resolve_match_clock(VideoClock {
+                elapsed_seconds: 209.0,
+            })
+            .expect("phase の中");
+        resolver
+            .phase_for_match_elapsed(match_clock.elapsed_seconds)
+            .expect("phase の中")
+            .fact_id
+    };
+    assert_eq!(
+        phase_of_goal(&facts),
+        FactId(Uuid::from_u128(1)),
+        "直す前は前半に入る（不具合の形）"
+    );
+
+    let repaired = applied(&facts, &phase_overlap_repair_plan(&video_match(), &facts));
+
+    assert_eq!(phase_of_goal(&repaired), FactId(Uuid::from_u128(2)));
+    assert!(validate_fact_log(&repaired, &video_match()).is_empty());
+}
+
+#[test]
+fn 重なっていなければ直さない() {
+    let with_gap = vec![
+        video_phase_with_id(1, 0.0, 1500.0),
+        video_phase_with_id(2, 2100.0, 3600.0),
+    ];
+    let sharing_boundary = vec![
+        video_phase_with_id(1, 0.0, 1800.0),
+        video_phase_with_id(2, 1800.0, 3600.0),
+    ];
+
+    assert!(phase_overlap_repair_plan(&video_match(), &with_gap).is_empty());
+    assert!(phase_overlap_repair_plan(&video_match(), &sharing_boundary).is_empty());
+}
+
+#[test]
+fn 開始が同じ_phase_は直さない() {
+    let facts = vec![
+        video_phase_with_id(1, 0.0, 1800.0),
+        video_phase_with_id(2, 0.0, 1800.0),
+    ];
+
+    assert!(phase_overlap_repair_plan(&video_match(), &facts).is_empty());
+}
+
+#[test]
+fn 三つ重なっていれば前の二つをそれぞれ次の開始で終わらせる() {
+    let facts = vec![
+        video_phase_with_id(3, 400.0, 2200.0),
+        video_phase_with_id(1, 0.0, 1800.0),
+        video_phase_with_id(2, 195.0, 1995.0),
+    ];
+
+    let plan = phase_overlap_repair_plan(&video_match(), &facts);
+
+    let ends: BTreeMap<u128, FactAnchor> = plan
+        .iter()
+        .map(|fact| (fact.id.0.as_u128(), phase_payload(fact).end_anchor))
+        .collect();
+    assert_eq!(
+        ends,
+        BTreeMap::from([
+            (
+                1,
+                FactAnchor::VideoClock(VideoClock {
+                    elapsed_seconds: 195.0
+                })
+            ),
+            (
+                2,
+                FactAnchor::VideoClock(VideoClock {
+                    elapsed_seconds: 400.0
+                })
+            ),
+        ])
+    );
+}
+
+#[test]
+fn 停止区間が後半の開始をまたいでいると直した結果は検証に落ちる() {
+    // 自動では直せない形。計画は作るが、発火層の結果 log の検証が拒否する。
+    let facts = vec![
+        video_phase_with_id(1, 0.0, 1800.0),
+        video_phase_with_id(2, 195.0, 1995.0),
+        video_stoppage_with_id(3, 150.0, 240.0),
+    ];
+
+    let repaired = applied(&facts, &phase_overlap_repair_plan(&video_match(), &facts));
+
+    assert!(validate_fact_log(&repaired, &video_match()).contains(
+        &DomainValidationIssue::Timeline(TimelineValidationError::StoppageOutsidePhaseRange)
+    ));
+}
+
+#[test]
+fn タイマーモードの試合は直さない() {
+    assert!(phase_overlap_repair_plan(&timer_match(1800.0), &二_phase_の試合()).is_empty());
 }

@@ -25,8 +25,8 @@ use crate::sync::{self, SyncSnapshot, VideoRelink};
 use crate::validation::DomainValidationIssue;
 use crate::validators::{self, RosterContext};
 use crate::write::{
-    self, NewFactStamp, PhaseDurationChangeError, PlayerTeamRef, VideoMigrationPlanError,
-    VideoSourceReplacementError, VideoSyncInput,
+    self, NewFactStamp, PhaseDurationChangeError, PhaseEndError, PlayerTeamRef,
+    VideoMigrationPlanError, VideoSourceReplacementError, VideoSyncInput,
 };
 
 /// write 入口の失敗（ADR 0005 決定 5。ADR 0002: 構造化 — コード + パラメータのみ）。
@@ -71,6 +71,17 @@ pub enum CoreWriteError {
     /// （handball-project#352）。シェルは件数を見せて承認を取り、`allow_clamp` を立てて
     /// 呼び直す。**承認なしに寄せない** — 記録の時刻が実際と変わるため。
     PhaseDurationClampNotPermitted { clamped_fact_count: u32 },
+    /// phase を終わらせる計画の不成立（動画モード以外 / 位置を含む phase が無い）。
+    /// UI が phase の中でだけ「終了」を出していれば到達しない安全網（handball-project#626）。
+    PhaseEndInfeasible { detail: String },
+}
+
+impl From<PhaseEndError> for CoreWriteError {
+    fn from(error: PhaseEndError) -> Self {
+        CoreWriteError::PhaseEndInfeasible {
+            detail: format!("{error:?}"),
+        }
+    }
 }
 
 impl From<PhaseDurationChangeError> for CoreWriteError {
@@ -303,6 +314,80 @@ pub async fn record_update_phase_duration(
         repo.update_fact(match_id, fact).await?;
     }
     Ok(())
+}
+
+/// 動画モードで、再生位置 `video_elapsed_seconds` を含む phase をそこで終わらせる入口
+/// （handball-project#626）。読む → 計画（`phase_end_plan`）→ `validate_update` → 発火。
+///
+/// 書き換えるのは対象 phase の終わり 1 件だけで、次の phase は作らない（ハーフタイムを
+/// 挟めるようにするため — 計画の doc）。終わりより後ろに同じ phase の記録が残っていると
+/// R7（`PlayRecordedOutsidePhaseRange`）で拒否する。記録は動かさない。
+#[uniffi::export]
+pub async fn record_end_phase(
+    repo: Arc<dyn MatchWriteRepository>,
+    match_id: MatchId,
+    video_elapsed_seconds: f64,
+) -> Result<(), CoreWriteError> {
+    let (match_, existing, roster) = load_validation_inputs(repo.as_ref(), match_id).await?;
+    let updated = write::phase_end_plan(&match_, &existing, video_elapsed_seconds)?;
+    let issues = validators::validate_update(&updated, &existing, &match_, roster.as_ref());
+    if !issues.is_empty() {
+        return Err(CoreWriteError::ValidationFailed { issues });
+    }
+    repo.update_fact(match_id, updated).await
+}
+
+/// 動画モードで重なった phase を直す入口（handball-project#626）。直した phase の数を返す。
+///
+/// 読む → 計画（`phase_overlap_repair_plan`）→ 結果 log を 1 回で検証 → 発火。
+/// 重なりは `PhasesOverlap` で保存を拒否されるので、重なったまま残っている試合には
+/// 何も保存できない。シェルは起動時に全試合へ、取り込み・同期の後にその試合へ当てる。
+///
+/// **検証に落ちたら 1 件も保存しない**（`ValidationFailed`）。前の phase の中で記録した
+/// 停止区間が次の開始をまたいでいる試合がこれに当たる — 自動では直さず、利用者が phase の
+/// 終わりを手で直す。重なりが無ければ何も書かずに 0 を返す。
+///
+/// 発火は逐次・非 atomic。途中で repository が失敗しても、直した phase はそれぞれ単独で
+/// 正しい（終わりを次の開始へ寄せるだけ）ので、もう一度呼べば残りが直る。
+#[uniffi::export]
+pub async fn record_repair_phase_overlaps(
+    repo: Arc<dyn MatchWriteRepository>,
+    match_id: MatchId,
+) -> Result<u32, CoreWriteError> {
+    let (match_, existing, roster) = load_validation_inputs(repo.as_ref(), match_id).await?;
+    let updated_facts = write::phase_overlap_repair_plan(&match_, &existing);
+    if updated_facts.is_empty() {
+        return Ok(0);
+    }
+
+    let default_roster;
+    let effective_roster = match roster.as_ref() {
+        Some(roster) => roster,
+        None => {
+            default_roster = RosterContext::empty(match_.home_team_id, match_.away_team_id);
+            &default_roster
+        }
+    };
+
+    let resulting = apply_fact_updates(&existing, &updated_facts);
+    let mut issues: Vec<DomainValidationIssue> = Vec::new();
+    for fact in &updated_facts {
+        issues.extend(validators::validate_match_fact(
+            fact,
+            &match_.configuration,
+            effective_roster,
+        ));
+    }
+    issues.extend(validators::validate_fact_log(&resulting, &match_));
+    if !issues.is_empty() {
+        return Err(CoreWriteError::ValidationFailed { issues });
+    }
+
+    let repaired = updated_facts.len() as u32;
+    for fact in updated_facts {
+        repo.update_fact(match_id, fact).await?;
+    }
+    Ok(repaired)
 }
 
 /// `updates` で同 id の既存 fact を置き換えた log を永続化順で返す。

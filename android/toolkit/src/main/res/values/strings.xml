@@ -98,6 +98,8 @@
     <string name="handball_toolkit_timeline_shootout_not_last_body">The shootout is the final phase. No phase start can come after it.</string>
     <string name="handball_toolkit_timeline_phase_start_not_continuous_from_previous_title">The phase does not follow on from the previous one</string>
     <string name="handball_toolkit_timeline_phase_start_not_continuous_from_previous_body">A new phase must start at exactly the time the previous phase ended.</string>
+    <string name="handball_toolkit_timeline_phases_overlap_title">Phases overlap</string>
+    <string name="handball_toolkit_timeline_phases_overlap_body">One phase overlaps another on the video. End the earlier phase where the next one starts.</string>
     <string name="handball_toolkit_timeline_stoppages_overlap_title">Stoppages overlap</string>
     <string name="handball_toolkit_timeline_stoppages_overlap_body">One stoppage interval overlaps another. Tidy up the records.</string>
     <string name="handball_toolkit_timeline_stoppage_outside_phase_range_title">A stoppage falls outside every phase</string>
@@ -126,5 +128,7 @@
     <string name="handball_toolkit_write_phase_duration_change_infeasible_body">This phase\'s length cannot be changed. Pick a phase from a timer match and try again.</string>
     <string name="handball_toolkit_write_phase_duration_clamp_not_permitted_title">Shortening would push records out</string>
     <string name="handball_toolkit_write_phase_duration_clamp_not_permitted_body">Some records sit past the new end. Confirm that they may be moved to the end time, then try again.</string>
+    <string name="handball_toolkit_write_phase_end_infeasible_title">Cannot end the phase</string>
+    <string name="handball_toolkit_write_phase_end_infeasible_body">There is no phase at this position. Move the playback position inside a phase of a video match and try again.</string>
 
 </resources>
