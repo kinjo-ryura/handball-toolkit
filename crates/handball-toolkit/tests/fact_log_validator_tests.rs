@@ -424,6 +424,53 @@ fn video_phase_gap_is_accepted() {
     assert!(!issues.contains(&DomainValidationIssue::Timeline(
         TimelineValidationError::PhaseStartNotContinuousFromPrevious
     )));
+    assert!(!issues.contains(&DomainValidationIssue::Timeline(
+        TimelineValidationError::PhasesOverlap
+    )));
+}
+
+// ── Video phase 重複（handball-project#626）──
+
+#[test]
+fn overlapping_video_phases_are_blocking() {
+    // iOS の「phase 1 を終了して次へ」が作っていた形: 前半の予測の終わり（1800）より
+    // 手前（195）で後半が始まっている。
+    let c = ctx();
+    let facts = vec![
+        video_phase_start(0.0, 1800.0),
+        video_phase_start(195.0, 1995.0),
+    ];
+    let issues = validate_fact_log(&facts, &c.video_match);
+    assert!(issues.contains(&DomainValidationIssue::Timeline(
+        TimelineValidationError::PhasesOverlap
+    )));
+}
+
+#[test]
+fn video_phases_sharing_a_boundary_are_accepted() {
+    let c = ctx();
+    let facts = vec![
+        video_phase_start(0.0, 1800.0),
+        video_phase_start(1800.0, 3600.0),
+    ];
+    let issues = validate_fact_log(&facts, &c.video_match);
+    assert!(!issues.contains(&DomainValidationIssue::Timeline(
+        TimelineValidationError::PhasesOverlap
+    )));
+}
+
+#[test]
+fn video_phases_overlap_is_checked_regardless_of_fact_order() {
+    // 後半の PhaseStart が先に並んでいても、開始順に並べ直して比べる。
+    let c = ctx();
+    let facts = vec![
+        video_phase_start(195.0, 1995.0),
+        video_phase_start(0.0, 1800.0),
+    ];
+    let issues = validate_fact_log(&facts, &c.video_match);
+    assert!(issues.contains(&DomainValidationIssue::Timeline(
+        TimelineValidationError::PhasesOverlap
+    )));
 }
 
 // ── Stoppage 重複 ──

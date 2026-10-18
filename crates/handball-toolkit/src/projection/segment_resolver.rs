@@ -315,6 +315,38 @@ fn stoppages_contained<'a>(
     in_range.into_iter().map(|(entry, _)| entry).collect()
 }
 
+/// phase の動画上の開始から `video_seconds` までに進む matchClock の秒数（停止区間を除く）。
+///
+/// phase の内側の video → match の対応は `carve_regular_phase_segments` が開始の累積秒から
+/// 1:1 で刻む（`Both` の終わりの matchClock は内側の対応に使われない）ので、同じ式で数える。
+/// phase を途中で終わらせるときに `Both` の終わりの matchClock を組むのに使う
+/// （handball-project#626）。shootout は matchClock が進まないので 0。videoClock を持たない
+/// phase は `None`。
+pub(crate) fn running_seconds_in_phase(
+    facts: &[MatchFact],
+    payload: &PhaseStartPayload,
+    video_seconds: f64,
+) -> Option<f64> {
+    if payload.kind == PhaseKind::Shootout {
+        return Some(0.0);
+    }
+    let video_start = payload.start_anchor.video_elapsed_seconds()?;
+    let stoppages = extract_stoppages(facts);
+    // phase_start は matchClock 軸の判定（timer mode）にしか使われず、videoClock の範囲を
+    // 渡すこの呼び方では読まれない。
+    let contained = stoppages_contained(
+        payload,
+        0.0,
+        Some(video_start),
+        Some(video_seconds),
+        &stoppages,
+    );
+    Some(total_running_duration(
+        (video_start, video_seconds),
+        &contained,
+    ))
+}
+
 /// video mode の phase 内、stoppage を除いた running 区間の合計時間を算出。
 fn total_running_duration(phase_range: (f64, f64), stoppages: &[&StoppageEntry]) -> f64 {
     let (v_start, v_end) = phase_range;

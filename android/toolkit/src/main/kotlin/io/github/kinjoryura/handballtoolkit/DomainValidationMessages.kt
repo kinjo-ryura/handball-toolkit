@@ -72,6 +72,10 @@ fun CoreWriteException.userMessage(context: Context): DomainValidationMessage = 
         R.string.handball_toolkit_write_phase_duration_clamp_not_permitted_title,
         R.string.handball_toolkit_write_phase_duration_clamp_not_permitted_body,
     ).resolve(context)
+    is CoreWriteException.PhaseEndInfeasible -> MessageRes(
+        R.string.handball_toolkit_write_phase_end_infeasible_title,
+        R.string.handball_toolkit_write_phase_end_infeasible_body,
+    ).resolve(context)
 }
 
 private fun validationFailedMessage(
@@ -273,6 +277,10 @@ private fun TimelineValidationError.messageRes(): MessageRes = when (this) {
     is TimelineValidationError.PhaseStartNotContinuousFromPrevious -> MessageRes(
         R.string.handball_toolkit_timeline_phase_start_not_continuous_from_previous_title,
         R.string.handball_toolkit_timeline_phase_start_not_continuous_from_previous_body,
+    )
+    is TimelineValidationError.PhasesOverlap -> MessageRes(
+        R.string.handball_toolkit_timeline_phases_overlap_title,
+        R.string.handball_toolkit_timeline_phases_overlap_body,
     )
     is TimelineValidationError.StoppagesOverlap -> MessageRes(
         R.string.handball_toolkit_timeline_stoppages_overlap_title,

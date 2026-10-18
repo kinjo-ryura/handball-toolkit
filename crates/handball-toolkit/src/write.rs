@@ -17,6 +17,7 @@ use crate::facts::{
 };
 use crate::ids::{FactId, PlayerId, TeamId};
 use crate::projection::SegmentResolver;
+use crate::projection::segment_resolver::running_seconds_in_phase;
 use crate::validators::{self, RosterContext};
 
 /// home / away 所属選手 1 件の (player, team) 参照。
@@ -412,6 +413,130 @@ fn shift_anchor(anchor: &mut FactAnchor, delta: f64) {
         let shifted = anchor.with_elapsed_seconds(FactAnchorKind::MatchClock, seconds + delta);
         *anchor = shifted;
     }
+}
+
+// ── 動画モードの phase を途中で終わらせる（handball-project#626）──
+
+/// phase を終わらせる計画が成立しない理由（発火層が `CoreWriteError` へ写像する）。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PhaseEndError {
+    /// 動画モード（`.video`）以外。タイマーモードの phase は長さで編集し
+    /// （`phase_duration_change_plan`）、ハイライトは phase を持たない。
+    NotVideoConfiguration { kind: MatchConfigurationKind },
+    /// 指定位置を含む phase が無い（試合前 / ハーフタイム / 試合終了後）。
+    NoPhaseAtPosition { video_elapsed_seconds: f64 },
+}
+
+/// 動画モードで、再生位置 `video_elapsed_seconds` を含む phase をそこで終わらせた fact を返す。
+///
+/// 「phase N を終了」の計画（handball-project#626）。動画モードの phase の終わりは開始時に
+/// 「開始 + 規定長」の予測で入るので、実際に終わった位置で置き直す。**動かすのは対象 phase の
+/// 終わりだけで、次の phase は作らない** — 動画にはハーフタイムが映っていることがあり、
+/// 次の phase の開始は人が別に打つ。以前の iOS の「phase N を終了して次へ」は次の phase を
+/// 足すだけで終わりを置き直さず、予測の終わりまで 2 つの phase が重なっていた。
+///
+/// 位置を含む phase が複数ある（重なった古い記録）ときは、開始が最も遅いものを選ぶ。
+/// 利用者から見た「今の phase」は最後に始めたものだから。
+///
+/// 位置が phase の開始ちょうどでも計画は作る。長さ 0 の phase は `PhaseStartEndBeforeStart`
+/// として検証が拒否するので、ここで別の理由を立てない。
+pub fn phase_end_plan(
+    match_: &Match,
+    facts: &[MatchFact],
+    video_elapsed_seconds: f64,
+) -> Result<MatchFact, PhaseEndError> {
+    if !matches!(match_.configuration, MatchConfiguration::Video(_)) {
+        return Err(PhaseEndError::NotVideoConfiguration {
+            kind: match_.configuration.kind(),
+        });
+    }
+    let target = video_phase_ranges(facts)
+        .into_iter()
+        .filter(|(_, start, end)| video_elapsed_seconds >= *start && video_elapsed_seconds < *end)
+        .max_by(|lhs, rhs| lhs.1.total_cmp(&rhs.1))
+        .map(|(fact, _, _)| fact)
+        .ok_or(PhaseEndError::NoPhaseAtPosition {
+            video_elapsed_seconds,
+        })?;
+    Ok(phase_ended_at(target, facts, video_elapsed_seconds))
+}
+
+/// 動画モードで、videoClock の range が次の phase と重なっている phase を、次の phase の開始で
+/// 終わらせた fact の一覧を返す（handball-project#626）。直すものが無ければ空。
+///
+/// 重なりを作っていたのは iOS の「phase N を終了して次へ」（`phase_end_plan` の doc）。
+/// 次の phase の開始はボタンを押した位置そのものなので、前の phase をそこで終わらせると、
+/// ボタンが本来すべきだったことを後から行うことになる。記録（play / 停止区間）は動かさない。
+/// 重なった区間の記録は、直した後は次の phase に入る。
+///
+/// - `.video` 以外は空。タイマーモードは連続性の検証が重なりを拒否し、ハイライトは phase を持たない
+/// - 開始が同じ 2 つの phase は直さない（前の phase が長さ 0 になる）。結果の log の検証が
+///   `PhasesOverlap` で拒否し続けるので、手で直してもらう
+/// - 書き換えた結果が検証を通るかはここでは見ない（発火層と import が結果の log を検証する）。
+///   前の phase の中で記録した停止区間が次の開始をまたいでいると、縮めた phase から
+///   はみ出して `StoppageOutsidePhaseRange` になる
+pub fn phase_overlap_repair_plan(match_: &Match, facts: &[MatchFact]) -> Vec<MatchFact> {
+    if !matches!(match_.configuration, MatchConfiguration::Video(_)) {
+        return Vec::new();
+    }
+    let mut phases = video_phase_ranges(facts);
+    phases.sort_by(|lhs, rhs| lhs.1.total_cmp(&rhs.1));
+    phases
+        .windows(2)
+        .filter(|pair| {
+            let (_, previous_start, previous_end) = pair[0];
+            let (_, next_start, _) = pair[1];
+            next_start < previous_end && next_start > previous_start
+        })
+        .map(|pair| phase_ended_at(pair[0].0, facts, pair[1].1))
+        .collect()
+}
+
+/// videoClock の range を持つ PhaseStart fact と、その `(開始, 終わり)`。並びは `facts` のまま。
+fn video_phase_ranges(facts: &[MatchFact]) -> Vec<(&MatchFact, f64, f64)> {
+    facts
+        .iter()
+        .filter_map(|fact| {
+            let MatchFactPayload::Control(ControlFact::PhaseStart(payload)) = &fact.payload else {
+                return None;
+            };
+            Some((
+                fact,
+                payload.start_anchor.video_elapsed_seconds()?,
+                payload.end_anchor.video_elapsed_seconds()?,
+            ))
+        })
+        .collect()
+}
+
+/// PhaseStart fact `phase` の終わりを videoClock `video_seconds` に置き直した fact。
+///
+/// `Both` の phase は終わりも `Both` でなければならない（`PhaseStartAnchorMismatch`）ので、
+/// matchClock 側を「開始の累積秒 + そこまでに進んだ running の秒数」で組む。
+/// `SegmentResolver` が phase の内側の位置に割り当てる累積秒と同じ値になる。
+fn phase_ended_at(phase: &MatchFact, facts: &[MatchFact], video_seconds: f64) -> MatchFact {
+    let mut updated = phase.clone();
+    if let MatchFactPayload::Control(ControlFact::PhaseStart(payload)) = &mut updated.payload {
+        let video_clock = VideoClock {
+            elapsed_seconds: video_seconds,
+        };
+        let end_anchor = match payload.start_anchor {
+            FactAnchor::Both { match_clock, .. } => {
+                let running = running_seconds_in_phase(facts, payload, video_seconds);
+                FactAnchor::Both {
+                    match_clock: MatchClock {
+                        elapsed_seconds: match_clock.elapsed_seconds + running.unwrap_or(0.0),
+                    },
+                    video_clock,
+                }
+            }
+            FactAnchor::VideoClock(_) | FactAnchor::MatchClock(_) => {
+                FactAnchor::VideoClock(video_clock)
+            }
+        };
+        payload.end_anchor = end_anchor;
+    }
+    updated
 }
 
 // ── タイマー → 動画移行の commit 計画（移植元: MigrateToVideoStore.buildUpdatedFacts）──

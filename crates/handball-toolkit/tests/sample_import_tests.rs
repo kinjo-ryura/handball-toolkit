@@ -9,13 +9,13 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, TimeZone, Utc};
 use handball_toolkit::entities::{Player, Team};
-use handball_toolkit::facts::MatchFactPayload;
+use handball_toolkit::facts::{ControlFact, MatchFactPayload};
 use handball_toolkit::ids::{PlayerId, TeamId};
 use handball_toolkit::sample_dto::{
     SCHEMA_VERSION_CURRENT, SampleControlFactDtoV2, SampleFactAnchorDtoV2, SampleFactDtoV2,
     SampleFactPayloadDtoV2, SampleMatchClockDtoV2, SampleMatchConfigurationDtoV2, SampleMatchDtoV2,
     SampleMatchHeaderV2, SamplePhaseStartPayloadDtoV2, SamplePlayFactDtoV2, SamplePlayerDtoV2,
-    SampleTeamDtoV2, SampleTeamsDtoV2, SampleTimerConfigurationDtoV2,
+    SampleTeamDtoV2, SampleTeamsDtoV2, SampleTimerConfigurationDtoV2, SampleVideoClockDtoV2,
 };
 use handball_toolkit::validation::{DomainValidationIssue, MatchValidationError};
 
@@ -596,4 +596,69 @@ fn import_commit_batch_accepts_distinct_teams_on_each_side() {
 
     assert_eq!(batch.match_.home_team_id, home.id);
     assert_eq!(batch.match_.away_team_id, away.id);
+}
+
+// ── 重なった動画モードの phase（handball-project#626）──
+
+fn video_phase_start_fact_dto(start: f64, end: f64) -> SampleFactDtoV2 {
+    SampleFactDtoV2 {
+        fact_id: None,
+        recorded_at: epoch(0),
+        payload: SampleFactPayloadDtoV2 {
+            kind: "control".to_owned(),
+            play: None,
+            control: Some(SampleControlFactDtoV2 {
+                kind: "phaseStart".to_owned(),
+                phase_start: Some(SamplePhaseStartPayloadDtoV2 {
+                    kind: "regular".to_owned(),
+                }),
+                stoppage: None,
+                anchor: SampleFactAnchorDtoV2 {
+                    kind: "videoClock".to_owned(),
+                    match_clock: None,
+                    video_clock: Some(SampleVideoClockDtoV2 {
+                        elapsed_seconds: start,
+                    }),
+                    end_match_elapsed_seconds: None,
+                    end_video_elapsed_seconds: Some(end),
+                },
+            }),
+            possession: None,
+        },
+    }
+}
+
+/// 古い版の iOS（「phase N を終了して次へ」が前の phase を終わらせなかった版）が書いた
+/// 試合ファイルも取り込める。前の phase の終わりを次の開始へ寄せてから検証する。
+#[test]
+fn overlapping_video_phases_are_repaired_before_import() {
+    let mut dto = import_dto(vec![
+        video_phase_start_fact_dto(0.0, 1800.0),
+        video_phase_start_fact_dto(195.0, 1995.0),
+    ]);
+    dto.r#match.configuration = serde_json::from_value(serde_json::json!({
+        "kind": "video",
+        "video": { "source": { "provider": "youtube", "externalID": "abc" } }
+    }))
+    .unwrap();
+    let decisions = ImportDecisions {
+        home_team: TeamTarget::CreateNew,
+        away_team: TeamTarget::CreateNew,
+        players: HashMap::new(),
+    };
+
+    let plan = import_commit_plan(&dto, &decisions, sequential_ids()).unwrap();
+
+    let ends: Vec<Option<f64>> = plan
+        .facts
+        .iter()
+        .map(|fact| match &fact.payload {
+            MatchFactPayload::Control(ControlFact::PhaseStart(payload)) => {
+                payload.end_anchor.video_elapsed_seconds()
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(ends, vec![Some(195.0), Some(1995.0)]);
+    assert!(import_commit_batch(plan, &[]).is_ok());
 }

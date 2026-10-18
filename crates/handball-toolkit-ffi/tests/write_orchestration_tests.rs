@@ -17,6 +17,7 @@ use handball_toolkit::entities::{Match, RosterSelection};
 use handball_toolkit::entities::{Player, Team};
 use handball_toolkit::facts::{
     ControlFact, MatchFact, MatchFactPayload, PhaseStartPayload, PlayEventKind, PlayFact,
+    StoppageKind, StoppagePayload,
 };
 use handball_toolkit::ids::{FactId, MatchId, PlayerId, TeamId};
 use handball_toolkit::sample_dto::{
@@ -28,14 +29,16 @@ use handball_toolkit::sample_dto::{
 use handball_toolkit::sample_import::{ImportDecisions, ImportWriteBatch, TeamTarget};
 use handball_toolkit::validation::{
     ConfigurationValidationError, DomainValidationIssue, FactValidationError,
+    TimelineValidationError,
 };
 use handball_toolkit::write::{NewFactStamp, PlayerTeamRef, VideoSyncInput};
 use handball_toolkit_ffi::ffi_write::{
     CoreWriteError, ImportWriteRepository, MatchWriteRepository, TeamWriteRepository,
     commit_sample_match_import, commit_video_migration, count_phase_completion_facts,
     record_append_fact, record_delete_fact, record_delete_player, record_delete_team,
-    record_fact_with_phase_completion, record_replace_video_source, record_save_player,
-    record_save_team, record_update_fact, record_update_match,
+    record_end_phase, record_fact_with_phase_completion, record_repair_phase_overlaps,
+    record_replace_video_source, record_save_player, record_save_team, record_update_fact,
+    record_update_match,
 };
 use uuid::Uuid;
 
@@ -1257,4 +1260,161 @@ fn 空の_external_id_への差し替えは発火せず_validation_failed() {
         other => panic!("ValidationFailed を期待したが {other:?}"),
     }
     assert!(repo.saved_matches().is_empty(), "違反時は発火しない");
+}
+
+// ── 動画モードの phase を終わらせる / 重なりを直す（handball-project#626）──
+
+const SECOND_PHASE_ID: u128 = 12;
+
+fn video_phase(id: u128, start: f64, end: f64) -> MatchFact {
+    fact(
+        id,
+        MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
+            kind: PhaseKind::Regular,
+            start_anchor: FactAnchor::VideoClock(VideoClock {
+                elapsed_seconds: start,
+            }),
+            end_anchor: FactAnchor::VideoClock(VideoClock {
+                elapsed_seconds: end,
+            }),
+        })),
+    )
+}
+
+fn video_goal(id: u128, seconds: f64) -> MatchFact {
+    fact(
+        id,
+        MatchFactPayload::Play(PlayFact {
+            kind: PlayEventKind::Goal,
+            team_id: Some(TeamId(Uuid::from_u128(HOME_ID))),
+            player_id: Some(PlayerId(Uuid::from_u128(SCORER_ID))),
+            related_player_id: None,
+            anchor: FactAnchor::VideoClock(VideoClock {
+                elapsed_seconds: seconds,
+            }),
+            title: None,
+            note: None,
+        }),
+    )
+}
+
+fn video_repo(facts: Vec<MatchFact>) -> Arc<FakeRepo> {
+    Arc::new(FakeRepo::new(facts).with_configuration(MatchConfiguration::Video(poc_video_source())))
+}
+
+fn end_seconds(repo: &FakeRepo, id: u128) -> Option<f64> {
+    repo.fact_log()
+        .into_iter()
+        .find(|fact| fact.id == FactId(Uuid::from_u128(id)))
+        .and_then(|fact| match fact.payload {
+            MatchFactPayload::Control(ControlFact::PhaseStart(payload)) => {
+                payload.end_anchor.video_elapsed_seconds()
+            }
+            _ => None,
+        })
+}
+
+#[test]
+fn phase_の終了は再生位置で終わりを書き換える() {
+    let repo = video_repo(vec![video_phase(PHASE_START_ID, 10.0, 1810.0)]);
+
+    assert_eq!(
+        run(record_end_phase(repo.clone(), match_id(), 1510.0)),
+        Ok(())
+    );
+    assert_eq!(end_seconds(&repo, PHASE_START_ID), Some(1510.0));
+    assert_eq!(repo.fact_log().len(), 1, "次の phase は作らない");
+}
+
+#[test]
+fn 終わりより後ろに記録が残る_phase_の終了は発火しない() {
+    let repo = video_repo(vec![
+        video_phase(PHASE_START_ID, 10.0, 1810.0),
+        video_goal(GOAL_ID, 1600.0),
+    ]);
+
+    match run(record_end_phase(repo.clone(), match_id(), 1510.0)) {
+        Err(CoreWriteError::ValidationFailed { issues }) => {
+            assert!(issues.iter().any(|issue| matches!(
+                issue,
+                DomainValidationIssue::Timeline(
+                    TimelineValidationError::PlayRecordedOutsidePhaseRange { .. }
+                )
+            )));
+        }
+        other => panic!("ValidationFailed を期待したが {other:?}"),
+    }
+    assert_eq!(end_seconds(&repo, PHASE_START_ID), Some(1810.0));
+}
+
+#[test]
+fn phase_の外での終了は発火せず_phase_end_infeasible() {
+    let repo = video_repo(vec![video_phase(PHASE_START_ID, 10.0, 1810.0)]);
+
+    assert!(matches!(
+        run(record_end_phase(repo.clone(), match_id(), 2000.0)),
+        Err(CoreWriteError::PhaseEndInfeasible { .. })
+    ));
+    assert_eq!(end_seconds(&repo, PHASE_START_ID), Some(1810.0));
+}
+
+#[test]
+fn 重なった_phase_は前の終わりを次の開始へ寄せて直す() {
+    let repo = video_repo(vec![
+        video_phase(PHASE_START_ID, 10.0, 1810.0),
+        video_phase(SECOND_PHASE_ID, 205.0, 2005.0),
+        video_goal(GOAL_ID, 219.0),
+    ]);
+
+    assert_eq!(
+        run(record_repair_phase_overlaps(repo.clone(), match_id())),
+        Ok(1)
+    );
+    assert_eq!(end_seconds(&repo, PHASE_START_ID), Some(205.0));
+    assert_eq!(end_seconds(&repo, SECOND_PHASE_ID), Some(2005.0));
+}
+
+#[test]
+fn 重なりが無ければ直さず_0_を返す() {
+    let facts = vec![
+        video_phase(PHASE_START_ID, 10.0, 1810.0),
+        video_phase(SECOND_PHASE_ID, 2400.0, 4200.0),
+    ];
+    let repo = video_repo(facts.clone());
+
+    assert_eq!(
+        run(record_repair_phase_overlaps(repo.clone(), match_id())),
+        Ok(0)
+    );
+    assert_eq!(repo.fact_log(), facts);
+}
+
+#[test]
+fn 直した結果が検証に落ちる試合は_1_件も書き換えない() {
+    // 前半の中で記録した中断が、後半の開始（205）をまたいでいる。
+    let stoppage = fact(
+        GOAL_ID,
+        MatchFactPayload::Control(ControlFact::Stoppage(StoppagePayload {
+            kind: StoppageKind::Timeout,
+            start_anchor: FactAnchor::VideoClock(VideoClock {
+                elapsed_seconds: 150.0,
+            }),
+            end_anchor: Some(FactAnchor::VideoClock(VideoClock {
+                elapsed_seconds: 240.0,
+            })),
+            note: None,
+        })),
+    );
+    let facts = vec![
+        video_phase(PHASE_START_ID, 10.0, 1810.0),
+        stoppage,
+        video_phase(SECOND_PHASE_ID, 205.0, 2005.0),
+    ];
+    let repo = video_repo(facts.clone());
+
+    assert!(matches!(
+        run(record_repair_phase_overlaps(repo.clone(), match_id())),
+        Err(CoreWriteError::ValidationFailed { .. })
+    ));
+    assert_eq!(repo.fact_log(), facts);
 }

@@ -264,6 +264,10 @@ pub enum CoreWriteError {
 10. **migrate commit の検証を保存より前へ（第 4 段の順序の改め）**: 決定 7 の 2026-09-14 追記に基づく — handball-project#388。
    - **コア（Rust）**: `commit_video_migration` のループを検証だけにし（`validate_update` → working ログへ反映）、`save_match` → 計画順の `update_fact` をループの後ろへ移す。テストは `write_orchestration_tests` に 1 件（phase は通り、後ろの goal が roster の参照整合で落ちる入力で、`save_match` を呼ばず fact も書き換わらない）
    - **シェル**: 呼び出しの形は変わらない。doc の「途中失敗は再実行で復旧」を直す
+11. **動画モードの phase を終わらせる入口と、重なった phase の修復**: handball-project#626。
+   - **なぜ要るか**: iOS の「phase N を終了して次へ」は現在位置に次の PhaseStart を足すだけで、前の phase の予測の終わり（開始 + 規定長）を書き換えなかった。予測の終わりまで 2 つの phase が videoClock 上で重なり、`SegmentResolver::segment_for_video_elapsed` が重なった区間の記録を先の phase に割り当てる（後半の得点が前半に入る）。`Video` の連続性は rolling forward で構造的に保証されるとして検証の対象外にしていたが、保証されるのは matchClock の連続性だけだった
+   - **コア（Rust）**: 検証 `PhasesOverlap`（`Video` の videoClock range の重なり。隙間は許す — ハーフタイム）。計画層 `phase_end_plan`（再生位置を含む phase の終わりをそこへ置き直す。次の phase は作らない）と `phase_overlap_repair_plan`（重なった前の phase を次の開始で終わらせる）。入口 `record_end_phase` と `record_repair_phase_overlaps`（結果 log を 1 回で検証し、落ちたら 1 件も書かない）。`Both` の phase は終わりの matchClock を「開始 + running の秒数」で組む。import（`import_commit_plan`）も整列の前に同じ修復を当てる — 古い版が書いた試合ファイルを `PhasesOverlap` で拒否しないため。`CoreWriteError::PhaseEndInfeasible { detail }` を足した
+   - **シェル**: phase の中では「終了」だけを出し、`record_end_phase` を呼ぶ。起動時に全試合へ、同期の後に `record_repair_phase_overlaps` を当てる。`commit_sample_match_import` は従来どおりの入力を受けたうえで中身を直すので、FFI 公開面の挙動変更としてリリースを積む対象
 
 各段は独立して出荷可能な状態を保つ（途中の段で止めても境界は整合する）。
 
