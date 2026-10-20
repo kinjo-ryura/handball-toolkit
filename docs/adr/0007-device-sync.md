@@ -29,6 +29,7 @@ ID を振り直して**別の試合**として取り込むので、送り直す�
 | `reconcile(local, remote, answers, now)` | そろえる。問いがあれば `Questions`、なければ `Merged`（中身と、端末ごとの変化の一覧 — 決定 8） |
 | `materialize(incoming, local)` | 届いた中身を、保存する端末の端末ごとの値で戻す |
 | `encode_sync_payload` / `decode_sync_payload` | 端末の間を運ぶ形 |
+| `select_sync_matches` / `decode_sync_file` | 同じ形を 1 つのファイルにして運ぶ（まとめファイル — 下の「実装追記」。handball-project#669） |
 
 保存は `ffi_write::apply_sync(repo, incoming)`。店の最新の記録を読み直して `materialize` し、
 `SyncWriteRepository::replace_all` で店全体を 1 トランザクションで入れ替える。
@@ -201,6 +202,25 @@ ID を振り直して**別の試合**として取り込むので、送り直す�
   そのチームを外した。運ぶ形と `SYNC_FORMAT_VERSION` は変わらない。テストは `tests/sync_tests.rs` の
   `team_added_with_matches_is_counted_on_the_newest_match_only`・`team_added_by_a_match_update_is_counted_on_that_match`・
   `team_added_without_a_match_stays_a_team_row`
+
+- **まとめファイルを足した（handball-project#669）**。選んだ試合（全試合も）を、同期で運ぶ形（`SyncPayload`）の
+  まま 1 つのファイルにして運び、取り込む端末がファイルを相手とみなして `reconcile` でそろえる（片道 —
+  取り込んだ端末だけが変わる）。用途はバックアップと、近くにいなくて同期できない端末へ送ること。
+  足した関数は 2 つで、比べる規則・問い・一覧・保存（`apply_sync`）は同期と同じものを使う
+  - `select_sync_matches(snapshot, match_ids)` — 全記録から、選んだ試合（消されていないもの）と、その fact
+    （消したものも）・ホームとアウェイ・fact と出場の選択が指す選手のチーム・そのチームの選手（消したものも）を
+    取り出す。**そろえるは「片方に無い」を「消した」とみなさない**（消したことは削除の記録で運ぶ — 決定 2）ので、
+    一部の試合だけのファイルでも取り込める。全試合を送るときは通さず、全記録をそのまま運ぶ（試合に使われて
+    いないチームと削除の記録も入る）
+  - `decode_sync_file(json)` — **今より古い版も読む**（決定 6 の `decode_sync_payload` は版が違えば読まない）。
+    同期は両方が同じ版のときにしか起きないが、ファイルはバックアップとして残り、アプリを更新した後に
+    開かれる。今より新しい版は中身を読まずに `UnsupportedFormatVersion`。**`SYNC_FORMAT_VERSION` を上げる
+    ときは、古い版の形を今の形へ直す道を `decode_sync_file` に足す**。`tests/fixtures/sync-files/` に
+    版ごとのファイルを置き、`tests/sync_file_tests.rs` が読めることを固定する（試合ファイルの
+    `tests/fixtures/shipped/` と同じ考え方。今の v1 は出荷前にテストの記録から書き出したもので、出荷した
+    アプリの実出力ではない）
+  - 選手の写真は運ばない（同期と同じ。`Player.photo` は取り込む端末の値に戻り、その端末に無い選手は写真なし —
+    `materialize`）
 
 ## 再判定の条件
 

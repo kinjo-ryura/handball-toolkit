@@ -23,9 +23,13 @@
 //!
 //! **両方の端末が同じ比較を別々にしない**。比べるのは始めた側だけで、相手はできた中身で店を入れ替える
 //! ので、結果が食い違わない。
+//!
+//! 同じ形を 1 つのファイルにして運ぶこともできる（まとめファイル — `file` モジュール。handball-project#669）。
+//! 取り込む端末が始めた側になり、ファイルを相手とみなして上の 1〜2 を回し、自分の分だけを保存する（片道）。
 
 mod changes;
 mod compare;
+mod file;
 mod materialize;
 mod normalize;
 mod pairing;
@@ -36,6 +40,7 @@ pub use changes::{
     SyncChangeKind, SyncChanges, SyncDeviceChanges, SyncMatchChange, SyncMatchField, SyncTeamChange,
 };
 pub use compare::{fact_content_equal, match_content_equal, player_content_equal};
+pub use file::{SYNC_FILE_OLDEST_FORMAT_VERSION, decode_sync_file, select_sync_matches};
 pub use materialize::{SyncApplyPlan, VideoRelink, materialize};
 pub use payload::{
     SYNC_FORMAT_VERSION, SyncPayload, SyncPayloadError, decode_sync_payload, encode_sync_payload,

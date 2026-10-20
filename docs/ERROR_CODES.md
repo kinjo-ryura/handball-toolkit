@@ -256,10 +256,13 @@ Raised when encoding or decoding the document two devices exchange when they syn
 (`encode_sync_payload` / `decode_sync_payload`). This document is separate from the match
 data above; both devices must use the same `formatVersion`.
 
+The same document saved as a file (`decode_sync_file`) is read even when its `formatVersion`
+is older than this app's; only a newer version is rejected.
+
 | case | fields | meaning |
 |---|---|---|
 | `InvalidJson` | `detail: string` | The JSON does not parse as a sync document. |
-| `UnsupportedFormatVersion` | `found: u32`, `supported: u32` | The other device uses a different format version. If `found` is newer, update this app; if older, update the other device's app. The contents are not read. |
+| `UnsupportedFormatVersion` | `found: u32`, `supported: u32` | The other device (or the file) uses a format version this app cannot read. If `found` is newer, update this app; if older, update the other device's app. The contents are not read. |
 | `EncodeFailed` | `detail: string` | The snapshot could not be written as JSON. A safety net; not expected in practice. |
 
 ## Implementing a wording table

@@ -75,7 +75,7 @@ pub fn decode_sync_payload(json: &str) -> Result<SyncPayload, SyncPayloadError> 
     serde_json::from_str(json).map_err(invalid_json)
 }
 
-fn invalid_json(error: serde_json::Error) -> SyncPayloadError {
+pub(super) fn invalid_json(error: serde_json::Error) -> SyncPayloadError {
     SyncPayloadError::InvalidJson {
         detail: error.to_string(),
     }
