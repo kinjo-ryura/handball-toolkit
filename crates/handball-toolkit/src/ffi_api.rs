@@ -619,3 +619,24 @@ pub fn decode_sync_payload(
 pub fn sync_format_version() -> u32 {
     crate::sync::SYNC_FORMAT_VERSION
 }
+
+// ── まとめファイル（handball-project#669 / ADR 0007 実装追記）──
+//
+// 中身は同期で運ぶ形。取り込みは `sync_reconcile`（ファイルを相手とみなす）→ `apply_sync`。
+
+/// `sync::select_sync_matches` — 全記録から、選んだ試合とそれを読むのに要る記録だけを取り出す。
+#[uniffi::export]
+pub fn sync_select_matches(
+    snapshot: crate::sync::SyncSnapshot,
+    match_ids: Vec<crate::ids::MatchId>,
+) -> crate::sync::SyncSnapshot {
+    crate::sync::select_sync_matches(&snapshot, &match_ids)
+}
+
+/// `sync::decode_sync_file` — まとめファイルの JSON を読む。今より古い版も読み、新しい版は中身を読まない。
+#[uniffi::export]
+pub fn decode_sync_file(
+    json: String,
+) -> Result<crate::sync::SyncPayload, crate::sync::SyncPayloadError> {
+    crate::sync::decode_sync_file(&json)
+}
