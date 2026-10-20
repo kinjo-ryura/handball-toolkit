@@ -22,6 +22,15 @@ pub struct LiveMatchProjection {
     pub current_phase_index: Option<usize>,
     pub timer_state: MatchTimerState,
     pub current_match_clock: Option<MatchClock>,
+    /// 再生位置での試合時計の読み（handball-project#668）。`current_match_clock` と違い
+    /// **phase の外でも値を持つ**。試合時計は phase の外で進まないので、直前に終わった phase の
+    /// 終わりで止まった値を返す（ハーフタイムは前半の終わり = 後半の起点、試合の後は最後の
+    /// phase の終わり）。最初の phase より前は 0。時刻を見せる表示はこちらを読む。
+    ///
+    /// `current_match_clock` を phase の外で `Some` にしなかったのは、「segment の上にいるか」を
+    /// None で表す移植面の契約（ゴールデンの照合対象）を変えないため。再生位置が無いとき・
+    /// `.timer`（時計の現在値はシェルのタイマーが持つ）・`.videoHighlight`（時計が無い）は None。
+    pub match_clock_reading: Option<MatchClock>,
     pub available_actions: AvailableActions,
 }
 
@@ -71,7 +80,7 @@ impl LiveMatchProjection {
     /// 外に落ちる状態も作れず R7 も当たらない。**「今どこを指しているか」で可否が変わらない**のが
     /// video mode との本質的な違いで、引数を足す余地があるように見せないためここで受け取らない。
     ///
-    /// `current_match_clock` は返さない。試合時計の現在値はシェルが自分のタイマーで持っており
+    /// `current_match_clock` / `match_clock_reading` は返さない。試合時計の現在値はシェルが自分のタイマーで持っており
     /// （fact 列からは導けない）、ここで `Some` を返すと表示がそちらへ切り替わってしまう。
     ///
     /// **`can_start_next_phase` は true**。timer mode でも直前 phase の end と連続する PhaseStart を
@@ -83,6 +92,7 @@ impl LiveMatchProjection {
             current_phase_index: None,
             timer_state: MatchTimerState::Playing,
             current_match_clock: None,
+            match_clock_reading: None,
             available_actions: available_actions_for_timer(),
         }
     }
@@ -103,6 +113,7 @@ impl LiveMatchProjection {
             current_phase_index: None,
             timer_state: MatchTimerState::BeforeMatch,
             current_match_clock: None,
+            match_clock_reading: None,
             available_actions: available_actions_for_highlight(),
         }
     }
@@ -139,6 +150,7 @@ impl LiveMatchProjection {
                 current_phase_index: None,
                 timer_state: MatchTimerState::BeforeMatch,
                 current_match_clock: None,
+                match_clock_reading: None,
                 available_actions: available_actions_for(MatchTimerState::BeforeMatch),
             };
         };
@@ -161,6 +173,7 @@ impl LiveMatchProjection {
                 current_phase_index: phase_index,
                 timer_state,
                 current_match_clock: Some(match_clock),
+                match_clock_reading: Some(match_clock),
                 available_actions: available_actions_for(timer_state),
             };
         }
@@ -173,6 +186,7 @@ impl LiveMatchProjection {
             current_phase_index: None,
             timer_state: outside_state,
             current_match_clock: None,
+            match_clock_reading: Some(match_clock_outside_phases(resolver, current_video_clock)),
             available_actions: available_actions_for(outside_state),
         }
     }
@@ -228,6 +242,26 @@ fn position_outside_phases(
         return MatchTimerState::Ended;
     }
     MatchTimerState::BetweenPhases
+}
+
+/// segment に含まれない videoClock での試合時計の読み（handball-project#668）。
+///
+/// 試合時計は phase の外で進まないので、位置より手前で終わった phase のうち最も遅く終わった
+/// ものの matchClock の終わりを返す。phase 境界の秒は前後の phase が共有する（前半 30:00 =
+/// 後半 0:00）ので、ハーフタイムの値は後半の起点とも一致する。手前で終わった phase が
+/// 無ければ（= 試合前）0。
+fn match_clock_outside_phases(
+    resolver: &SegmentResolver,
+    current_video_clock: VideoClock,
+) -> MatchClock {
+    let elapsed_seconds = resolver
+        .phases
+        .iter()
+        .filter_map(|phase| Some((phase.video_elapsed_end?, phase.match_elapsed_end?)))
+        .filter(|(video_end, _)| *video_end <= current_video_clock.elapsed_seconds)
+        .max_by(|a, b| a.0.total_cmp(&b.0))
+        .map_or(0.0, |(_, match_end)| match_end);
+    MatchClock { elapsed_seconds }
 }
 
 // ── actions ──
