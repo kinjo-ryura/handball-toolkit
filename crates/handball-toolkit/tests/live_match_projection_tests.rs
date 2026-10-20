@@ -200,6 +200,107 @@ fn video_after_last_phase_returns_ended() {
     assert!(!live.available_actions.can_record_free_note);
 }
 
+// ── 試合時計の読み（handball-project#668）──
+
+/// phase の外では `current_match_clock` が None のまま、`match_clock_reading` が止まった値を返す。
+///
+/// 動画モードの時刻表示は phase の外で `current_match_clock` を読めず、進まないシェルの値
+/// （0）へ倒れて、試合の後とハーフタイムに「00:00」を出していた（handball-project#668）。
+#[test]
+fn match_clock_reading_holds_outside_phases() {
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
+    let stoppage_id = FactId(Uuid::new_v4());
+    // 前半 video 600-2400（timeout 1200-1260 の 60 秒は進まないので matchClock 0-1740）、
+    // 後半 video 3300-5100（matchClock 1740-3540）
+    let timeline = TimelineProjection::build(
+        &make_video_match(home, away),
+        &[
+            video_only_phase(600.0, 2400.0),
+            video_stoppage(stoppage_id, StoppageKind::Timeout, 1200.0, 1260.0),
+            video_only_phase(3300.0, 5100.0),
+        ],
+    );
+    let cases = [
+        (100.0, MatchTimerState::BeforeMatch, 0.0),
+        (1000.0, MatchTimerState::Playing, 400.0),
+        (1230.0, MatchTimerState::Timeout, 600.0),
+        // 前半の終わりちょうど（半開区間の排他端）から先は前半の終わりで止まる
+        (2400.0, MatchTimerState::BetweenPhases, 1740.0),
+        (3000.0, MatchTimerState::BetweenPhases, 1740.0),
+        (5100.0, MatchTimerState::Ended, 3540.0),
+        (6000.0, MatchTimerState::Ended, 3540.0),
+    ];
+    for (video_seconds, expected_state, expected_reading) in cases {
+        let live = LiveMatchProjection::build_video_mode(
+            &make_video_match(home, away),
+            &timeline,
+            Some(VideoClock {
+                elapsed_seconds: video_seconds,
+            }),
+        );
+        assert_eq!(live.timer_state, expected_state, "video {video_seconds}");
+        assert_eq!(
+            live.match_clock_reading.map(|c| c.elapsed_seconds),
+            Some(expected_reading),
+            "video {video_seconds}"
+        );
+        // segment の上では 2 つが一致し、外では `current_match_clock` だけが None（移植面の契約）
+        let inside = matches!(
+            expected_state,
+            MatchTimerState::Playing | MatchTimerState::Timeout
+        );
+        if inside {
+            assert_eq!(
+                live.current_match_clock, live.match_clock_reading,
+                "video {video_seconds}"
+            );
+        } else {
+            assert_eq!(live.current_match_clock, None, "video {video_seconds}");
+        }
+    }
+}
+
+/// 後半の matchClock の起点は前半の終わりを継ぐ（境界の秒の共有）ので、ハーフタイムの読みは
+/// 後半を始めた位置の読みと一致する。止まった値が次の phase の起点とずれると、ハーフタイムから
+/// 後半へ入った瞬間に表示が跳ぶ。
+#[test]
+fn match_clock_reading_at_half_time_equals_second_half_start() {
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
+    let timeline = TimelineProjection::build(
+        &make_video_match(home, away),
+        &[
+            video_only_phase(0.0, 1800.0),
+            video_only_phase(2700.0, 4500.0),
+        ],
+    );
+    let reading_at = |video_seconds: f64| {
+        LiveMatchProjection::build_video_mode(
+            &make_video_match(home, away),
+            &timeline,
+            Some(VideoClock {
+                elapsed_seconds: video_seconds,
+            }),
+        )
+        .match_clock_reading
+        .map(|c| c.elapsed_seconds)
+    };
+    assert_eq!(reading_at(2000.0), Some(1800.0));
+    assert_eq!(reading_at(2700.0), reading_at(2000.0));
+}
+
+/// 再生位置が無ければ読みも無い（「試合前の 0」とは区別する）。
+#[test]
+fn match_clock_reading_is_none_without_video_position() {
+    let (home, away) = (TeamId(Uuid::new_v4()), TeamId(Uuid::new_v4()));
+    let timeline = TimelineProjection::build(
+        &make_video_match(home, away),
+        &[video_only_phase(0.0, 1800.0)],
+    );
+    let live =
+        LiveMatchProjection::build_video_mode(&make_video_match(home, away), &timeline, None);
+    assert_eq!(live.match_clock_reading, None);
+}
+
 // ── play fact 3 種の可否は常に同値 ──
 
 /// goal / shotMissed / freeNote の可否は全状態で同値で、`Playing` でのみ true。
@@ -478,7 +579,7 @@ fn timer_and_highlight_derive_recording_flags_from_playing() {
 
 /// 位置を入力に取らないので、呼ぶたびに同じ値を返す。
 ///
-/// **`current_match_clock` は返さない**（試合時計の現在値はシェルが自分のタイマーで持っており
+/// **`current_match_clock` / `match_clock_reading` は返さない**（試合時計の現在値はシェルが自分のタイマーで持っており
 /// fact 列からは導けない）。ここを `Some` にすると、消費側の時刻表示が自前のタイマーから
 /// コアの値へ黙って切り替わる。
 #[test]
@@ -495,6 +596,7 @@ fn timer_and_highlight_projections_are_position_independent() {
     let timer = LiveMatchProjection::build_timer_mode();
     assert_eq!(timer.timer_state, MatchTimerState::Playing);
     assert_eq!(timer.current_match_clock, None);
+    assert_eq!(timer.match_clock_reading, None);
     assert_eq!(timer.current_phase_kind, None);
     assert_eq!(timer.current_phase_index, None);
 
@@ -504,6 +606,8 @@ fn timer_and_highlight_projections_are_position_independent() {
     let highlight = LiveMatchProjection::build_highlight_mode();
     assert_eq!(highlight.timer_state, MatchTimerState::BeforeMatch);
     assert_eq!(highlight.current_match_clock, None);
+    // ハイライト集には時計が無いので、phase が無い log の `build_video_mode`（試合前の 0）とは揃えない
+    assert_eq!(highlight.match_clock_reading, None);
     assert_eq!(highlight.current_phase_kind, None);
     assert_eq!(highlight.current_phase_index, None);
 
