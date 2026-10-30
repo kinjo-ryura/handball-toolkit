@@ -66,7 +66,7 @@ handball-toolkit 0.22.0 の配布物（iOS / macOS の staticlib・Android の `
 | uniffi_macros | 0.32.2 | [MPL-2.0](#license-20) | [ソース](https://crates.io/crates/uniffi_macros/0.32.2) |
 | uniffi_meta | 0.32.2 | [MPL-2.0](#license-20) | [ソース](https://crates.io/crates/uniffi_meta/0.32.2) |
 | uniffi_pipeline | 0.32.2 | [MPL-2.0](#license-20) | [ソース](https://crates.io/crates/uniffi_pipeline/0.32.2) |
-| uuid | 1.28.0 | [MIT](#license-18) | [ソース](https://crates.io/crates/uuid/1.28.0) |
+| uuid | 1.29.0 | [MIT](#license-18) | [ソース](https://crates.io/crates/uuid/1.29.0) |
 | wasm-bindgen | 0.2.121 | [MIT](#license-4) | [ソース](https://crates.io/crates/wasm-bindgen/0.2.121) |
 | wasm-bindgen-macro | 0.2.121 | [MIT](#license-4) | [ソース](https://crates.io/crates/wasm-bindgen-macro/0.2.121) |
 | wasm-bindgen-macro-support | 0.2.121 | [MIT](#license-4) | [ソース](https://crates.io/crates/wasm-bindgen-macro-support/0.2.121) |
@@ -630,7 +630,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### <a id="license-18"></a>MIT License（MIT）
 
-適用: uuid 1.28.0
+適用: uuid 1.29.0
 
 ```
 Copyright (c) 2014 The Rust Project Developers
