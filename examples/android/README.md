@@ -76,8 +76,8 @@ AGP / Gradle / KSP / Room の組み合わせ、`.aar` の API とサンプルの
 |---|---|---|
 | Gradle | 9.7.1 | flake の `pkgs.gradle_9`（無印の `pkgs.gradle` は 8.x のまま） |
 | AGP | 9.5.0 | Gradle 9.6.0+ を要求。Kotlin は AGP の built-in Kotlin がコンパイルするので、`org.jetbrains.kotlin.android` は app に apply しない |
-| Kotlin | 2.4.20 | ルートの `build.gradle.kts` に `apply false` で宣言して版を決める（AGP 9.x が既定で引くのは 2.2.10） |
-| KSP | 2.3.12 | 2.3 系から Kotlin と版が連動しない。AGP 9 の built-in Kotlin には 2.3.1 以上が要る |
+| Kotlin | 2.4.21 | ルートの `build.gradle.kts` に `apply false` で宣言して版を決める（AGP 9.x が既定で引くのは 2.2.10） |
+| KSP | 2.3.13 | 2.3 系から Kotlin と版が連動しない。AGP 9 の built-in Kotlin には 2.3.1 以上が要る |
 | Room | 2.8.5 | |
 | handball-toolkit | 0.22.1 | `app/libs/handball-toolkit-0.22.1.aar`。コア crate の version に従う（ずれると CI が落ちる — 下記） |
 | JNA | 5.19.1（`@aar`） | 生成コードが `Native.register` で使う。**`.aar` は依存情報を運ばない**ので利用側で宣言する |
