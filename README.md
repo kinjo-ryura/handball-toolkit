@@ -120,11 +120,13 @@ dependencies {
 
     // .aar ファイル単体は依存情報を運ばない（運ぶのは Maven の POM）ので、
     // この 2 つは利用側で宣言する。生成コードが Native.register で .so を dlopen する
-    // のに JNA、suspend 関数に coroutines を使う。
-    implementation("net.java.dev.jna:jna:5.19.1@aar")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    // のに JNA、suspend 関数に coroutines を使う。<版> は下の段落を参照。
+    implementation("net.java.dev.jna:jna:<版>@aar")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:<版>")
 }
 ```
+
+**`<版>` には [`android/toolkit/build.gradle.kts`](android/toolkit/build.gradle.kts) の `api("net.java.dev.jna:jna:…@aar")` と `api("org.jetbrains.kotlinx:kotlinx-coroutines-android:…")` の行の版を写す**（`.aar` をビルドしたときの版。ダウンロードした `.aar` に合わせるなら、その Release のタグの同じファイルを見る）。この README に版を書かないのは、版を上げるのが Dependabot で、上げるのはビルド定義だけだから — README に写した版は上げるたびに古くなる。README に今の版を書くと CI（`scripts/check_readme_versions.py`）が落とす（handball-project#786）。
 
 `.aar` の中身は「生成 Kotlin + シム + 文言リソース + `arm64-v8a` の `.so` + consumer ProGuard ルール」。
 
@@ -171,7 +173,8 @@ android {
     compileOptions { isCoreLibraryDesugaringEnabled = true }
 }
 dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    // <版> は android/toolkit/build.gradle.kts の coreLibraryDesugaring(...) の行と同じにする。
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:<版>")
 }
 ```
 

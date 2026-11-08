@@ -56,7 +56,7 @@ Kotlin バインディングは専用の workspace member を持たない。生�
 - **NDK clang を PATH に出さないこと**: ホストリンクは Xcode CLT の `/usr/bin/cc` に任せる。クロスリンカはフルパスで名指しする
 - **エラー型のフィールドに `message` という名前を使わないこと**: Kotlin backend の error 型が `Throwable.message` と衝突してコンパイルできない（Swift では露見しない。診断文字列は `detail` に統一。2026-07-30 / handball-project#133 で `CoreWriteError` の 3 variant と `SampleDtoError::InvalidJson` を改名して解消した）
 - **consumer ProGuard ルールを消さないこと**（`android/toolkit/consumer-rules.pro`）: JNA は reflection で引くため、消費側が R8 で minify すると壊れる。サンプルは minify しないので**サンプルでは露見しない**
-- **依存を増減したら 3 箇所を揃える**（`android/toolkit/build.gradle.kts` / README / `examples/android/app/build.gradle.kts`）。`.aar` 単体は依存情報を運ばないので、JNA と kotlinx-coroutines は利用側が自分で宣言する
+- **依存を増減したら 3 箇所を揃える**（`android/toolkit/build.gradle.kts` / README / `examples/android/app/build.gradle.kts`）。`.aar` 単体は依存情報を運ばないので、JNA と kotlinx-coroutines は利用側が自分で宣言する。**README の例には座標だけを書き、版は `<版>` にしてビルド定義の行を指す**（版を上げても README は直さない。今の版を書くと CI の `scripts/check_readme_versions.py --root android` が落とす — handball-project#786）
 - **validation / write の case を増やしたら文言を 2 ロケール分足すこと**（`src/main/res/values/` と `values-ja/`）。`values-ja` の漏れはコンパイラに見えない。`DomainValidationMessagesTest`（CI でも走る）が文言 2 ロケールと `docs/ERROR_CODES.md` の表の 3 箇所が揃うまで赤くする
 - **シムに探索やドメイン規則を書かないこと**: 許可されるのは「self のみ / ループ・再帰・探索なし / ドメイン規則を含まない」の 3 条件を満たすものだけ（ADR 0004 決定 4）。半開区間・優先順位・丸め・閾値に触れる計算はコアに置く
 

@@ -85,7 +85,8 @@ dependencies {
     // **GitHub Release 配布では、この 2 行は利用者側にも必要**（ADR 0006 実装追記
     // 2026-08-02）。.aar ファイル単体は依存情報を運ばない — 運ぶのは Maven の POM で、
     // Release に置いた .aar を implementation(files(...)) で参照する形では POM が
-    // 介在しないため。README の Android 節に利用者向けのコピペ用として載せてある。
+    // 介在しないため。README の Android 節に利用者向けの例として載せてある（版は書かずに
+    // この 2 行を指す。Dependabot がここを上げても README は直さなくてよい — handball-project#786）。
     // ここでの api 宣言はライブラリ自身のコンパイルに効き、将来 Maven publish へ
     // 格上げしたときはそのまま POM の compile scope に出る。
     api("net.java.dev.jna:jna:5.19.1@aar")
