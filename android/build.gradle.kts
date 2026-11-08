@@ -1,8 +1,8 @@
 // ルートビルドスクリプト。プラグイン版は toolkit モジュール側で適用する。
 //
 // AGP / Kotlin / KSP のバージョンは examples/android と揃える（同じ Gradle = flake の
-// pkgs.gradle_9 で動かすため）。上げるときは examples/android/build.gradle.kts と
-// examples/android/README.md「バージョンの対応関係」も同時に直すこと。
+// pkgs.gradle_9 で動かすため）。上げるときは examples/android/build.gradle.kts も同時に直すこと
+// （examples/android/README.md には版を書かないので直さなくてよい。handball-project#783）。
 plugins {
     id("com.android.library") version "9.5.0" apply false
     // AGP 9 からは Kotlin のコンパイルを AGP 自身が受け持つ（built-in Kotlin。

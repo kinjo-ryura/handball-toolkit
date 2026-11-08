@@ -121,6 +121,16 @@ jobs:
         if: steps.scope.outputs.docs_only == 'true'
         run: echo "変更は .md / LICENSE / docs/ だけ。以降のステップは skip（判定は上の scope）"
 
+      # サンプルの README とビルド定義のコメントに依存の版を写していないかを見る（handball-project#783）。
+      # 版を上げるのは Dependabot で、書き換えるのはビルド定義だけなので、写した版は上げるたびに
+      # 古いまま残る（表の取り残しが 3 回続いた）。版を書いた PR をその場で止める。
+      #
+      # **docs_only でも回す。** 版を書き込むのは README だけの PR（= docs_only）なので、飛ばすと
+      # 肝心の回を見逃す。Nix も SDK も要らず数秒で終わる（ランナー同梱の python3 で動く）ので、
+      # README を上の scope の除外に足してビルドまで走らせるより安い。
+      - name: サンプルの README に依存の版が書かれていないか
+        run: python3 scripts/check_readme_versions.py --root examples/android examples/android/README.md
+
       # Nix を単一ユーザーモードで /nix に直接入れる（約 5 秒）。cachix/install-nix-action の
       # マルチユーザー（daemon）方式より速く、下の cache-nix-action が /nix を丸ごと復元
       # できる形になる。flakes は既定で有効。GitHub からの取得には GITHUB_TOKEN を使う。
