@@ -45,8 +45,10 @@ UI は plain View、エラー表示は素の文字列、依存は最小に絞っ
 [Releases](https://github.com/kinjo-ryura/handball-toolkit/releases) から落とす:
 
 ```sh
+# 版は app/build.gradle.kts の files("libs/handball-toolkit-<版>.aar") から読む
+ver=$(sed -n 's/.*files("libs\/handball-toolkit-\(.*\)\.aar").*/\1/p' app/build.gradle.kts)
 mkdir -p app/libs
-gh release download v0.22.1 --pattern '*.aar' --dir app/libs
+gh release download "v$ver" --pattern '*.aar' --dir app/libs
 ```
 
 ```sh
@@ -59,7 +61,8 @@ adb shell am start -n com.example.handballshell/.MainActivity
 
 ```sh
 ./scripts/build_aar.sh                                              # リポジトリルートから
-cp target/aar/handball-toolkit-0.22.1.aar examples/android/app/libs/
+ver=$(sed -n 's/^val toolkitVersion = "\(.*\)"$/\1/p' android/toolkit/build.gradle.kts)
+cp "target/aar/handball-toolkit-$ver.aar" examples/android/app/libs/
 ```
 
 `app/libs/` と `local.properties` はコミットしない。
@@ -72,17 +75,24 @@ AGP / Gradle / KSP / Room の組み合わせ、`.aar` の API とサンプルの
 
 ### バージョンの対応関係
 
-| | バージョン | 備考 |
+**この表には依存の版を書かない。** 版を持つのはビルド定義（と flake.lock）だけで、表は「どこで決まるか」と
+「なぜ」を書く。依存を上げるのは Dependabot で、書き換えるのはビルド定義だけなので、表に版を写していたころは
+上げるたびに表が古いまま残った（handball-project#783）。この README とビルド定義のコメントに今の依存の版を書くと、
+CI の `scripts/check_readme_versions.py` が落とす（手元ではリポジトリルートから
+`python3 scripts/check_readme_versions.py --root examples/android examples/android/README.md`）。
+SDK のレベル（compileSdk / targetSdk / minSdk / build-tools）は Dependabot が上げないので、ここに書く（検査も見ない）。
+
+| | どこで決まるか | 備考 |
 |---|---|---|
-| Gradle | 9.7.1 | flake の `pkgs.gradle_9`（無印の `pkgs.gradle` は 8.x のまま） |
-| AGP | 9.5.0 | Gradle 9.6.0+ を要求。Kotlin は AGP の built-in Kotlin がコンパイルするので、`org.jetbrains.kotlin.android` は app に apply しない |
-| Kotlin | 2.4.21 | ルートの `build.gradle.kts` に `apply false` で宣言して版を決める（AGP 9.x が既定で引くのは 2.2.10） |
-| KSP | 2.3.13 | 2.3 系から Kotlin と版が連動しない。AGP 9 の built-in Kotlin には 2.3.1 以上が要る |
-| Room | 2.8.5 | |
-| handball-toolkit | 0.22.1 | `app/libs/handball-toolkit-0.22.1.aar`。コア crate の version に従う（ずれると CI が落ちる — 下記） |
-| JNA | 5.19.1（`@aar`） | 生成コードが `Native.register` で使う。**`.aar` は依存情報を運ばない**ので利用側で宣言する |
-| compileSdk / targetSdk | 36 | `buildToolsVersion = "37.0.0"` を明示（nix の SDK には 1 つしか無い） |
-| minSdk | **24** | 下記参照 |
+| Gradle | flake の `pkgs.gradle_9`。版は `flake.lock` の nixpkgs が決める（wrapper は置いていない） | 無印の `pkgs.gradle` は 8.x のまま。AGP ごとに要求する Gradle の最低版がある（AGP のリリースノート）。検査は flake を評価しないので、ここは見ていない |
+| AGP | `build.gradle.kts` の `com.android.application` | Kotlin は AGP の built-in Kotlin がコンパイルするので、`org.jetbrains.kotlin.android` は app に apply しない |
+| Kotlin | `build.gradle.kts` の `org.jetbrains.kotlin.android` | ルートに `apply false` で宣言して版を決める（AGP が既定で引く KGP はこれより古い） |
+| KSP | `build.gradle.kts` の `com.google.devtools.ksp` | 2.3 系から Kotlin と版が連動しない。AGP 9 の built-in Kotlin には 2.3.1 以上が要る |
+| Room | `app/build.gradle.kts` | |
+| handball-toolkit | `app/build.gradle.kts` の `files("libs/handball-toolkit-<版>.aar")` | コア crate の version に従う（ずれると CI が落ちる — 上の段落） |
+| JNA | `app/build.gradle.kts`（`@aar`） | 生成コードが `Native.register` で使う。**`.aar` は依存情報を運ばない**ので利用側で宣言する |
+| compileSdk / targetSdk | `app/build.gradle.kts`（36） | `buildToolsVersion = "37.0.0"` を明示（nix の SDK には 1 つしか無い） |
+| minSdk | `app/build.gradle.kts`（**24**） | 下記参照 |
 
 ## Android シェルを書く人向けの注意点
 

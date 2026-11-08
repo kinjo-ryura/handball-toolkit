@@ -67,6 +67,7 @@ Room + 3 trait の 15 メソッド + 最小 UI の参照実装。**公開でき�
 **このサンプルは配布された `.aar` を `app/libs/` から参照する**（外部利用者と同じ経路）。コアを直したら `./scripts/build_aar.sh` の出力を `examples/android/app/libs/` へコピーする。
 
 - **版を切ったら `examples/android/app/build.gradle.kts` の `.aar` の参照も直す**。CI がいまのソースから組んだ `.aar` を `handball-toolkit-<toolkitVersion>.aar` の名前で置いてサンプルを `assembleDebug` するので、直し忘れると落ちる（CI がサンプルをビルドしていなかった間に 0.2.0 のまま 0.11.0 まで取り残された — handball-project#412）
+- **`examples/android/README.md` に依存の版を書かない**。表は「どこで決まるか」だけを持ち、版はビルド定義が持つ。Dependabot はビルド定義しか上げないので、写した版は上げるたびに古くなる（表の取り残しが 3 回続いた — handball-project#783）。README とビルド定義のコメントに今の版を書くと、CI の `scripts/check_readme_versions.py` が落とす（docs だけの PR でも回る）。同じスクリプトが handball-recorder-android にもあるので、直すときは揃える
 - **AGP 9 の built-in Kotlin を使う**。`org.jetbrains.kotlin.android` はルートで `apply false` にして Kotlin の版を決めるためだけに置き、モジュールには apply しない（apply すると AGP がエラーにする）。`android/` も同じ
 
 ### 設計不変条件（コアに入れてよいもの / いけないもの）
