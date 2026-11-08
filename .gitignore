@@ -3,3 +3,6 @@
 
 # ローカル実行専用の拡張ゴールデン（.timer コーパス — ADR 0003 §1。コミットしない）
 /crates/handball-toolkit/tests/golden/local/
+
+# Claude Code の手元の許可（「Don't ask again」の行き先）。許可したコマンドごと鍵やパスワードが入るのでコミットしない
+**/.claude/settings.local.json
