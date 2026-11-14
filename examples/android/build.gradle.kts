@@ -5,7 +5,7 @@
 // 版の数字を写さないこと（Dependabot は宣言の行しか上げないので、写した版は古いまま残る。
 // CI の scripts/check_readme_versions.py が落とす。handball-project#783）。
 plugins {
-    id("com.android.application") version "9.5.0" apply false
+    id("com.android.application") version "9.5.1" apply false
     // AGP 9 の built-in Kotlin が Kotlin をコンパイルするので、app では apply しない
     // （apply すると AGP がエラーにする）。ここは Kotlin Gradle Plugin の版を決めるためだけに
     // 置いている — 理由は android/build.gradle.kts と同じ（handball-project#412）。
