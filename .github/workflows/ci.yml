@@ -337,8 +337,9 @@ jobs:
       # 落ちたときに疑うところ:
       #   - advisory の ID が名指しで出る。直せる版があれば `cargo update -p <crate>`。
       #     無いなら deny.toml の `[advisories] ignore` に **理由つき**で足す（期限も書く）
-      #   - `unmaintained` は warn のまま（落とさない）。メンテ停止は脆弱性ではなく、
-      #     uniffi 一式のような選択肢の無い依存で赤くなり続けると検査が無視されるため
+      #   - `unmaintained`（メンテ停止）は workspace の crate が直接使う依存のものだけ落ちる。
+      #     推移的な依存では落とさない — uniffi 一式の下のような選択肢の無い依存で赤くなり
+      #     続けると検査が無視されるため。直接の依存なら乗り換えを Issue にしてから ignore に足す
       - name: 依存の既知脆弱性と取得元（cargo-deny）
         if: steps.scope.outputs.docs_only != 'true'
         run: nix develop --command cargo deny check advisories sources

@@ -9,12 +9,16 @@
 # 既知脆弱性は error（既定）。yanked された版が Cargo.lock に残っているのも落とす —
 # yank は「使うな」の意思表示で、advisory が後から付くことが多い。
 yanked = "deny"
-# メンテ停止の告知は warn に留める（CI は落とさない）。脆弱性ではなく、uniffi 一式の
-# ように代替の無い依存で赤くなり続けると検査そのものが無視されるため。
+# メンテ停止の告知は、workspace の crate が直接使う依存のものだけ落とす（推移的な
+# 依存では落とさない）。直接の依存は乗り換え先を選べるので気づきたいが、uniffi 一式の
+# 下にあるような推移的な依存は選べず、赤くなり続けると検査そのものが無視されるため。
+# 直接の依存で出たら、乗り換えを Issue にしてから下の ignore に期限つきで足す。
 unmaintained = "workspace"
 # 例外を置くときは ID・理由・見直し期限を並べて書く。
-#   { id = "RUSTSEC-0000-0000", reason = "…（2026-12 に再確認）" },
-ignore = []
+ignore = [
+  # chrono（コア・cli・ffi が直接使う）。直せる版は無く、今ある脆弱性でもない。
+  { id = "RUSTSEC-2026-0543", reason = "chrono のメンテ停止。jiff / time への乗り換えは handball-project#838（2027-02 に再確認）" },
+]
 
 [sources]
 # 取得元は crates.io だけ。git 依存や別レジストリが Cargo.lock に現れたら落とす
