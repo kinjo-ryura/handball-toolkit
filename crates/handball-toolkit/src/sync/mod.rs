@@ -49,7 +49,7 @@ pub use reconcile::{SyncDuplicateGroup, SyncReconcileResult, reconcile};
 
 use std::collections::HashMap;
 
-use chrono::{DateTime, Utc};
+use crate::timestamp::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::entities::{Match, Player, Team};
@@ -66,9 +66,12 @@ use crate::ids::{FactId, MatchId, PlayerId, TeamId};
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[serde(rename_all = "camelCase")]
 pub struct SyncStamp {
-    pub updated_at: DateTime<Utc>,
+    #[serde(with = "crate::timestamp::rfc3339")]
+    pub updated_at: Timestamp,
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
-    pub deleted_at: Option<DateTime<Utc>>,
+    // `with` を付けると欠けた項目を None と読まなくなるので `default` を添える。
+    #[serde(default, with = "crate::timestamp::rfc3339_opt")]
+    pub deleted_at: Option<Timestamp>,
 }
 
 impl SyncStamp {
@@ -77,7 +80,7 @@ impl SyncStamp {
     }
 
     /// `now` に書き直した、消されていない版。
-    pub(crate) fn alive_now(now: DateTime<Utc>) -> SyncStamp {
+    pub(crate) fn alive_now(now: Timestamp) -> SyncStamp {
         SyncStamp {
             updated_at: now,
             deleted_at: None,
@@ -85,7 +88,7 @@ impl SyncStamp {
     }
 
     /// `now` に消した版。
-    pub(crate) fn deleted_now(now: DateTime<Utc>) -> SyncStamp {
+    pub(crate) fn deleted_now(now: Timestamp) -> SyncStamp {
         SyncStamp {
             updated_at: now,
             deleted_at: Some(now),

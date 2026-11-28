@@ -45,7 +45,7 @@ fn sync(id: u128, start: Option<f64>, end: Option<f64>) -> VideoSyncDraftInput {
 fn phase_start(id: u128, start_anchor: FactAnchor, end_anchor: FactAnchor) -> MatchFact {
     MatchFact {
         id: FactId(Uuid::from_u128(id)),
-        recorded_at: chrono::DateTime::from_timestamp(1, 0).expect("固定秒は有効"),
+        recorded_at: handball_toolkit::timestamp::Timestamp::new(1, 0).expect("固定秒は有効"),
         payload: MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
             kind: PhaseKind::Regular,
             start_anchor,
@@ -57,7 +57,7 @@ fn phase_start(id: u128, start_anchor: FactAnchor, end_anchor: FactAnchor) -> Ma
 fn goal(id: u128, anchor: FactAnchor) -> MatchFact {
     MatchFact {
         id: FactId(Uuid::from_u128(id)),
-        recorded_at: chrono::DateTime::from_timestamp(10, 0).expect("固定秒は有効"),
+        recorded_at: handball_toolkit::timestamp::Timestamp::new(10, 0).expect("固定秒は有効"),
         payload: MatchFactPayload::Play(PlayFact {
             kind: PlayEventKind::Goal,
             team_id: None,

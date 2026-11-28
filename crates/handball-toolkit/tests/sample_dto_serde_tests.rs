@@ -4,11 +4,11 @@
 //! Rust では明示 rename（`factID` / `externalID`）・明示 null 耐性・RFC 3339 日時が
 //! 手書き属性なので、`SAMPLE_DTO_V2.md` の JSON 例と実配信コーパスの断片で固定する。
 
-use chrono::{DateTime, Utc};
 use handball_toolkit::sample_dto::{
     SampleFactDtoV2, SampleGeneratorDtoV2, SampleMatchConfigurationDtoV2, SampleMatchDtoV2,
     SampleVideoSourceDtoV2, encode_sample_match,
 };
+use handball_toolkit::timestamp::Timestamp;
 use uuid::Uuid;
 
 // ── configuration tagged union（SAMPLE_DTO_V2.md の JSON 例） ──
@@ -80,7 +80,7 @@ fn decodes_corpus_style_play_fact_with_explicit_nulls() {
     );
     assert_eq!(
         dto.recorded_at,
-        "2025-12-20T00:00:48Z".parse::<DateTime<Utc>>().unwrap()
+        "2025-12-20T00:00:48Z".parse::<Timestamp>().unwrap()
     );
     assert_eq!(dto.payload.kind, "play");
     assert!(dto.payload.control.is_none());

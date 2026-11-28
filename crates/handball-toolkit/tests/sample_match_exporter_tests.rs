@@ -11,7 +11,6 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, Utc};
 use handball_toolkit::clock::{FactAnchor, MatchClock, VideoClock};
 use handball_toolkit::configuration::{MatchConfiguration, PhaseKind, VideoProvider, VideoSource};
 use handball_toolkit::entities::{Match, Player, RosterSelection, Team};
@@ -24,14 +23,15 @@ use handball_toolkit::sample_dto::{
     SampleMatchConversionResult, SampleMatchDtoV2, convert, default_slug, encode_sample_match,
     export_match, required_id_count,
 };
+use handball_toolkit::timestamp::Timestamp;
 use uuid::Uuid;
 
 fn u(s: &str) -> Uuid {
     Uuid::parse_str(s).unwrap()
 }
 
-fn ts(secs: i64, nanos: u32) -> DateTime<Utc> {
-    DateTime::from_timestamp(secs, nanos).unwrap()
+fn ts(secs: i64, nanos: i32) -> Timestamp {
+    Timestamp::new(secs, nanos).unwrap()
 }
 
 // ── 決定的試合（fixture 生成側の main.swift と 1:1 対応） ──
@@ -72,7 +72,7 @@ fn player(id: &str, team_id: TeamId, name: &str, jersey_number: Option<i64>) -> 
     }
 }
 
-fn fact(n: u32, secs: i64, nanos: u32, payload: MatchFactPayload) -> MatchFact {
+fn fact(n: u32, secs: i64, nanos: i32, payload: MatchFactPayload) -> MatchFact {
     MatchFact {
         id: FactId(u(&format!("fac00000-0000-0000-0000-{n:012}"))),
         recorded_at: ts(secs, nanos),

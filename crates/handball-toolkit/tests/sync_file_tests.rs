@@ -14,7 +14,6 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
-use chrono::{DateTime, TimeDelta, Utc};
 use handball_toolkit::configuration::{MatchConfiguration, VideoProvider, VideoSource};
 use handball_toolkit::entities::{Match, Player, Team};
 use handball_toolkit::facts::{MatchFact, MatchFactPayload, PlayEventKind};
@@ -24,6 +23,8 @@ use handball_toolkit::sync::{
     SyncPlayer, SyncReconcileResult, SyncSnapshot, SyncStamp, SyncTeam, decode_sync_file,
     encode_sync_payload, reconcile, select_sync_matches,
 };
+use handball_toolkit::timestamp::Timestamp;
+use jiff::SignedDuration;
 use uuid::Uuid;
 
 use fixtures::{epoch, make_timer_match, make_video_match, play_at_match, timer_phase};
@@ -324,7 +325,7 @@ impl Device {
     }
 }
 
-fn phase(id: FactId, recorded_at: DateTime<Utc>) -> MatchFact {
+fn phase(id: FactId, recorded_at: Timestamp) -> MatchFact {
     let mut fact = timer_phase(id, 0.0, 1800.0);
     fact.recorded_at = recorded_at;
     fact
@@ -408,12 +409,12 @@ fn player_ids(snapshot: &SyncSnapshot) -> BTreeSet<PlayerId> {
     snapshot.players.iter().map(|p| p.player.id).collect()
 }
 
-fn at(secs: i64) -> DateTime<Utc> {
-    epoch() + TimeDelta::seconds(secs)
+fn at(secs: i64) -> Timestamp {
+    epoch() + SignedDuration::from_secs(secs)
 }
 
-fn at_ms(millis: i64) -> DateTime<Utc> {
-    epoch() + TimeDelta::milliseconds(millis)
+fn at_ms(millis: i64) -> Timestamp {
+    epoch() + SignedDuration::from_millis(millis)
 }
 
 fn alive(secs: i64) -> SyncStamp {

@@ -4,7 +4,6 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
-use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -17,6 +16,7 @@ use handball_toolkit::sample_dto::{
     SampleHighlightIndexDtoV2, SampleIndexDtoV2, SampleMatchDtoV2, SampleMatchSummaryV2,
     SampleTableV2, convert,
 };
+use handball_toolkit::timestamp::{self, Timestamp};
 use handball_toolkit::validation::DomainValidationIssue;
 use handball_toolkit::validators::{
     RosterContext, validate_configuration, validate_fact_log, validate_match, validate_match_fact,
@@ -333,6 +333,13 @@ pub fn validate_competition_index_dto(
     }
 }
 
+/// finding の params に載せる日時。`+00:00` 表記は chrono の `to_rfc3339()` を使っていた頃の
+/// 出力の形（handball-project#838 で jiff へ乗り換えても変えない）。
+pub(crate) fn to_rfc3339_offset(at: Timestamp) -> String {
+    let utc = timestamp::to_rfc3339(at);
+    format!("{}+00:00", utc.strip_suffix('Z').unwrap_or(&utc))
+}
+
 /// 大会・部門の id が一覧ファイルの名前に使えるか（slug と同じ字種で、`index` は名簿の予約）。
 pub(crate) fn is_safe_competition_id(id: &str) -> bool {
     is_safe_slug(id) && id != "index"
@@ -342,7 +349,7 @@ pub(crate) fn is_safe_competition_id(id: &str) -> bool {
 /// 不変条件は同じ（SCHEMA.md）ので、ここに落として検査を共有する。
 struct IndexEntry<'a> {
     slug: &'a str,
-    date: DateTime<Utc>,
+    date: Timestamp,
     /// 節 / 回戦のラベル（大会の一覧だけ。handball-project#567）。
     round: Option<&'a str>,
 }
@@ -525,9 +532,9 @@ fn check_date_descending(label: &str, entries: &[IndexEntry<'_>], report: &mut R
                     "indexNotDateDescending",
                     json!({
                         "previousSlug": previous.slug,
-                        "previousDate": previous.date.to_rfc3339(),
+                        "previousDate": to_rfc3339_offset(previous.date),
                         "slug": entry.slug,
-                        "date": entry.date.to_rfc3339(),
+                        "date": to_rfc3339_offset(entry.date),
                     }),
                 ),
             ));
@@ -544,7 +551,7 @@ fn check_date_descending(label: &str, entries: &[IndexEntry<'_>], report: &mut R
 /// 日中で、UTC でも同じ日に収まる。
 fn check_slug_date_prefix(label: &str, entries: &[IndexEntry<'_>], report: &mut RunReport) {
     for IndexEntry { slug, date, .. } in entries {
-        let expected = date.format("%Y-%m-%d").to_string();
+        let expected = timestamp::to_utc_date(*date);
         // 先頭 10 バイト。日付以外の文字が来る / 短すぎる slug は None になり、
         // 「先頭が日付になっていない」も同じ違反として報告する。
         let found = slug.get(..10);

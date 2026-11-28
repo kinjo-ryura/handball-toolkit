@@ -1,6 +1,6 @@
 //! 移植元: `Facts/MatchFact.swift`。
 
-use chrono::{DateTime, Utc};
+use crate::timestamp::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::clock::FactAnchor;
@@ -25,7 +25,8 @@ pub enum MatchFactPayload {
 #[serde(rename_all = "camelCase")]
 pub struct MatchFact {
     pub id: FactId,
-    pub recorded_at: DateTime<Utc>,
+    #[serde(with = "crate::timestamp::rfc3339")]
+    pub recorded_at: Timestamp,
     pub payload: MatchFactPayload,
 }
 

@@ -14,7 +14,6 @@
 
 mod fixtures;
 
-use chrono::{DateTime, TimeDelta, Utc};
 use handball_toolkit::configuration::{MatchConfiguration, VideoProvider, VideoSource};
 use handball_toolkit::entities::{Match, Player, PlayerPhoto, Team};
 use handball_toolkit::facts::{MatchFact, MatchFactPayload, PlayEventKind};
@@ -26,6 +25,8 @@ use handball_toolkit::sync::{
     SyncRecordRef, SyncSide, SyncSnapshot, SyncStamp, SyncTeam, SyncTeamChange,
     decode_sync_payload, encode_sync_payload, materialize, reconcile,
 };
+use handball_toolkit::timestamp::Timestamp;
+use jiff::SignedDuration;
 use uuid::Uuid;
 
 use fixtures::{epoch, make_timer_match, play_at_match, timer_phase};
@@ -373,8 +374,8 @@ fn nanosecond_drift_from_the_round_trip_is_not_a_difference() {
     let local = w.snapshot(alive(1));
     let mut remote = w.snapshot(alive(1));
     for f in &mut remote.facts {
-        f.fact.recorded_at += TimeDelta::nanoseconds(120);
-        f.stamp.updated_at -= TimeDelta::nanoseconds(90);
+        f.fact.recorded_at += SignedDuration::from_nanos(120);
+        f.stamp.updated_at -= SignedDuration::from_nanos(90);
     }
 
     let result = reconcile(&local, &remote, &[], at(100));
@@ -1196,7 +1197,7 @@ fn payload_round_trips_exactly() {
     let mut snapshot = w.snapshot(alive(1));
     // f64 と ns の時刻が、JSON を往復しても 1 bit も変わらない。
     replace_fact(&mut snapshot, goal(w.goal.id, &w, 0.1 + 0.2), alive(1));
-    snapshot.facts[0].stamp.updated_at += TimeDelta::nanoseconds(123_456_789);
+    snapshot.facts[0].stamp.updated_at += SignedDuration::from_nanos(123_456_789);
     let payload = SyncPayload {
         format_version: SYNC_FORMAT_VERSION,
         device_id: Uuid::from_u128(99),
@@ -1454,7 +1455,7 @@ fn timer_match_records(
     id: MatchId,
     (home, away): (TeamId, TeamId),
     scorer: PlayerId,
-    [(phase_id, phase_at), (goal_id, goal_at)]: [(u128, DateTime<Utc>); 2],
+    [(phase_id, phase_at), (goal_id, goal_at)]: [(u128, Timestamp); 2],
     stamp: SyncStamp,
 ) -> (SyncMatch, Vec<SyncFact>) {
     let mut match_ = make_timer_match(home, away);
@@ -1491,12 +1492,12 @@ fn live_match_ids(snapshot: &SyncSnapshot) -> Vec<MatchId> {
         .collect()
 }
 
-fn at(secs: i64) -> DateTime<Utc> {
-    epoch() + TimeDelta::seconds(secs)
+fn at(secs: i64) -> Timestamp {
+    epoch() + SignedDuration::from_secs(secs)
 }
 
-fn at_ms(millis: i64) -> DateTime<Utc> {
-    epoch() + TimeDelta::milliseconds(millis)
+fn at_ms(millis: i64) -> Timestamp {
+    epoch() + SignedDuration::from_millis(millis)
 }
 
 fn alive(secs: i64) -> SyncStamp {
@@ -1537,7 +1538,7 @@ fn set_fact_stamp(snapshot: &mut SyncSnapshot, id: FactId, stamp: SyncStamp) {
     fact.stamp = stamp;
 }
 
-fn set_recorded_at(snapshot: &mut SyncSnapshot, id: FactId, at: DateTime<Utc>) {
+fn set_recorded_at(snapshot: &mut SyncSnapshot, id: FactId, at: Timestamp) {
     let fact = snapshot.facts.iter_mut().find(|f| f.fact.id == id).unwrap();
     fact.fact.recorded_at = at;
 }

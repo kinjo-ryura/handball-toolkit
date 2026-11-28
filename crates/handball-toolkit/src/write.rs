@@ -6,7 +6,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use chrono::{DateTime, Utc};
+use crate::timestamp::Timestamp;
 
 use crate::clock::{FactAnchor, FactAnchorKind, MatchClock, VideoClock};
 use crate::configuration::{MatchConfiguration, MatchConfigurationKind, PhaseKind, VideoSource};
@@ -68,7 +68,7 @@ pub fn roster_context_from_players(
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct NewFactStamp {
     pub id: FactId,
-    pub recorded_at: DateTime<Utc>,
+    pub recorded_at: Timestamp,
 }
 
 /// 補完すべき regular phase 区間（昇順）。

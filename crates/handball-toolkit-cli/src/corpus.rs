@@ -280,7 +280,7 @@ fn check_match_consistency(
             Stage::Corpus,
             corpus_issue(
                 "dateMismatch",
-                json!({"index": entry.date.to_rfc3339(), "body": dto.r#match.date.to_rfc3339()}),
+                json!({"index": validate::to_rfc3339_offset(entry.date), "body": validate::to_rfc3339_offset(dto.r#match.date)}),
             ),
         ));
     }
@@ -407,7 +407,7 @@ fn check_highlight_consistency(
             Stage::Corpus,
             corpus_issue(
                 "dateMismatch",
-                json!({"index": entry.date.to_rfc3339(), "body": dto.r#match.date.to_rfc3339()}),
+                json!({"index": validate::to_rfc3339_offset(entry.date), "body": validate::to_rfc3339_offset(dto.r#match.date)}),
             ),
         ));
     }

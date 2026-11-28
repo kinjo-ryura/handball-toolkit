@@ -19,7 +19,7 @@
 //! 担う。バイト正は `tests/golden/export/`（ADR 0004 決定 2）。deserialize は従来どおり
 //! 寛容（明示 null / UUID 小文字 / RFC 3339 を受理 — 実配信コーパスは python 生成で形式が違う）。
 
-use chrono::{DateTime, Utc};
+use crate::timestamp::Timestamp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -53,7 +53,7 @@ pub struct SampleMatchSummaryV2 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(with = "swift_wire::iso8601_seconds")]
-    pub date: DateTime<Utc>,
+    pub date: Timestamp,
     pub home_score: i64,
     pub away_score: i64,
     pub has_video: bool,
@@ -228,7 +228,7 @@ pub struct SampleHighlightSummaryV2 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(with = "swift_wire::iso8601_seconds")]
-    pub date: DateTime<Utc>,
+    pub date: Timestamp,
     pub home_team_name: String,
     pub away_team_name: String,
     pub fact_count: i64,
@@ -278,7 +278,7 @@ pub struct SampleMatchHeaderV2 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
     #[serde(with = "swift_wire::iso8601_seconds")]
-    pub date: DateTime<Utc>,
+    pub date: Timestamp,
     pub configuration: SampleMatchConfigurationDtoV2,
 }
 
@@ -390,7 +390,7 @@ pub struct SampleFactDtoV2 {
     )]
     pub fact_id: Option<Uuid>,
     #[serde(with = "swift_wire::iso8601_seconds")]
-    pub recorded_at: DateTime<Utc>,
+    pub recorded_at: Timestamp,
     pub payload: SampleFactPayloadDtoV2,
 }
 
@@ -517,25 +517,26 @@ pub struct SampleVideoClockDtoV2 {
 /// Swift `JSONEncoder`（`.iso8601` / Codable の UUID encode）と一致する serialize と、
 /// 従来どおり寛容な deserialize の組。バイト正は `tests/golden/export/`。
 pub(crate) mod swift_wire {
-    use chrono::{DateTime, Utc};
     use serde::{Deserialize, Deserializer, Serializer};
     use uuid::Uuid;
+
+    use crate::timestamp::{self, Timestamp};
 
     /// Swift `.iso8601` 相当: 秒未満は**切り捨て**（`.999` も丸め上げない）・`Z` 表記。
     pub(crate) mod iso8601_seconds {
         use super::*;
 
         pub fn serialize<S: Serializer>(
-            value: &DateTime<Utc>,
+            value: &Timestamp,
             serializer: S,
         ) -> Result<S::Ok, S::Error> {
-            serializer.serialize_str(&value.format("%Y-%m-%dT%H:%M:%SZ").to_string())
+            serializer.serialize_str(&timestamp::to_iso8601_seconds(*value))
         }
 
         pub fn deserialize<'de, D: Deserializer<'de>>(
             deserializer: D,
-        ) -> Result<DateTime<Utc>, D::Error> {
-            DateTime::<Utc>::deserialize(deserializer)
+        ) -> Result<Timestamp, D::Error> {
+            Timestamp::deserialize(deserializer)
         }
     }
 

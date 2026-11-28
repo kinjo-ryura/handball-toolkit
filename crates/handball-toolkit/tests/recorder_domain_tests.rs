@@ -1,6 +1,5 @@
 //! 移植元: `Tests/RecorderDomainTests/RecorderDomainTests.swift`。
 
-use chrono::DateTime;
 use handball_toolkit::clock::{FactAnchor, FactAnchorKind, MatchClock, VideoClock};
 use handball_toolkit::configuration::{MatchConfiguration, PhaseKind, VideoProvider, VideoSource};
 use handball_toolkit::facts::{
@@ -9,6 +8,7 @@ use handball_toolkit::facts::{
 };
 use handball_toolkit::ids::{FactId, PlayerId, TeamId};
 use handball_toolkit::projection::TimeSegment;
+use handball_toolkit::timestamp::Timestamp;
 use uuid::Uuid;
 
 #[test]
@@ -51,7 +51,7 @@ fn match_fact_payload_round_trips_via_serde() {
     let player_id = PlayerId(Uuid::new_v4());
     let fact = MatchFact {
         id: FactId(Uuid::new_v4()),
-        recorded_at: DateTime::from_timestamp(1_700_000_000, 0).unwrap(),
+        recorded_at: Timestamp::new(1_700_000_000, 0).unwrap(),
         payload: MatchFactPayload::Play(PlayFact {
             kind: PlayEventKind::Goal,
             team_id: Some(home_id),
@@ -155,7 +155,7 @@ fn match_fact_anchor_reads_through_payload() {
     // 固定値を使う（このテストで recorded_at の値は無関係）。
     let fact = MatchFact {
         id: FactId(Uuid::new_v4()),
-        recorded_at: DateTime::from_timestamp(0, 0).unwrap(),
+        recorded_at: Timestamp::new(0, 0).unwrap(),
         payload: MatchFactPayload::Control(control),
     };
     if let FactAnchor::Both {

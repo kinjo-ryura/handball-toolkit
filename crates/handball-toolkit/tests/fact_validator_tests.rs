@@ -5,7 +5,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use chrono::DateTime;
 use handball_toolkit::clock::{FactAnchor, FactAnchorKind, MatchClock, VideoClock};
 use handball_toolkit::configuration::{
     MatchConfiguration, MatchConfigurationKind, PhaseKind, VideoProvider, VideoSource,
@@ -15,6 +14,7 @@ use handball_toolkit::facts::{
     StoppageKind, StoppagePayload,
 };
 use handball_toolkit::ids::{FactId, PlayerId, TeamId};
+use handball_toolkit::timestamp::Timestamp;
 use handball_toolkit::validation::{DomainValidationIssue, FactValidationError};
 use handball_toolkit::validators::{
     RosterContext, validate_control_fact, validate_match_fact, validate_play_fact,
@@ -586,7 +586,7 @@ fn match_fact_dispatches_to_play_validation() {
     let bad = play_base(PlayEventKind::Goal, mc(0.0));
     let fact = MatchFact {
         id: FactId(Uuid::new_v4()),
-        recorded_at: DateTime::from_timestamp(0, 0).unwrap(),
+        recorded_at: Timestamp::new(0, 0).unwrap(),
         payload: MatchFactPayload::Play(bad),
     };
     let issues = validate_match_fact(&fact, &c.timer_config, &c.roster);

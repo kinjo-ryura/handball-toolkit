@@ -577,15 +577,17 @@ fn competition_round_and_table_details_are_pinned() {
 /// 日付が進むのは従来どおり違反。
 #[test]
 fn date_descending_is_checked_within_a_round_only() {
-    use chrono::{TimeZone, Utc};
     use handball_toolkit::sample_dto::{SampleIndexDtoV2, SampleMatchSummaryV2};
+    use handball_toolkit::timestamp::Timestamp;
     use handball_toolkit_cli::validate::validate_match_index_dto;
 
     let entry = |slug: &str, day: u32, round: &str| SampleMatchSummaryV2 {
         slug: slug.to_owned(),
         display_name: "A vs B".to_owned(),
         description: None,
-        date: Utc.with_ymd_and_hms(2026, 1, day, 10, 0, 0).unwrap(),
+        date: format!("2026-01-{day:02}T10:00:00Z")
+            .parse::<Timestamp>()
+            .unwrap(),
         home_score: 1,
         away_score: 0,
         has_video: false,

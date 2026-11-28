@@ -17,7 +17,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use chrono::{DateTime, Utc};
+use crate::timestamp::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::facts::{MatchFact, MatchFactPayload};
@@ -76,7 +76,7 @@ pub fn reconcile(
     local: &SyncSnapshot,
     remote: &SyncSnapshot,
     answers: &[SyncAnswer],
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> SyncReconcileResult {
     // 時刻をミリ秒に丸めてから比べる（`normalize` の doc — 端末との往復で ns の桁がずれる）。
     // 突き合わせる前の記録は、一覧（`changes`）の比べる元にも使う。
@@ -240,7 +240,7 @@ pub fn reconcile(
 
 struct Context<'a> {
     answers: &'a Answers,
-    now: DateTime<Utc>,
+    now: Timestamp,
 }
 
 enum Decision<T> {
@@ -351,7 +351,7 @@ fn pairs<'a, T, K: Ord>(
 /// 渡す（試合は fact の変更も含める — 試合の `updated_at` は fact の変更で進まないため）。
 fn decide<T: Record>(
     pair: &Pair<'_, T>,
-    last_changed: (Option<DateTime<Utc>>, Option<DateTime<Utc>>),
+    last_changed: (Option<Timestamp>, Option<Timestamp>),
     record: SyncRecordRef,
     match_id: Option<MatchId>,
     ctx: &Context<'_>,
@@ -414,9 +414,9 @@ fn decide<T: Record>(
 
 /// 片方で消し、もう片方では消していないとき。消した時刻が相手の最後の変更より後なら消す。
 fn deletion_against_change<T: Record>(
-    (deleted, deleted_on, deleted_at): (&T, SyncSide, DateTime<Utc>),
+    (deleted, deleted_on, deleted_at): (&T, SyncSide, Timestamp),
     alive: &T,
-    alive_last_changed: DateTime<Utc>,
+    alive_last_changed: Timestamp,
     record: SyncRecordRef,
     match_id: Option<MatchId>,
     ctx: &Context<'_>,
@@ -466,8 +466,8 @@ fn questions_result(mut questions: Vec<SyncQuestion>) -> SyncReconcileResult {
 
 /// 試合ごとの「最後に変わった時刻」。試合自身と、その試合の fact（消した fact を含む）の
 /// `updated_at` の最大。試合の削除と、相手での変更を比べるのに使う。
-fn last_changed_by_match(snapshot: &SyncSnapshot) -> BTreeMap<MatchId, DateTime<Utc>> {
-    let mut last: BTreeMap<MatchId, DateTime<Utc>> = BTreeMap::new();
+fn last_changed_by_match(snapshot: &SyncSnapshot) -> BTreeMap<MatchId, Timestamp> {
+    let mut last: BTreeMap<MatchId, Timestamp> = BTreeMap::new();
     for m in &snapshot.matches {
         bump(&mut last, m.match_.id, m.stamp.updated_at);
     }
@@ -477,7 +477,7 @@ fn last_changed_by_match(snapshot: &SyncSnapshot) -> BTreeMap<MatchId, DateTime<
     last
 }
 
-fn bump(last: &mut BTreeMap<MatchId, DateTime<Utc>>, id: MatchId, at: DateTime<Utc>) {
+fn bump(last: &mut BTreeMap<MatchId, Timestamp>, id: MatchId, at: Timestamp) {
     last.entry(id)
         .and_modify(|current| {
             if at > *current {
@@ -498,7 +498,7 @@ fn revive_referenced(
     facts: &BTreeMap<FactId, SyncFact>,
     teams: &mut BTreeMap<TeamId, SyncTeam>,
     players: &mut BTreeMap<PlayerId, SyncPlayer>,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) {
     let live_matches: BTreeSet<MatchId> = matches
         .values()
@@ -675,7 +675,7 @@ fn replace_whole_match(
     other: &SideView<'_>,
     matches: &mut BTreeMap<MatchId, SyncMatch>,
     facts: &mut BTreeMap<FactId, SyncFact>,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) {
     let restamp = |stamp: SyncStamp| {
         if stamp.is_deleted() {

@@ -3,7 +3,6 @@
 //! （Swift の suite static 群は Rust では各テスト内の `ctx()` ローカル値。
 //! ID の一貫性は 1 テスト内で閉じる。）
 
-use chrono::{DateTime, Utc};
 use handball_toolkit::clock::{FactAnchor, MatchClock, VideoClock};
 use handball_toolkit::configuration::{MatchConfiguration, PhaseKind, VideoProvider, VideoSource};
 use handball_toolkit::entities::{Match, RosterSelection};
@@ -12,12 +11,13 @@ use handball_toolkit::facts::{
     StoppageKind, StoppagePayload,
 };
 use handball_toolkit::ids::{FactId, MatchId, PlayerId, TeamId};
+use handball_toolkit::timestamp::Timestamp;
 use handball_toolkit::validation::{DomainValidationIssue, TimelineValidationError};
 use handball_toolkit::validators::validate_fact_log;
 use uuid::Uuid;
 
-fn recorded_at() -> DateTime<Utc> {
-    DateTime::from_timestamp(1_700_000_000, 0).unwrap()
+fn recorded_at() -> Timestamp {
+    Timestamp::new(1_700_000_000, 0).unwrap()
 }
 
 struct Ctx {

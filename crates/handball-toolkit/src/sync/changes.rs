@@ -26,7 +26,7 @@
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
 
-use chrono::{DateTime, Utc};
+use crate::timestamp::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::facts::{MatchFact, MatchFactPayload};
@@ -272,7 +272,7 @@ impl<'a> Live<'a> {
 
 fn match_changes(before: &Live<'_>, after: &Live<'_>, merges: &IdMerges) -> Vec<SyncMatchChange> {
     // 並べるための日付と、行。
-    let mut rows: Vec<(DateTime<Utc>, SyncMatchChange)> = Vec::new();
+    let mut rows: Vec<(Timestamp, SyncMatchChange)> = Vec::new();
 
     // 写しをまとめた試合: この端末の写し（消す側）を、残す側の試合として 1 行にする。
     let mut replacing: BTreeSet<MatchId> = BTreeSet::new();
