@@ -2,7 +2,7 @@
 
 <!-- scripts/generate_licenses.sh が THIRD_PARTY_LICENSES.json から生成する。直接編集しない。 -->
 
-handball-toolkit 0.22.3 の配布物（iOS / macOS の staticlib・Android の `.so`・Web の `.wasm`）にリンクされるオープンソースソフトウェアと、そのライセンス本文。
+handball-toolkit 0.22.4 の配布物（iOS / macOS の staticlib・Android の `.so`・Web の `.wasm`）にリンクされるオープンソースソフトウェアと、そのライセンス本文。
 
 - 配布物ごとの依存を統合した一覧のため、配布物によっては含まれないライブラリも載っている
 - 各ライブラリのソースコードは「入手先」から入手できる
@@ -26,9 +26,9 @@ handball-toolkit 0.22.3 の配布物（iOS / macOS の staticlib・Android の `
 | fastrand | 2.4.1 | [MIT](#license-0) | [ソース](https://crates.io/crates/fastrand/2.4.1) |
 | fs-err | 3.3.1 | [MIT](#license-7) | [ソース](https://crates.io/crates/fs-err/3.3.1) |
 | getrandom | 0.4.3 | [MIT](#license-8) | [ソース](https://crates.io/crates/getrandom/0.4.3) |
-| handball-toolkit | 0.22.3 | [MIT](#license-9) | [ソース](https://github.com/kinjo-ryura/handball-toolkit) |
-| handball-toolkit-ffi | 0.22.3 | [MIT](#license-9) | [ソース](https://github.com/kinjo-ryura/handball-toolkit) |
-| handball-toolkit-wasm | 0.22.3 | [MIT](#license-9) | [ソース](https://github.com/kinjo-ryura/handball-toolkit) |
+| handball-toolkit | 0.22.4 | [MIT](#license-9) | [ソース](https://github.com/kinjo-ryura/handball-toolkit) |
+| handball-toolkit-ffi | 0.22.4 | [MIT](#license-9) | [ソース](https://github.com/kinjo-ryura/handball-toolkit) |
+| handball-toolkit-wasm | 0.22.4 | [MIT](#license-9) | [ソース](https://github.com/kinjo-ryura/handball-toolkit) |
 | hashbrown | 0.17.1 | [MIT](#license-10) | [ソース](https://crates.io/crates/hashbrown/0.17.1) |
 | heck | 0.5.0 | [MIT](#license-11) | [ソース](https://crates.io/crates/heck/0.5.0) |
 | indexmap | 2.14.0 | [MIT](#license-12) | [ソース](https://crates.io/crates/indexmap/2.14.0) |
@@ -363,7 +363,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### <a id="license-9"></a>MIT License（MIT）
 
-適用: handball-toolkit 0.22.3、handball-toolkit-ffi 0.22.3、handball-toolkit-wasm 0.22.3、siphasher 1.0.3
+適用: handball-toolkit 0.22.4、handball-toolkit-ffi 0.22.4、handball-toolkit-wasm 0.22.4、siphasher 1.0.3
 
 ```
 MIT License
