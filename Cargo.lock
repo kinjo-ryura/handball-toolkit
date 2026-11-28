@@ -274,7 +274,7 @@ dependencies = [
 
 [[package]]
 name = "handball-toolkit"
-version = "0.22.3"
+version = "0.22.4"
 dependencies = [
  "async-trait",
  "jiff",
@@ -286,7 +286,7 @@ dependencies = [
 
 [[package]]
 name = "handball-toolkit-cli"
-version = "0.22.3"
+version = "0.22.4"
 dependencies = [
  "handball-toolkit",
  "serde",
@@ -296,7 +296,7 @@ dependencies = [
 
 [[package]]
 name = "handball-toolkit-ffi"
-version = "0.22.3"
+version = "0.22.4"
 dependencies = [
  "async-trait",
  "handball-toolkit",
@@ -307,7 +307,7 @@ dependencies = [
 
 [[package]]
 name = "handball-toolkit-wasm"
-version = "0.22.3"
+version = "0.22.4"
 dependencies = [
  "handball-toolkit",
  "serde",
