@@ -28,7 +28,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use chrono::{DateTime, Utc};
+use crate::timestamp::{self, Timestamp};
 
 use crate::clock::FactAnchor;
 use crate::configuration::{MatchConfiguration, VideoProvider};
@@ -59,7 +59,7 @@ pub(crate) fn pair_copies(
     local: &SyncSnapshot,
     remote: &SyncSnapshot,
     answers: &Answers,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Pairing {
     let local_view = SideView::new(SyncSide::Local, local);
     let remote_view = SideView::new(SyncSide::Remote, remote);
@@ -361,7 +361,7 @@ fn copies_identical(a: &SideView<'_>, a_id: MatchId, b: &SideView<'_>, b_id: Mat
     };
     let (x, y) = (&am.match_, &bm.match_);
     if x.title != y.title
-        || x.date.timestamp() != y.date.timestamp()
+        || timestamp::unix_seconds(x.date) != timestamp::unix_seconds(y.date)
         || a.team_name(x.home_team_id) != b.team_name(y.home_team_id)
         || a.team_name(x.away_team_id) != b.team_name(y.away_team_id)
         || !same_configuration(am, bm)
@@ -395,7 +395,7 @@ fn same_configuration(a: &SyncMatch, b: &SyncMatch) -> bool {
 }
 
 fn fact_signature(fact: &MatchFact, view: &SideView<'_>, m: &Match) -> String {
-    let secs = fact.recorded_at.timestamp();
+    let secs = timestamp::unix_seconds(fact.recorded_at);
     match &fact.payload {
         MatchFactPayload::Play(play) => format!(
             "{secs}|play|{:?}|{}|{}|{}|{}|{:?}|{:?}",
@@ -509,14 +509,14 @@ impl<'a> SideView<'a> {
                 for f in self.live_facts.get(&m.match_.id).into_iter().flatten() {
                     let at = f.fact.recorded_at;
                     prints
-                        .entry((at.timestamp(), kind_key(&f.fact)))
+                        .entry((timestamp::unix_seconds(at), kind_key(&f.fact)))
                         .or_default()
-                        .insert(at.timestamp_subsec_millis());
+                        .insert(timestamp::subsec_nanos(at) / 1_000_000);
                 }
                 let print_count: usize = prints.values().map(BTreeSet::len).sum();
                 let empty_key = prints.is_empty().then(|| {
                     (
-                        m.match_.date.timestamp(),
+                        timestamp::unix_seconds(m.match_.date),
                         self.team_name(m.match_.home_team_id)
                             .unwrap_or_default()
                             .to_owned(),
@@ -682,7 +682,7 @@ fn apply(
     edits: &Edits,
     team_merges: &BTreeMap<TeamId, (SyncSide, TeamId)>,
     player_merges: &BTreeMap<PlayerId, PlayerId>,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) {
     let team = |id: TeamId| team_merges.get(&id).map_or(id, |(_, to)| *to);
     let player = |id: PlayerId| player_merges.get(&id).copied().unwrap_or(id);

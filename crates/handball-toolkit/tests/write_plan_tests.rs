@@ -89,7 +89,7 @@ fn timer_match(duration: f64) -> Match {
     Match {
         id: MatchId(Uuid::from_u128(1)),
         title: None,
-        date: chrono::DateTime::from_timestamp(0, 0).expect("epoch は有効"),
+        date: handball_toolkit::timestamp::Timestamp::new(0, 0).expect("epoch は有効"),
         home_team_id: TeamId(Uuid::from_u128(2)),
         away_team_id: TeamId(Uuid::from_u128(3)),
         configuration: MatchConfiguration::Timer {
@@ -103,7 +103,7 @@ fn timer_match(duration: f64) -> Match {
 fn goal_at(seconds: f64) -> MatchFact {
     MatchFact {
         id: FactId(Uuid::from_u128(100)),
-        recorded_at: chrono::DateTime::from_timestamp(10, 0).expect("固定秒は有効"),
+        recorded_at: handball_toolkit::timestamp::Timestamp::new(10, 0).expect("固定秒は有効"),
         payload: MatchFactPayload::Play(PlayFact {
             kind: PlayEventKind::Goal,
             team_id: None,
@@ -121,7 +121,7 @@ fn goal_at(seconds: f64) -> MatchFact {
 fn phase_start(start: f64, end: f64) -> MatchFact {
     MatchFact {
         id: FactId(Uuid::from_u128((start as u128) + 200)),
-        recorded_at: chrono::DateTime::from_timestamp(1, 0).expect("固定秒は有効"),
+        recorded_at: handball_toolkit::timestamp::Timestamp::new(1, 0).expect("固定秒は有効"),
         payload: MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
             kind: PhaseKind::Regular,
             start_anchor: FactAnchor::MatchClock(MatchClock {
@@ -188,7 +188,7 @@ fn phase_start_自身の記録は補完しない() {
 fn stoppage_の記録も補完対象() {
     let pause = MatchFact {
         id: FactId(Uuid::from_u128(101)),
-        recorded_at: chrono::DateTime::from_timestamp(10, 0).expect("固定秒は有効"),
+        recorded_at: handball_toolkit::timestamp::Timestamp::new(10, 0).expect("固定秒は有効"),
         payload: MatchFactPayload::Control(ControlFact::Stoppage(StoppagePayload {
             kind: StoppageKind::Pause,
             start_anchor: FactAnchor::MatchClock(MatchClock {
@@ -221,7 +221,7 @@ fn 補完_fact_はスタンプの_id_と時刻で組まれる() {
     let plan = phase_completion_plan(&timer_match(1800.0), &[], &goal_at(100.0));
     let stamp = NewFactStamp {
         id: FactId(Uuid::from_u128(77)),
-        recorded_at: chrono::DateTime::from_timestamp(42, 0).expect("固定秒は有効"),
+        recorded_at: handball_toolkit::timestamp::Timestamp::new(42, 0).expect("固定秒は有効"),
     };
     let fact = phase_completion_fact(plan[0], stamp);
     assert_eq!(fact.id, stamp.id);
@@ -314,7 +314,7 @@ fn 移行計画は_stoppage_の_end_match_clock_を_start_と同値にする() {
     let phase = phase_start(0.0, 1800.0);
     let pause = MatchFact {
         id: FactId(Uuid::from_u128(150)),
-        recorded_at: chrono::DateTime::from_timestamp(5, 0).expect("固定秒は有効"),
+        recorded_at: handball_toolkit::timestamp::Timestamp::new(5, 0).expect("固定秒は有効"),
         payload: MatchFactPayload::Control(ControlFact::Stoppage(StoppagePayload {
             kind: StoppageKind::Timeout,
             start_anchor: FactAnchor::MatchClock(MatchClock {
@@ -495,7 +495,7 @@ fn 二_phase_の試合() -> Vec<MatchFact> {
 fn goal_with_id(id: u128, seconds: f64) -> MatchFact {
     MatchFact {
         id: FactId(Uuid::from_u128(id)),
-        recorded_at: chrono::DateTime::from_timestamp(10, 0).expect("固定秒は有効"),
+        recorded_at: handball_toolkit::timestamp::Timestamp::new(10, 0).expect("固定秒は有効"),
         payload: MatchFactPayload::Play(PlayFact {
             kind: PlayEventKind::Goal,
             team_id: None,
@@ -674,7 +674,7 @@ fn 中断の_marker_も同じ規則で動く() {
     let mut facts = 二_phase_の試合();
     facts.push(MatchFact {
         id: FactId(Uuid::from_u128(400)),
-        recorded_at: chrono::DateTime::from_timestamp(11, 0).expect("固定秒は有効"),
+        recorded_at: handball_toolkit::timestamp::Timestamp::new(11, 0).expect("固定秒は有効"),
         payload: MatchFactPayload::Control(ControlFact::Stoppage(StoppagePayload {
             kind: StoppageKind::Timeout,
             start_anchor: FactAnchor::MatchClock(MatchClock {
@@ -830,7 +830,7 @@ fn video_match() -> Match {
 fn video_phase_with_id(id: u128, start: f64, end: f64) -> MatchFact {
     MatchFact {
         id: FactId(Uuid::from_u128(id)),
-        recorded_at: chrono::DateTime::from_timestamp(1, 0).expect("固定秒は有効"),
+        recorded_at: handball_toolkit::timestamp::Timestamp::new(1, 0).expect("固定秒は有効"),
         payload: MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
             kind: PhaseKind::Regular,
             start_anchor: FactAnchor::VideoClock(VideoClock {
@@ -846,7 +846,7 @@ fn video_phase_with_id(id: u128, start: f64, end: f64) -> MatchFact {
 fn video_goal_with_id(id: u128, seconds: f64) -> MatchFact {
     MatchFact {
         id: FactId(Uuid::from_u128(id)),
-        recorded_at: chrono::DateTime::from_timestamp(10, 0).expect("固定秒は有効"),
+        recorded_at: handball_toolkit::timestamp::Timestamp::new(10, 0).expect("固定秒は有効"),
         payload: MatchFactPayload::Play(PlayFact {
             kind: PlayEventKind::Goal,
             team_id: None,
@@ -864,7 +864,7 @@ fn video_goal_with_id(id: u128, seconds: f64) -> MatchFact {
 fn video_stoppage_with_id(id: u128, start: f64, end: f64) -> MatchFact {
     MatchFact {
         id: FactId(Uuid::from_u128(id)),
-        recorded_at: chrono::DateTime::from_timestamp(5, 0).expect("固定秒は有効"),
+        recorded_at: handball_toolkit::timestamp::Timestamp::new(5, 0).expect("固定秒は有効"),
         payload: MatchFactPayload::Control(ControlFact::Stoppage(StoppagePayload {
             kind: StoppageKind::Timeout,
             start_anchor: FactAnchor::VideoClock(VideoClock {
@@ -966,7 +966,7 @@ fn both_の_phase_は終わりの試合時計を停止区間を除いて組む()
     // PhaseStartAnchorMismatch になる。
     let phase = MatchFact {
         id: FactId(Uuid::from_u128(1)),
-        recorded_at: chrono::DateTime::from_timestamp(1, 0).expect("固定秒は有効"),
+        recorded_at: handball_toolkit::timestamp::Timestamp::new(1, 0).expect("固定秒は有効"),
         payload: MatchFactPayload::Control(ControlFact::PhaseStart(PhaseStartPayload {
             kind: PhaseKind::Regular,
             start_anchor: FactAnchor::Both {

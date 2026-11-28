@@ -58,7 +58,7 @@ fn timer_match() -> Match {
     Match {
         id: MatchId(Uuid::from_u128(MATCH_ID)),
         title: Some("write orchestration".to_string()),
-        date: chrono::DateTime::from_timestamp(0, 0).expect("epoch は有効"),
+        date: handball_toolkit::timestamp::Timestamp::new(0, 0).expect("epoch は有効"),
         home_team_id: TeamId(Uuid::from_u128(HOME_ID)),
         away_team_id: TeamId(Uuid::from_u128(AWAY_ID)),
         configuration: MatchConfiguration::Timer {
@@ -72,7 +72,8 @@ fn timer_match() -> Match {
 fn fact(id: u128, payload: MatchFactPayload) -> MatchFact {
     MatchFact {
         id: FactId(Uuid::from_u128(id)),
-        recorded_at: chrono::DateTime::from_timestamp(id as i64, 0).expect("固定秒は有効"),
+        recorded_at: handball_toolkit::timestamp::Timestamp::new(id as i64, 0)
+            .expect("固定秒は有効"),
         payload,
     }
 }
@@ -387,7 +388,8 @@ fn play_を内包する_phase_start_の削除は発火せず拒否() {
 fn stamp(id: u128) -> NewFactStamp {
     NewFactStamp {
         id: FactId(Uuid::from_u128(id)),
-        recorded_at: chrono::DateTime::from_timestamp(id as i64, 0).expect("固定秒は有効"),
+        recorded_at: handball_toolkit::timestamp::Timestamp::new(id as i64, 0)
+            .expect("固定秒は有効"),
     }
 }
 
@@ -851,7 +853,7 @@ fn imported_match(id: u128, home: u128, away: u128) -> Match {
     Match {
         id: MatchId(Uuid::from_u128(id)),
         title: Some("テスト試合".to_string()),
-        date: chrono::DateTime::from_timestamp(0, 0).expect("epoch は有効"),
+        date: handball_toolkit::timestamp::Timestamp::new(0, 0).expect("epoch は有効"),
         home_team_id: TeamId(Uuid::from_u128(home)),
         away_team_id: TeamId(Uuid::from_u128(away)),
         configuration: MatchConfiguration::Timer {
@@ -880,7 +882,7 @@ fn import_dto(player_key: Option<&str>) -> SampleMatchDtoV2 {
         generator: None,
         r#match: SampleMatchHeaderV2 {
             display_name: Some("テスト試合".to_string()),
-            date: chrono::DateTime::from_timestamp(0, 0).expect("epoch は有効"),
+            date: handball_toolkit::timestamp::Timestamp::new(0, 0).expect("epoch は有効"),
             configuration: SampleMatchConfigurationDtoV2 {
                 kind: "timer".to_string(),
                 timer: Some(SampleTimerConfigurationDtoV2 {
@@ -920,7 +922,8 @@ fn import_dto(player_key: Option<&str>) -> SampleMatchDtoV2 {
         facts: vec![
             SampleFactDtoV2 {
                 fact_id: None,
-                recorded_at: chrono::DateTime::from_timestamp(0, 0).expect("epoch は有効"),
+                recorded_at: handball_toolkit::timestamp::Timestamp::new(0, 0)
+                    .expect("epoch は有効"),
                 payload: SampleFactPayloadDtoV2 {
                     kind: "control".to_string(),
                     play: None,
@@ -937,7 +940,8 @@ fn import_dto(player_key: Option<&str>) -> SampleMatchDtoV2 {
             },
             SampleFactDtoV2 {
                 fact_id: None,
-                recorded_at: chrono::DateTime::from_timestamp(1, 0).expect("固定秒は有効"),
+                recorded_at: handball_toolkit::timestamp::Timestamp::new(1, 0)
+                    .expect("固定秒は有効"),
                 payload: SampleFactPayloadDtoV2 {
                     kind: "play".to_string(),
                     play: Some(SamplePlayFactDtoV2 {

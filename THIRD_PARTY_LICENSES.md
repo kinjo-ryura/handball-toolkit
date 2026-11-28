@@ -21,23 +21,23 @@ handball-toolkit 0.22.2 の配布物（iOS / macOS の staticlib・Android の `
 | cargo-platform | 0.3.3 | [MIT](#license-0) | [ソース](https://crates.io/crates/cargo-platform/0.3.3) |
 | cargo_metadata | 0.23.1 | [MIT](#license-0) | [ソース](https://crates.io/crates/cargo_metadata/0.23.1) |
 | cfg-if | 1.0.4 | [MIT](#license-4) | [ソース](https://crates.io/crates/cfg-if/1.0.4) |
-| chrono | 0.4.45 | [MIT](#license-5) | [ソース](https://crates.io/crates/chrono/0.4.45) |
-| equivalent | 1.0.2 | [MIT](#license-6) | [ソース](https://crates.io/crates/equivalent/1.0.2) |
-| errno | 0.3.14 | [MIT](#license-7) | [ソース](https://crates.io/crates/errno/0.3.14) |
+| equivalent | 1.0.2 | [MIT](#license-5) | [ソース](https://crates.io/crates/equivalent/1.0.2) |
+| errno | 0.3.14 | [MIT](#license-6) | [ソース](https://crates.io/crates/errno/0.3.14) |
 | fastrand | 2.4.1 | [MIT](#license-0) | [ソース](https://crates.io/crates/fastrand/2.4.1) |
-| fs-err | 3.3.1 | [MIT](#license-8) | [ソース](https://crates.io/crates/fs-err/3.3.1) |
-| getrandom | 0.4.3 | [MIT](#license-9) | [ソース](https://crates.io/crates/getrandom/0.4.3) |
-| handball-toolkit | 0.22.2 | [MIT](#license-5) | [ソース](https://github.com/kinjo-ryura/handball-toolkit) |
-| handball-toolkit-ffi | 0.22.2 | [MIT](#license-5) | [ソース](https://github.com/kinjo-ryura/handball-toolkit) |
-| handball-toolkit-wasm | 0.22.2 | [MIT](#license-5) | [ソース](https://github.com/kinjo-ryura/handball-toolkit) |
+| fs-err | 3.3.1 | [MIT](#license-7) | [ソース](https://crates.io/crates/fs-err/3.3.1) |
+| getrandom | 0.4.3 | [MIT](#license-8) | [ソース](https://crates.io/crates/getrandom/0.4.3) |
+| handball-toolkit | 0.22.2 | [MIT](#license-9) | [ソース](https://github.com/kinjo-ryura/handball-toolkit) |
+| handball-toolkit-ffi | 0.22.2 | [MIT](#license-9) | [ソース](https://github.com/kinjo-ryura/handball-toolkit) |
+| handball-toolkit-wasm | 0.22.2 | [MIT](#license-9) | [ソース](https://github.com/kinjo-ryura/handball-toolkit) |
 | hashbrown | 0.17.1 | [MIT](#license-10) | [ソース](https://crates.io/crates/hashbrown/0.17.1) |
 | heck | 0.5.0 | [MIT](#license-11) | [ソース](https://crates.io/crates/heck/0.5.0) |
 | indexmap | 2.14.0 | [MIT](#license-12) | [ソース](https://crates.io/crates/indexmap/2.14.0) |
 | itoa | 1.0.18 | [MIT](#license-0) | [ソース](https://crates.io/crates/itoa/1.0.18) |
-| libc | 0.2.186 | [MIT](#license-13) | [ソース](https://crates.io/crates/libc/0.2.186) |
+| jiff | 1.0.3 | [MIT](#license-13) | [ソース](https://crates.io/crates/jiff/1.0.3) |
+| jiff-core | 1.0.2 | [MIT](#license-13) | [ソース](https://crates.io/crates/jiff-core/1.0.2) |
+| libc | 0.2.186 | [MIT](#license-14) | [ソース](https://crates.io/crates/libc/0.2.186) |
 | linux-raw-sys | 0.12.1 | [MIT](#license-0) | [ソース](https://crates.io/crates/linux-raw-sys/0.12.1) |
-| memchr | 2.8.3 | [MIT](#license-14) | [ソース](https://crates.io/crates/memchr/2.8.3) |
-| num-traits | 0.2.19 | [MIT](#license-1) | [ソース](https://crates.io/crates/num-traits/0.2.19) |
+| memchr | 2.8.3 | [MIT](#license-13) | [ソース](https://crates.io/crates/memchr/2.8.3) |
 | once_cell | 1.21.4 | [MIT](#license-0) | [ソース](https://crates.io/crates/once_cell/1.21.4) |
 | proc-macro2 | 1.0.106 | [MIT](#license-0) | [ソース](https://crates.io/crates/proc-macro2/1.0.106) |
 | quote | 1.0.46 | [MIT](#license-0) | [ソース](https://crates.io/crates/quote/1.0.46) |
@@ -48,10 +48,10 @@ handball-toolkit 0.22.2 の配布物（iOS / macOS の staticlib・Android の `
 | serde_derive | 1.0.229 | [MIT](#license-0) | [ソース](https://crates.io/crates/serde_derive/1.0.229) |
 | serde_json | 1.0.154 | [MIT](#license-0) | [ソース](https://crates.io/crates/serde_json/1.0.154) |
 | serde_spanned | 1.1.1 | [MIT](#license-15) | [ソース](https://crates.io/crates/serde_spanned/1.1.1) |
-| siphasher | 1.0.3 | [MIT](#license-5) | [ソース](https://crates.io/crates/siphasher/1.0.3) |
+| siphasher | 1.0.3 | [MIT](#license-9) | [ソース](https://crates.io/crates/siphasher/1.0.3) |
 | static_assertions | 1.1.0 | [MIT](#license-16) | [ソース](https://crates.io/crates/static_assertions/1.1.0) |
 | syn | 2.0.118 | [MIT](#license-0) | [ソース](https://crates.io/crates/syn/2.0.118) |
-| syn | 3.0.0 | [MIT](#license-0) | [ソース](https://crates.io/crates/syn/3.0.0) |
+| syn | 3.0.10 | [MIT](#license-0) | [ソース](https://crates.io/crates/syn/3.0.10) |
 | tempfile | 3.27.0 | [MIT](#license-17) | [ソース](https://crates.io/crates/tempfile/3.27.0) |
 | thiserror | 2.0.18 | [MIT](#license-0) | [ソース](https://crates.io/crates/thiserror/2.0.18) |
 | thiserror-impl | 2.0.18 | [MIT](#license-0) | [ソース](https://crates.io/crates/thiserror-impl/2.0.18) |
@@ -78,7 +78,7 @@ handball-toolkit 0.22.2 の配布物（iOS / macOS の staticlib・Android の `
 
 ### <a id="license-0"></a>MIT License（MIT）
 
-適用: anyhow 1.0.103、async-trait 0.1.92、camino 1.2.4、cargo-platform 0.3.3、cargo_metadata 0.23.1、fastrand 2.4.1、itoa 1.0.18、linux-raw-sys 0.12.1、once_cell 1.21.4、proc-macro2 1.0.106、quote 1.0.46、rustix 1.1.4、semver 1.0.28、serde 1.0.229、serde_core 1.0.229、serde_derive 1.0.229、serde_json 1.0.154、syn 2.0.118、syn 3.0.0、thiserror 2.0.18、thiserror-impl 2.0.18、unicode-ident 1.0.24、zmij 1.0.21
+適用: anyhow 1.0.103、async-trait 0.1.92、camino 1.2.4、cargo-platform 0.3.3、cargo_metadata 0.23.1、fastrand 2.4.1、itoa 1.0.18、linux-raw-sys 0.12.1、once_cell 1.21.4、proc-macro2 1.0.106、quote 1.0.46、rustix 1.1.4、semver 1.0.28、serde 1.0.229、serde_core 1.0.229、serde_derive 1.0.229、serde_json 1.0.154、syn 2.0.118、syn 3.0.10、thiserror 2.0.18、thiserror-impl 2.0.18、unicode-ident 1.0.24、zmij 1.0.21
 
 ```
 Permission is hereby granted, free of charge, to any
@@ -108,7 +108,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### <a id="license-1"></a>MIT License（MIT）
 
-適用: bitflags 2.13.0、num-traits 0.2.19
+適用: bitflags 2.13.0
 
 ```
 Copyright (c) 2014 The Rust Project Developers
@@ -236,31 +236,6 @@ DEALINGS IN THE SOFTWARE.
 
 ### <a id="license-5"></a>MIT License（MIT）
 
-適用: chrono 0.4.45、handball-toolkit 0.22.2、handball-toolkit-ffi 0.22.2、handball-toolkit-wasm 0.22.2、siphasher 1.0.3
-
-```
-MIT License
-
-Copyright (c) <year> <copyright holders>
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
-associated documentation files (the "Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the
-following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial
-portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
-LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO
-EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
-### <a id="license-6"></a>MIT License（MIT）
-
 適用: equivalent 1.0.2
 
 ```
@@ -291,7 +266,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### <a id="license-7"></a>MIT License（MIT）
+### <a id="license-6"></a>MIT License（MIT）
 
 適用: errno 0.3.14
 
@@ -323,7 +298,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### <a id="license-8"></a>MIT License（MIT）
+### <a id="license-7"></a>MIT License（MIT）
 
 適用: fs-err 3.3.1
 
@@ -353,7 +328,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### <a id="license-9"></a>MIT License（MIT）
+### <a id="license-8"></a>MIT License（MIT）
 
 適用: getrandom 0.4.3
 
@@ -384,6 +359,31 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
+```
+
+### <a id="license-9"></a>MIT License（MIT）
+
+適用: handball-toolkit 0.22.2、handball-toolkit-ffi 0.22.2、handball-toolkit-wasm 0.22.2、siphasher 1.0.3
+
+```
+MIT License
+
+Copyright (c) <year> <copyright holders>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the
+following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial
+portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO
+EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 ### <a id="license-10"></a>MIT License（MIT）
@@ -484,6 +484,34 @@ DEALINGS IN THE SOFTWARE.
 
 ### <a id="license-13"></a>MIT License（MIT）
 
+適用: jiff 1.0.3、jiff-core 1.0.2、memchr 2.8.3
+
+```
+The MIT License (MIT)
+
+Copyright (c) 2015 Andrew Gallant
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
+### <a id="license-14"></a>MIT License（MIT）
+
 適用: libc 0.2.186
 
 ```
@@ -512,34 +540,6 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
-```
-
-### <a id="license-14"></a>MIT License（MIT）
-
-適用: memchr 2.8.3
-
-```
-The MIT License (MIT)
-
-Copyright (c) 2015 Andrew Gallant
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
 ```
 
 ### <a id="license-15"></a>MIT License（MIT）

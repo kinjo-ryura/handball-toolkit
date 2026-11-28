@@ -7,7 +7,6 @@
 //! `.videoHighlight` での禁止はいずれも意図的に許しており、後から「バグに見えるから」と
 //! 足されると供給源（動画解析）の欠測 1 件で試合まるごと import 拒否になる。
 
-use chrono::{DateTime, Utc};
 use handball_toolkit::clock::{FactAnchor, MatchClock, VideoClock};
 use handball_toolkit::configuration::{MatchConfiguration, PhaseKind, VideoProvider, VideoSource};
 use handball_toolkit::entities::{Match, RosterSelection};
@@ -17,6 +16,7 @@ use handball_toolkit::facts::{
 };
 use handball_toolkit::ids::{FactId, MatchId, TeamId};
 use handball_toolkit::sample_dto::{SampleFactDtoV2, SampleMatchDecodeErrorV2, decode_fact};
+use handball_toolkit::timestamp::Timestamp;
 use handball_toolkit::validation::{
     DomainValidationIssue, FactValidationError, TimelineValidationError,
 };
@@ -26,8 +26,8 @@ use handball_toolkit::validators::{
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
-fn recorded_at() -> DateTime<Utc> {
-    DateTime::from_timestamp(1_700_000_000, 0).unwrap()
+fn recorded_at() -> Timestamp {
+    Timestamp::new(1_700_000_000, 0).unwrap()
 }
 
 struct Ctx {

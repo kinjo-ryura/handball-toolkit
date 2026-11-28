@@ -63,7 +63,7 @@ Swift のディレクトリ構成を 1:1 でミラーする。移植レビュー
 
 | Swift | Rust | 備考 |
 |---|---|---|
-| `Match { id, title?, date, homeTeamID, awayTeamID, configuration, rosterSelection, isHomeOnLeft }` | 同構造（`title: Option<String>`, `date: DateTime<Utc>`） | `isHomeOnLeft` は表示設定だが Match に永続。忠実移植 |
+| `Match { id, title?, date, homeTeamID, awayTeamID, configuration, rosterSelection, isHomeOnLeft }` | 同構造（`title: Option<String>`, `date: Timestamp`） | `isHomeOnLeft` は表示設定だが Match に永続。忠実移植 |
 | `RosterSelection { benchedPlayerIDs: Set, outOfRosterPlayerIDs: Set }` | `BTreeSet<PlayerId>` × 2 | HashSet でなく BTreeSet を採用（エラー payload・ゴールデン出力の決定性。集合演算の意味論は同一） |
 | `Team { id, name }` / `Player { id, teamID, name, jerseyNumber?, photo? }` / `PlayerPhoto { storageKey }` | 同構造 | photo は storage 参照キーのみ（実体はシェル管理） |
 
@@ -71,7 +71,7 @@ Swift のディレクトリ構成を 1:1 でミラーする。移植レビュー
 
 | Swift | Rust | 備考 |
 |---|---|---|
-| `MatchFact { id, recordedAt: Date, payload }` | `MatchFact { id: FactId, recorded_at: DateTime<Utc>, payload: MatchFactPayload }` | id / timestamp はここに一元化。`recorded_at` は**整列 tie-break 専用**（位置づけは anchor） |
+| `MatchFact { id, recordedAt: Date, payload }` | `MatchFact { id: FactId, recorded_at: Timestamp, payload: MatchFactPayload }` | id / timestamp はここに一元化。`recorded_at` は**整列 tie-break 専用**（位置づけは anchor） |
 | `MatchFactPayload`（`.play` / `.control`） | `enum MatchFactPayload { Play(PlayFact), Control(ControlFact) }` | helper `anchor()`（Play は唯一の anchor、Control は startAnchor） |
 | `PlayFact { kind, teamID?, playerID?, relatedPlayerID?, anchor, title?, note? }` | 同構造 | phase フィールドは持たない（PhaseStart range から逆引き）。teamID は全 kind optional（goal / shotMissed は UI が実質必須担保） |
 | `PlayEventKind`（6 種） | `Goal / ShotMissed / FreeNote / YellowCard / TwoMinuteSuspension / RedCard` | serde rename で camelCase |
@@ -182,13 +182,21 @@ pub fn validate_delete(removed_fact_id: FactId, existing_facts: &[MatchFact], ma
 | Foundation | Rust | 注意 |
 |---|---|---|
 | `UUID` | `uuid::Uuid` | 決定的ソートキー用途（Swift `uuidString` 昇順）は `Uuid` の `Ord`（バイト順 = hex 文字列順と同順）で置換。パリティ検証で同順性を確認する |
-| `Date` | `chrono::DateTime<Utc>` | 用途は順序比較（tie-break）と ISO 8601 serde のみ。書式化・TZ 計算はコアに無い。crate は chrono で確定（grill 2026-07-12。用途が狭く最も枯れた選択肢を採る。time / jiff は差が出ない） |
+| `Date` | `jiff::Timestamp`（`handball_toolkit::timestamp` が再公開） | 用途は順序比較（tie-break）と ISO 8601 serde のみ。書式化・TZ 計算はコアに無い。crate は chrono で確定（grill 2026-07-12。用途が狭く最も枯れた選択肢を採る。time / jiff は差が出ない）→ 2026-11 に jiff へ乗り換え（下の実装追記） |
 | `TimeInterval` | `f64` | 実体は Double の別名。等価境界比較（`start == end` の degenerate 判定等）は移植で演算順を変えないこと。ソートは `total_cmp` で決定化 |
 | `Set<UUID>` | `BTreeSet<Uuid>` | 決定性優先（前述） |
 | `String.trimmingCharacters(.whitespacesAndNewlines)` | `str::trim()` | どちらも Unicode 空白基準でほぼ同等。厳密同等性はパリティ検証の確認項目 |
 | `Int` | `i64` | Swift Int は 64-bit（Apple プラットフォーム）。該当は `Player.jerseyNumber` 等の値フィールド。コレクションの index を返す API のみ Rust 慣習の `usize`（関数目録 `phase_index` 参照） |
 
 依存 crate は `uuid` / `serde` / `serde_json` / 日時 crate の最小集合に留める（wasm 対応を壊さない）。
+
+**実装追記（2026-11-28 handball-project#838）**: chrono にメンテ停止の勧告（RUSTSEC-2026-0543）が出たため、日時 crate を jiff に乗り換えた。
+
+- **jiff を選んだ理由**: `std` を外した構成（`alloc` + `serde`）で `Timestamp::now()` がコンパイル時点で存在しない（chrono の clock 抜きと同じ守り方）。time は RFC 3339 の読み書きに要る `formatting` が `std` を入れ、`now_utc()` が使える状態になる
+- **jiff を直接の依存にするのはコアだけ**。cli / wasm / ffi のテストは `handball_toolkit::timestamp::Timestamp` の再公開を使う（どれかが jiff の `std` を足すと feature の統合でコアにも now() が生える）
+- **書き出しの形は chrono の頃のまま**: jiff の既定の serde は小数秒の末尾の 0 を削る（`.1234`）が、コアの型（`Match.date` / `MatchFact.recorded_at` / `SyncStamp`）は `timestamp::rfc3339` で chrono と同じ 0 / 3 / 6 / 9 桁に揃える。SAMPLE_DTO_V2 の秒精度・切り捨ても不変。`tests/timestamp_wire_tests.rs` が固定する
+- **読むほうの差**: 小数 10 桁以上・うるう秒（`:60`）・西暦 9999 年より後は、chrono は読めたが jiff はエラーか `:59` に丸める。配信 JSON（Swift `.iso8601`）・同期の payload（コアが書く）・JS の `toISOString()` はどれも出さない形
+- **表せる範囲**: jiff は西暦 -9999〜9999 年（chrono は ±262143 年）。FFI で範囲外の `Date` が来たら、chrono は panic（= abort）だったが jiff はエラーで返す
 
 ## 保存すべきセマンティクス（変えてはいけないリスト）
 

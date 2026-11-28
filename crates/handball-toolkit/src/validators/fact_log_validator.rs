@@ -12,7 +12,7 @@
 //!
 //! 個別 fact の value validation は `fact_validator` が担当する。
 
-use chrono::{DateTime, Utc};
+use crate::timestamp::Timestamp;
 
 use crate::clock::FactAnchor;
 use crate::configuration::{MatchConfiguration, PhaseKind};
@@ -123,14 +123,14 @@ pub fn validate_fact_log(facts: &[MatchFact], match_: &Match) -> Vec<DomainValid
 struct PhaseStartFact {
     #[allow(dead_code)]
     id: FactId,
-    recorded_at: DateTime<Utc>,
+    recorded_at: Timestamp,
     payload: PhaseStartPayload,
 }
 
 struct StoppageFact {
     #[allow(dead_code)]
     id: FactId,
-    recorded_at: DateTime<Utc>,
+    recorded_at: Timestamp,
     payload: StoppagePayload,
 }
 
@@ -143,7 +143,7 @@ struct SingleAnchorFact {
     #[allow(dead_code)]
     id: FactId,
     #[allow(dead_code)]
-    recorded_at: DateTime<Utc>,
+    recorded_at: Timestamp,
     anchor: FactAnchor,
 }
 

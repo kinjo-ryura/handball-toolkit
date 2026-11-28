@@ -15,7 +15,7 @@ fn timer_match() -> Match {
     Match {
         id: MatchId(Uuid::from_u128(1)),
         title: Some("スモーク".to_string()),
-        date: chrono::DateTime::from_timestamp(0, 0).expect("epoch は有効"),
+        date: handball_toolkit::timestamp::Timestamp::new(0, 0).expect("epoch は有効"),
         home_team_id: TeamId(Uuid::from_u128(2)),
         away_team_id: TeamId(Uuid::from_u128(3)),
         configuration: MatchConfiguration::Timer {

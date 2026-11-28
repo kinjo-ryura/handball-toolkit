@@ -15,10 +15,7 @@ yanked = "deny"
 # 直接の依存で出たら、乗り換えを Issue にしてから下の ignore に期限つきで足す。
 unmaintained = "workspace"
 # 例外を置くときは ID・理由・見直し期限を並べて書く。
-ignore = [
-  # chrono（コア・cli・ffi が直接使う）。直せる版は無く、今ある脆弱性でもない。
-  { id = "RUSTSEC-2026-0543", reason = "chrono のメンテ停止。jiff / time への乗り換えは handball-project#838（2027-02 に再確認）" },
-]
+ignore = []
 
 [sources]
 # 取得元は crates.io だけ。git 依存や別レジストリが Cargo.lock に現れたら落とす

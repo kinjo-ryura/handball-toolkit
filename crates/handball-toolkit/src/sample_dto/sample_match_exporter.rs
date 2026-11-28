@@ -86,7 +86,7 @@ pub fn export_match(
 /// `2025-12-20-tigers-vs-falcons` のような ASCII slug（ファイル名向け）。
 /// Swift `MatchExporterV2.defaultSlug` 相当。日付は UTC。
 pub fn default_slug(match_: &Match, home_team: &Team, away_team: &Team) -> String {
-    let date = match_.date.format("%Y-%m-%d").to_string();
+    let date = crate::timestamp::to_utc_date(match_.date);
     let home = ascii_slug(&home_team.name);
     let away = ascii_slug(&away_team.name);
     if !home.is_empty() && !away.is_empty() {

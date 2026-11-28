@@ -9,11 +9,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::SystemTime;
 
-use chrono::{DateTime, Utc};
+use jiff::SignedDuration;
 use uuid::Uuid;
 
 use crate::clock::FactAnchorKind;
 use crate::ids::{FactId, MatchId, PlayerId, TeamId};
+use crate::timestamp::Timestamp;
 
 // Uuid は String でブリッジし、Swift 側では Foundation の UUID になる（uniffi.toml）。
 uniffi::custom_type!(Uuid, String, {
@@ -41,13 +42,37 @@ uniffi::custom_type!(FactId, String, {
     lower: |obj| obj.0.to_string(),
 });
 
-/// `DateTime<Utc>` は SystemTime（uniffi 組み込み Timestamp）でブリッジし、Swift では Date になる。
-pub type UtcDateTime = DateTime<Utc>;
+/// 日時（[`Timestamp`]）は SystemTime（uniffi 組み込み Timestamp）でブリッジし、Swift では Date、
+/// Kotlin では `java.time.Instant` になる。別名は chrono を使っていた頃の `UtcDateTime` のまま
+/// （生成されるバインディングの型名を変えない — handball-project#838）。
+///
+/// jiff の SystemTime との変換は `std` 配下（コアは `std` を外している — `timestamp` の doc）
+/// なので、Unix 時刻からの差で書く。
+pub type UtcDateTime = Timestamp;
 uniffi::custom_type!(UtcDateTime, SystemTime, {
     remote,
-    try_lift: |val| Ok(DateTime::<Utc>::from(val)),
-    lower: |obj| SystemTime::from(obj),
+    try_lift: |val| Ok(timestamp_from_system_time(val)?),
+    lower: |obj| timestamp_to_system_time(obj),
 });
+
+/// jiff が表せる範囲（西暦 -9999〜9999 年）の外はエラー（シェルへ例外として返る）。
+fn timestamp_from_system_time(at: SystemTime) -> Result<Timestamp, jiff::Error> {
+    let since_epoch = match at.duration_since(SystemTime::UNIX_EPOCH) {
+        Ok(after) => SignedDuration::try_from(after)?,
+        Err(before) => -SignedDuration::try_from(before.duration())?,
+    };
+    Timestamp::from_duration(since_epoch)
+}
+
+/// 西暦 -9999〜9999 年は Unix 系の SystemTime（i64 秒）に収まるので、足し引きは溢れない。
+fn timestamp_to_system_time(at: Timestamp) -> SystemTime {
+    let since_epoch = at.as_duration();
+    if since_epoch.is_negative() {
+        SystemTime::UNIX_EPOCH - since_epoch.unsigned_abs()
+    } else {
+        SystemTime::UNIX_EPOCH + since_epoch.unsigned_abs()
+    }
+}
 
 /// `BTreeSet<PlayerId>` はソート済み Vec でブリッジ（決定的順序を保存 — ADR 0004 決定 6）。
 /// Swift 側の Set 変換 convenience はシムが提供する。
@@ -111,3 +136,51 @@ uniffi::custom_type!(PlayerKeyLookup, std::collections::HashMap<String, PlayerId
     try_lift: |val| Ok(val.into_iter().collect()),
     lower: |obj| obj.into_iter().collect(),
 });
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+
+    fn at(s: &str) -> Timestamp {
+        s.parse().unwrap()
+    }
+
+    /// 秒未満・1970 年より前も、SystemTime を往復して同じ瞬間に戻る（handball-project#838）。
+    #[test]
+    fn timestamp_round_trips_through_system_time() {
+        for s in [
+            "1970-01-01T00:00:00Z",
+            "2026-11-28T12:34:56.123456789Z",
+            "1969-12-31T23:59:59.5Z",
+            "0001-01-01T00:00:00Z",
+            // jiff の上限（`Timestamp::MAX`）。
+            "9999-12-30T22:00:00.999999999Z",
+        ] {
+            let system = timestamp_to_system_time(at(s));
+            assert_eq!(timestamp_from_system_time(system).unwrap(), at(s), "{s}");
+        }
+    }
+
+    #[test]
+    fn system_time_maps_to_the_same_instant() {
+        let after = SystemTime::UNIX_EPOCH + Duration::new(1_700_000_000, 250_000_000);
+        assert_eq!(
+            timestamp_from_system_time(after).unwrap(),
+            at("2023-11-14T22:13:20.25Z")
+        );
+        let before = SystemTime::UNIX_EPOCH - Duration::from_millis(500);
+        assert_eq!(
+            timestamp_from_system_time(before).unwrap(),
+            at("1969-12-31T23:59:59.5Z")
+        );
+    }
+
+    /// jiff が表せない範囲（西暦 9999 年より後）は abort せずエラーで返す。
+    #[test]
+    fn system_time_outside_jiff_range_is_an_error() {
+        let far = SystemTime::UNIX_EPOCH + Duration::from_secs(400_000_000_000);
+        assert!(timestamp_from_system_time(far).is_err());
+    }
+}

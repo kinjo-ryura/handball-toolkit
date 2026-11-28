@@ -115,7 +115,7 @@ impl SyncWriteRepository for FakeSyncRepo {
 
 fn stamp() -> SyncStamp {
     SyncStamp {
-        updated_at: chrono::DateTime::from_timestamp(1, 0).expect("有効な時刻"),
+        updated_at: handball_toolkit::timestamp::Timestamp::new(1, 0).expect("有効な時刻"),
         deleted_at: None,
     }
 }
@@ -129,7 +129,7 @@ fn snapshot() -> SyncSnapshot {
             match_: Match {
                 id: MatchId(Uuid::from_u128(10)),
                 title: None,
-                date: chrono::DateTime::from_timestamp(0, 0).expect("epoch は有効"),
+                date: handball_toolkit::timestamp::Timestamp::new(0, 0).expect("epoch は有効"),
                 home_team_id: home,
                 away_team_id: away,
                 configuration: MatchConfiguration::Timer {

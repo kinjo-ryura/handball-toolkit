@@ -123,7 +123,7 @@ object は**不変の導出スナップショットへのハンドル**であり
 | コア | FFI 上 | Swift 側 |
 |---|---|---|
 | `Uuid`（MatchId 等の type alias） | custom type（String bridge） | `UUID`（Foundation）。シムで `public typealias MatchID = UUID` 等を再提供し、呼び出し側の型注記を無改修化 |
-| `DateTime<Utc>` | `SystemTime` に変換して公開 | `Date` |
+| `DateTime<Utc>`（2026-11 から `jiff::Timestamp`。uniffi 上の名前は `UtcDateTime` のまま — handball-project#838） | `SystemTime` に変換して公開 | `Date` |
 | `BTreeSet<PlayerId>`（RosterSelection） | ソート済み `Vec<Uuid>` | シムで `Set<UUID>` を受け / 返す convenience init + computed property（既存 init シグネチャ維持） |
 | `usize`（phase_index） | `u32` | シムで `Int` 変換 property |
 

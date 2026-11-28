@@ -7,7 +7,6 @@
 
 use std::collections::HashMap;
 
-use chrono::{DateTime, TimeZone, Utc};
 use handball_toolkit::entities::{Player, Team};
 use handball_toolkit::facts::{ControlFact, MatchFactPayload};
 use handball_toolkit::ids::{PlayerId, TeamId};
@@ -17,6 +16,7 @@ use handball_toolkit::sample_dto::{
     SampleMatchHeaderV2, SamplePhaseStartPayloadDtoV2, SamplePlayFactDtoV2, SamplePlayerDtoV2,
     SampleTeamDtoV2, SampleTeamsDtoV2, SampleTimerConfigurationDtoV2, SampleVideoClockDtoV2,
 };
+use handball_toolkit::timestamp::Timestamp;
 use handball_toolkit::validation::{DomainValidationIssue, MatchValidationError};
 
 use handball_toolkit::sample_import::{
@@ -28,8 +28,8 @@ use uuid::Uuid;
 
 // ── helpers ──
 
-fn epoch(seconds: i64) -> DateTime<Utc> {
-    Utc.timestamp_opt(seconds, 0).unwrap()
+fn epoch(seconds: i64) -> Timestamp {
+    Timestamp::from_second(seconds).unwrap()
 }
 
 fn parsed_team(name: &str, players: &[(&str, Option<i64>)]) -> SampleTeamDtoV2 {

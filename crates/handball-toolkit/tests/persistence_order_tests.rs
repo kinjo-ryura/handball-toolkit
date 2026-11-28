@@ -11,7 +11,6 @@
 use std::fs;
 use std::path::Path;
 
-use chrono::{DateTime, Utc};
 use handball_toolkit::clock::{FactAnchor, MatchClock, VideoClock};
 use handball_toolkit::configuration::PhaseKind;
 use handball_toolkit::facts::{
@@ -20,11 +19,12 @@ use handball_toolkit::facts::{
 };
 use handball_toolkit::ids::{FactId, PlayerId, TeamId};
 use handball_toolkit::persistence_order::{persistence_ordered, sort_by_persistence_order};
+use handball_toolkit::timestamp::Timestamp;
 use serde::Deserialize;
 use uuid::Uuid;
 
-fn at(secs: i64) -> DateTime<Utc> {
-    DateTime::from_timestamp(secs, 0).expect("テスト用の timestamp は常に有効")
+fn at(secs: i64) -> Timestamp {
+    Timestamp::new(secs, 0).expect("テスト用の timestamp は常に有効")
 }
 
 fn fact(id: u128, recorded_at: i64, anchor: FactAnchor) -> MatchFact {

@@ -18,8 +18,10 @@ uniffi = ["dep:uniffi", "dep:async-trait"]
 # async-trait は発火層（ffi_write）の async foreign trait 用。feature `uniffi` 配下のみで
 # wasm / CLI ビルドには入らない（ADR 0005）。
 async-trait = { version = "0.1", optional = true }
-# chrono は決定性のため clock 機能（now()）を外す（設計不変条件: コアは now() を持たない）。
-chrono = { version = "0.4", default-features = false, features = ["std", "serde"] }
+# jiff は決定性のため `std` を外す（設計不変条件: コアは now() を持たない。`Timestamp::now()` は
+# `std` 配下）。cli / wasm / ffi は jiff を直接取らず `handball_toolkit::timestamp` の再公開を使う
+# （どれかが `std` を足すと feature の統合でコアにも now() が生える — handball-project#838）。
+jiff = { version = "1", default-features = false, features = ["alloc", "serde"] }
 # rc: TimelineProjection.resolver の Arc を透過 serialize するため（ADR 0004）。
 serde = { version = "1", features = ["derive", "rc"] }
 # sample_dto の encode（Swift JSONEncoder 互換の配信 JSON 書き出し — ADR 0004 決定 2）。

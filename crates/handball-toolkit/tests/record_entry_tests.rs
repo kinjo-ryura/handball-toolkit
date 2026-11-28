@@ -7,7 +7,6 @@
 //! `tickTimer` の delta 加算はシェル（UI 状態遷移・2Hz 経路）に残したため、
 //! `RecordingScreenStoreTickTests` は Swift 側に据え置く。
 
-use chrono::{DateTime, Utc};
 use handball_toolkit::clock::{FactAnchor, MatchClock, VideoClock};
 use handball_toolkit::configuration::PhaseKind;
 use handball_toolkit::facts::{
@@ -15,14 +14,15 @@ use handball_toolkit::facts::{
     StoppageKind, StoppagePayload,
 };
 use handball_toolkit::ids::{FactId, PlayerId, TeamId};
+use handball_toolkit::timestamp::Timestamp;
 use handball_toolkit::write::{
     CaptureClockKind, NewFactStamp, PlayFactEdit, apply_play_fact_edit, build_play_fact,
     build_possession_fact, build_stoppage_fact, capture_play_anchor, initial_timer_seconds,
 };
 use uuid::Uuid;
 
-fn epoch() -> DateTime<Utc> {
-    DateTime::from_timestamp(0, 0).unwrap()
+fn epoch() -> Timestamp {
+    Timestamp::new(0, 0).unwrap()
 }
 
 fn stamp(n: u128) -> NewFactStamp {

@@ -5,7 +5,6 @@
 
 #![allow(dead_code)]
 
-use chrono::{DateTime, Utc};
 use handball_toolkit::clock::{FactAnchor, MatchClock, VideoClock};
 use handball_toolkit::configuration::{MatchConfiguration, PhaseKind, VideoProvider, VideoSource};
 use handball_toolkit::entities::{Match, RosterSelection};
@@ -14,10 +13,11 @@ use handball_toolkit::facts::{
     StoppageKind, StoppagePayload,
 };
 use handball_toolkit::ids::{FactId, MatchId, PlayerId, TeamId};
+use handball_toolkit::timestamp::Timestamp;
 use uuid::Uuid;
 
-pub fn epoch() -> DateTime<Utc> {
-    DateTime::from_timestamp(0, 0).unwrap()
+pub fn epoch() -> Timestamp {
+    Timestamp::new(0, 0).unwrap()
 }
 
 /// SegmentResolverAdvancedTests の `videoOnlyPhase`。

@@ -583,7 +583,7 @@ pub fn sync_reconcile(
     local: crate::sync::SyncSnapshot,
     remote: crate::sync::SyncSnapshot,
     answers: Vec<crate::sync::SyncAnswer>,
-    now: chrono::DateTime<chrono::Utc>,
+    now: crate::timestamp::Timestamp,
 ) -> crate::sync::SyncReconcileResult {
     crate::sync::reconcile(&local, &remote, &answers, now)
 }

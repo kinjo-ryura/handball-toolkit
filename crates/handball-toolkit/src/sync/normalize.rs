@@ -10,15 +10,15 @@
 //! 往復のずれが負の向きに出ると 1 ms 手前へ落ちるため（最近接なら ±0.5 ms まで吸収する）。
 //! 秒には丸めない — 後勝ちの比較と、`recorded_at` を決め手に含む並び順を変えないため。
 
-use chrono::{DateTime, Utc};
+use crate::timestamp::{self, Timestamp};
 
 use super::{SyncSnapshot, SyncStamp};
 
 /// 最も近いミリ秒に丸める。表せない範囲（実際には来ない）はそのまま返す。
-pub(crate) fn round_to_millis(at: DateTime<Utc>) -> DateTime<Utc> {
-    let millis =
-        at.timestamp() * 1000 + (i64::from(at.timestamp_subsec_nanos()) + 500_000) / 1_000_000;
-    DateTime::from_timestamp_millis(millis).unwrap_or(at)
+pub(crate) fn round_to_millis(at: Timestamp) -> Timestamp {
+    let millis = timestamp::unix_seconds(at) * 1000
+        + (i64::from(timestamp::subsec_nanos(at)) + 500_000) / 1_000_000;
+    Timestamp::from_millisecond(millis).unwrap_or(at)
 }
 
 fn round_stamp(stamp: SyncStamp) -> SyncStamp {

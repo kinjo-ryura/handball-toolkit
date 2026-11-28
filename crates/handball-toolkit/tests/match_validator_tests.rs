@@ -2,10 +2,10 @@
 
 use std::collections::BTreeSet;
 
-use chrono::DateTime;
 use handball_toolkit::configuration::MatchConfiguration;
 use handball_toolkit::entities::{Match, RosterSelection};
 use handball_toolkit::ids::{MatchId, PlayerId, TeamId};
+use handball_toolkit::timestamp::Timestamp;
 use handball_toolkit::validation::{DomainValidationIssue, MatchValidationError};
 use handball_toolkit::validators::validate_match;
 use uuid::Uuid;
@@ -20,7 +20,7 @@ fn make_match(
     Match {
         id: MatchId(Uuid::new_v4()),
         title: title.map(str::to_owned),
-        date: DateTime::from_timestamp(1_700_000_000, 0).unwrap(),
+        date: Timestamp::new(1_700_000_000, 0).unwrap(),
         home_team_id,
         away_team_id,
         configuration: MatchConfiguration::Timer {

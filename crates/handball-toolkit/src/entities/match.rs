@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use chrono::{DateTime, Utc};
+use crate::timestamp::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::configuration::MatchConfiguration;
@@ -26,7 +26,8 @@ pub struct Match {
     // uniffi(default) は移植元 Swift init のデフォルト引数の保存。
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub title: Option<String>,
-    pub date: DateTime<Utc>,
+    #[serde(with = "crate::timestamp::rfc3339")]
+    pub date: Timestamp,
     pub home_team_id: TeamId,
     pub away_team_id: TeamId,
     pub configuration: MatchConfiguration,
