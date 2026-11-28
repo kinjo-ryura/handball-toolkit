@@ -21,6 +21,8 @@ updates:
       actions:
         patterns: ['*']
 
+  # Dependabot は Cargo.lock しか書き換えないので、ライセンス一覧（THIRD_PARTY_LICENSES.*）は
+  # workflow の dependabot-licenses.yml が作り直して同じ PR に積む（handball-project#842）。
   - package-ecosystem: cargo
     directory: /
     schedule:

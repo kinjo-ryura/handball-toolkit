@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Dependabot の PR にライセンス一覧を積んだ dependabot-licenses.yml が呼び直す（handball-project#842）。
+  # GITHUB_TOKEN の push では pull_request の run が承認待ちになり、required check の `check` が
+  # 新しい commit に付かないため。push と同じく全部走らせる（下の `scope`）。
+  workflow_dispatch:
 
 # 既定の GITHUB_TOKEN を読み取りのみに絞る（handball-project#284）。リポジトリ設定の
 # default_workflow_permissions も read だが、設定は UI から変えられるので workflow 側にも
@@ -99,7 +103,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" != "pull_request" ]; then
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            echo "push なので全部走らせる"
+            echo "${{ github.event_name }} なので全部走らせる"
             exit 0
           fi
           changed="$(git diff --name-only HEAD^1 HEAD)"
