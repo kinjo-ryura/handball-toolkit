@@ -603,9 +603,9 @@
     },
     {
       "name": "uuid",
-      "version": "1.29.2",
+      "version": "1.29.3",
       "origin": "registry",
-      "sourceUrl": "https://crates.io/crates/uuid/1.29.2",
+      "sourceUrl": "https://crates.io/crates/uuid/1.29.3",
       "licenseIndexes": [
         18
       ]
